@@ -1,10 +1,12 @@
 pub mod lexer;
 
-use std::io::stdin;
+use std::{io::stdin, collections::HashMap};
 
-use lexer::token::tokenize_line;
+use lexer::{token::tokenize_line, keyword::Keyword};
 
 fn main() {
+	// Create main struct
+	let mut main_struct = Main::new();
 	// Starting message
 	println!("--- Swamp BASIC, type \"exit\" to exit interpreter. ---");
 	// Main loop untill exit typed
@@ -15,7 +17,7 @@ fn main() {
 		// For each line
 		for line in input_text.lines() {
 			// Interpret line
-			let exit = interpret_line(line);
+			let exit = interpret_line(&mut main_struct, line);
 			// Exit if the function returned true
 			if exit {
 				break 'main_loop;
@@ -27,7 +29,7 @@ fn main() {
 /// Interpret a line that is a string slice.
 /// Should not contain any newline chars.
 /// Returns weather to exit the interpreter.
-fn interpret_line(line: &str) -> bool {
+fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 	// Remove starting whitespaces
 	let line = line.trim_start();
 	// Get first word of line
@@ -66,7 +68,7 @@ fn interpret_line(line: &str) -> bool {
 	};
 
 	// Tokenize line body
-	let tokens = tokenize_line(line_body);
+	let tokens = tokenize_line(main_struct, line_body);
 	// Print tokens if asked to and return
 	if print_tokens {
 		for token in tokens {
@@ -78,4 +80,16 @@ fn interpret_line(line: &str) -> bool {
 	println!("Line {:?}: \"{}\"", line_number, line_body);
 	// Return false (do not exit interpreter)
 	false
+}
+
+pub struct Main {
+	string_to_keyword_mapping: HashMap<String, Keyword>,
+}
+
+impl Main {
+	pub fn new() -> Self {
+		Self {
+			string_to_keyword_mapping: Keyword::get_string_to_keyword_mapping(),
+		}
+	}
 }
