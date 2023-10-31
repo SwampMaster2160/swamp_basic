@@ -1,4 +1,8 @@
+pub mod lexer;
+
 use std::io::stdin;
+
+use lexer::token::tokenize_line;
 
 fn main() {
 	// Starting message
@@ -10,39 +14,68 @@ fn main() {
 		stdin().read_line(&mut input_text).unwrap();
 		// For each line
 		for line in input_text.lines() {
-			// Break loop and exit if exit typed
-			if line == "exit" {
+			// Interpret line
+			let exit = interpret_line(line);
+			// Exit if the function returned true
+			if exit {
 				break 'main_loop;
 			}
-			// Else interpret line
-			interpret_line(line);
 		}
 	}
 }
 
 /// Interpret a line that is a string slice.
 /// Should not contain any newline chars.
-fn interpret_line(line: &str) {
-	let first_char = match line.chars().next() {
-		None => return,
-		Some(first_char) => first_char,
+/// Returns weather to exit the interpreter.
+fn interpret_line(line: &str) -> bool {
+	// Remove starting whitespaces
+	let line = line.trim_start();
+	// Get first word of line
+	let first_word_end = match line.find(|chr: char| chr.is_whitespace()) {
+		None => line.len(),
+		Some(line_number_substring_end) => line_number_substring_end,
 	};
-	if first_char.is_ascii_digit() {
-		let line_number_substring_end = match line.find(|chr: char| chr.is_whitespace()) {
-			None => line.len(),
-			Some(line_number_substring_end) => line_number_substring_end,
-		};
-		let line_number_str = &line[..line_number_substring_end];
-		let line_number = match line_number_str.parse::<i32>() {
+	let first_word = &line[..first_word_end];
+	let line_without_first_word = &line[first_word_end..];
+
+	// Get the line number if there is one, the main part of the line to be converted to tokens and weather to just print the tokens
+	// The line is numbered if it's first char is a digit
+	let (line_number, line_body, print_tokens) = if first_word.chars().next().unwrap().is_ascii_digit() {
+		// Get the line number
+		let line_number = match first_word.parse::<i32>() {
 			Err(_) => {
-				println!("Error: Line number \"{}\" is not a valid signed 32-bit integer.", line_number_str);
-				return;
+				println!("Error: Line number \"{}\" is not a valid signed 32-bit integer.", first_word);
+				return false;
 			},
 			Ok(line_number) => line_number,
 		};
-		let line_without_number = &line[line_number_substring_end..];
-		println!("Line {}: \"{}\"", line_number, line_without_number);
-		return;
+		// Get rest of line
+		(Some(line_number), line_without_first_word, false)
 	}
-	println!("{}", line);
+	// If the line is "tokens" then we will print out the tokens that the lexer produces later
+	else if first_word.eq_ignore_ascii_case("tokens") {
+		(None, line, true)
+	}
+	// Exit the interpreter is exit is entered
+	else if first_word.eq_ignore_ascii_case("exit") {
+		return true;
+	}
+	// If there is no line number or special word then the line body is the entire line
+	else {
+		(None, line, false)
+	};
+
+	// Tokenize line body
+	let tokens = tokenize_line(line_body);
+	// Print tokens if asked to and return
+	if print_tokens {
+		for token in tokens {
+			println!("{:?}", token);
+		}
+		return false;
+	}
+	//
+	println!("Line {:?}: \"{}\"", line_number, line_body);
+	// Return false (do not exit interpreter)
+	false
 }
