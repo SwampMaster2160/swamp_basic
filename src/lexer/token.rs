@@ -1,11 +1,12 @@
 use crate::Main;
 
-use super::keyword::Keyword;
+use super::{keyword::Keyword, built_in_function::BuiltInFunction};
 
 #[derive(Debug, Clone)]
 pub enum Token {
 	Identifier(String),
 	Keyword(Keyword),
+	BuiltInFunction(BuiltInFunction),
 	Separator,
 	Operator,
 	NumericalLiteral(String),
