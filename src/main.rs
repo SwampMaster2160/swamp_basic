@@ -83,7 +83,7 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 }
 
 pub struct Main {
-	string_to_keyword_mapping: HashMap<String, Keyword>,
+	string_to_keyword_mapping: HashMap<&'static str, Keyword>,
 }
 
 impl Main {

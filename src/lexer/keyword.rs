@@ -37,14 +37,53 @@ pub enum Keyword {
 }
 
 impl Keyword {
+	/// Takes a string and returns the keyword that is associated with the string if it is a name or alias for a keyword.
 	pub fn from_str(main_data: &mut Main, string: &str) -> Option<Self> {
 		main_data.string_to_keyword_mapping.get(string).copied()
 	}
 
-	pub fn get_string_to_keyword_mapping() -> HashMap<String, Keyword> {
-		for keyword in Keyword::iter() {
-			
+	/// Returns the name of the keyword and a list of aliases.
+	pub fn get_names(self) -> (&'static str, &'static[&'static str]) {
+		match self {
+			Self::Base => ("base", &[]),
+			Self::Data => ("data", &["dat"]),
+			Self::Define => ("def", &["define"]),
+			Self::Dimension => ("dim", &["dimension"]),
+			Self::End => ("end", &[]),
+			Self::For => ("for", &[]),
+			Self::Go => ("go", &[]),
+			Self::GoSubroutine => ("goSub", &["goSubroutine"]),
+			Self::Goto => ("goto", &[]),
+			Self::If => ("if", &[]),
+			Self::Input => ("input", &[]),
+			Self::Let => ("let", &[]),
+			Self::Next => ("next", &[]),
+			Self::On => ("on", &[]),
+			Self::Option => ("option", &[]),
+			Self::Print => ("print", &[]),
+			Self::Randomize => ("randomize", &[]),
+			Self::Read => ("read", &[]),
+			Self::Remark => ("rem", &["remark"]),
+			Self::Restore => ("restore", &[]),
+			Self::Return => ("return", &["ret"]),
+			Self::Step => ("step", &[]),
+			Self::Stop => ("stop", &[]),
+			Self::Subroutine => ("subroutine", &["sub"]),
+			Self::Then => ("then", &[]),
+			Self::To => ("to", &[]),
 		}
-		HashMap::new()
+	}
+
+	/// Returns a hashmap mapping a keyword names and aliases to keywords
+	pub fn get_string_to_keyword_mapping() -> HashMap<&'static str, Keyword> {
+		let mut out = HashMap::new();
+		for keyword in Keyword::iter() {
+			let (keyword_name, keyword_aliases) = keyword.get_names();
+			out.insert(keyword_name, keyword);
+			for keyword_alias in keyword_aliases {
+				out.insert(keyword_alias, keyword);
+			}
+		}
+		out
 	}
 }
