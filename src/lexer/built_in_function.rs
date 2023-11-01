@@ -28,7 +28,7 @@ impl BuiltInFunction {
 	}
 
 	/// Returns the name of the built-in function and a list of aliases.
-	pub fn get_names(self) -> (&'static str, &'static[&'static str]) {
+	pub const fn get_names(self) -> (&'static str, &'static[&'static str]) {
 		match self {
 			Self::AbsoluteValue => ("abs", &["absolutevalue"]),
 			Self::Arctangent => ("atn", &["atan", "arctangent"]),

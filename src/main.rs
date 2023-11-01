@@ -2,7 +2,7 @@ pub mod lexer;
 
 use std::{io::stdin, collections::HashMap};
 
-use lexer::{token::tokenize_line, keyword::Keyword, built_in_function::BuiltInFunction};
+use lexer::{token::tokenize_line, keyword::Keyword, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator};
 
 fn main() {
 	// Create main struct
@@ -85,6 +85,8 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 pub struct Main {
 	string_to_keyword_mapping: HashMap<&'static str, Keyword>,
 	string_to_built_in_keyword_mapping: HashMap<&'static str, BuiltInFunction>,
+	char_to_type_restriction_mapping: HashMap<char, TypeRestriction>,
+	char_to_separator_mapping: HashMap<char, Separator>,
 }
 
 impl Main {
@@ -92,6 +94,8 @@ impl Main {
 		Self {
 			string_to_keyword_mapping: Keyword::get_string_to_keyword_mapping(),
 			string_to_built_in_keyword_mapping: BuiltInFunction::get_string_to_built_in_function_mapping(),
+			char_to_type_restriction_mapping: TypeRestriction::get_char_to_type_restruction_mapping(),
+			char_to_separator_mapping: Separator::get_char_to_separator_mapping(),
 		}
 	}
 }

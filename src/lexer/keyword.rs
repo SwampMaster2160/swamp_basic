@@ -43,7 +43,7 @@ impl Keyword {
 	}
 
 	/// Returns the name of the keyword and a list of aliases.
-	pub fn get_names(self) -> (&'static str, &'static[&'static str]) {
+	pub const fn get_names(self) -> (&'static str, &'static[&'static str]) {
 		match self {
 			Self::Base => ("base", &[]),
 			Self::Data => ("data", &["dat"]),
