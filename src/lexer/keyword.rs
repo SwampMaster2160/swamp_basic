@@ -38,12 +38,14 @@ pub enum Keyword {
 
 impl Keyword {
 	/// Takes a string and returns the keyword that is associated with the string if it is a name or alias for a keyword.
+	#[inline(always)]
 	pub fn from_str(main_data: &mut Main, string: &str) -> Option<Self> {
 		main_data.string_to_keyword_mapping.get(string.to_lowercase().as_str()).copied()
 	}
 
 	/// Returns the name of the keyword and a list of aliases.
-	pub const fn get_names(self) -> (&'static str, &'static[&'static str]) {
+	#[inline(always)]
+	const fn get_names(self) -> (&'static str, &'static[&'static str]) {
 		match self {
 			Self::Base => ("base", &[]),
 			Self::Data => ("data", &["dat"]),
@@ -75,6 +77,7 @@ impl Keyword {
 	}
 
 	/// Returns a hashmap mapping keyword names and aliases to keywords
+	#[inline(always)]
 	pub fn get_string_to_keyword_mapping() -> HashMap<&'static str, Self> {
 		let mut out = HashMap::new();
 		for keyword in Self::iter() {

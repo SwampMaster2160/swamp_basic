@@ -23,12 +23,14 @@ pub enum BuiltInFunction {
 
 impl BuiltInFunction {
 	/// Takes a string and returns the built-in function that is associated with the string if it is a name or alias for a built-in function.
+	#[inline(always)]
 	pub fn from_str(main_data: &mut Main, string: &str) -> Option<Self> {
 		main_data.string_to_built_in_keyword_mapping.get(string.to_lowercase().as_str()).copied()
 	}
 
 	/// Returns the name of the built-in function and a list of aliases.
-	pub const fn get_names(self) -> (&'static str, &'static[&'static str]) {
+	#[inline(always)]
+	const fn get_names(self) -> (&'static str, &'static[&'static str]) {
 		match self {
 			Self::AbsoluteValue => ("abs", &["absolutevalue"]),
 			Self::Arctangent => ("atn", &["atan", "arctangent"]),
@@ -45,6 +47,7 @@ impl BuiltInFunction {
 	}
 
 	/// Returns a hashmap mapping built-in function names and aliases to built-in functions
+	#[inline(always)]
 	pub fn get_string_to_built_in_function_mapping() -> HashMap<&'static str, BuiltInFunction> {
 		let mut out = HashMap::new();
 		for keyword in BuiltInFunction::iter() {

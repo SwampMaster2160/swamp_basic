@@ -18,6 +18,7 @@ pub enum TypeRestriction {
 
 impl TypeRestriction {
 	/// Takes a char and returns the type restriction that is associated with the char if it is a symbol for a type restriction.
+	#[inline(always)]
 	pub fn from_suffix_char(main_data: &mut Main, suffix: char) -> Option<Self> {
 		main_data.char_to_type_restriction_mapping.get(&suffix).copied()
 	}
@@ -35,6 +36,7 @@ impl TypeRestriction {
 	}
 
 	/// Returns a hashmap mapping char suffixes to type restrictions
+	#[inline(always)]
 	pub fn get_char_to_type_restruction_mapping() -> HashMap<char, Self> {
 		let mut out = HashMap::new();
 		for type_restruction in Self::iter() {

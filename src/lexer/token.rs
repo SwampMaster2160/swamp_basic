@@ -1,6 +1,6 @@
 use crate::Main;
 
-use super::{keyword::Keyword, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator};
+use super::{keyword::Keyword, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
 
 #[derive(Debug, Clone)]
 #[repr(u8)]
@@ -9,7 +9,7 @@ pub enum Token {
 	Keyword(Keyword),
 	BuiltInFunction(BuiltInFunction, TypeRestriction),
 	Separator(Separator),
-	Operator,
+	Operator(Operator),
 	NumericalLiteral(String),
 	StringLiteral(String),
 	Comment(String),
