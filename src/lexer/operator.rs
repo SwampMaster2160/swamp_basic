@@ -28,7 +28,7 @@ pub enum Operator {
 }
 
 impl Operator {
-	const NON_ALPHABETIC_NAME_CHARS: [char; 11] = ['+', '-', '*', '/', '^', '=', '<', '>', '&', '|', '!'];
+	const NON_ALPHABETIC_CHARACTER_SET: [char; 11] = ['+', '-', '*', '/', '^', '=', '<', '>', '&', '|', '!'];
 
 	/// Takes a string and returns the operator that is associated with the string if it is a name or alias for an operator.
 	#[inline(always)]
@@ -74,13 +74,13 @@ impl Operator {
 	}
 
 	#[inline(always)]
-	pub fn is_char_in_operator_character_set(main: &Main, chr: char) -> bool {
+	pub fn is_char_in_non_alphabetic_character_set(main: &Main, chr: char) -> bool {
 		main.operator_character_set.contains(&chr)
 	}
 
 	#[inline(always)]
-	pub fn get_operator_character_set() -> HashSet<char> {
-		Self::NON_ALPHABETIC_NAME_CHARS
+	pub fn get_character_set() -> HashSet<char> {
+		Self::NON_ALPHABETIC_CHARACTER_SET
 			.into_iter()
 			.collect()
 	}

@@ -100,7 +100,7 @@ impl Main {
 			char_to_type_restriction_mapping: TypeRestriction::get_char_to_type_restruction_mapping(),
 			char_to_separator_mapping: Separator::get_char_to_separator_mapping(),
 			string_to_operator_mapping: Operator::get_string_to_operator_mapping(),
-			operator_character_set: Operator::get_operator_character_set(),
+			operator_character_set: Operator::get_character_set(),
 		}
 	}
 }
