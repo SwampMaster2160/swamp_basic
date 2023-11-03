@@ -1,4 +1,5 @@
 pub mod lexer;
+pub mod error;
 
 use std::{io::stdin, collections::{HashMap, HashSet}};
 
@@ -69,6 +70,13 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 
 	// Tokenize line body
 	let tokens = tokenize_line(main_struct, line_body);
+	let tokens = match tokens {
+		Ok(tokens) => tokens,
+		Err(error) => {
+			println!("Error: {}", error);
+			return false;
+		}
+	};
 	// Print tokens if asked to and return
 	if print_tokens {
 		for token in tokens {
