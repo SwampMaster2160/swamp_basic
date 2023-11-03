@@ -143,8 +143,40 @@ pub fn tokenize_line(main_struct: &mut Main, line: &str) -> Result<Vec<Token>, B
 				}
 				current_token_string = String::new();
 			}
-			ParsingType::IdentifierKeywordOperatorAlphabeticBuiltInFunction => {
-				todo!();
+			ParsingType::IdentifierKeywordOperatorAlphabeticBuiltInFunction => 'end_parse_other: {
+				let as_keyword = Keyword::from_str(main_struct, &current_token_string);
+				if let Some(keyword) = as_keyword {
+					out.push(Token::Keyword(keyword));
+					current_token_string = String::new();
+					break 'end_parse_other;
+				}
+				let as_operator = Operator::from_str(main_struct, &current_token_string);
+				if let Some(operator) = as_operator {
+					out.push(Token::Operator(operator));
+					current_token_string = String::new();
+					break 'end_parse_other;
+				}
+				let last_char = current_token_string.chars().last().unwrap();
+				let type_restriction = TypeRestriction::from_suffix_char(main_struct, last_char);
+				let name_without_type_restriction = match type_restriction {
+					Some(_) => {
+						let mut name_without_type_restriction = current_token_string.clone();
+						name_without_type_restriction.pop();
+						name_without_type_restriction
+					}
+					None => current_token_string.clone(),
+				};
+				let type_restriction = match type_restriction {
+					Some(type_restriction) => type_restriction,
+					None => TypeRestriction::Any,
+				};
+				let as_built_in_function = BuiltInFunction::from_str(main_struct, &name_without_type_restriction);
+				if let Some(built_in_function) = as_built_in_function {
+					out.push(Token::BuiltInFunction(built_in_function, type_restriction));
+					current_token_string = String::new();
+					break 'end_parse_other;
+				}
+				out.push(Token::Identifier(mem::take(&mut current_token_string), type_restriction));
 			}
 			ParsingType::None => {},
 		}

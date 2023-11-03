@@ -57,7 +57,7 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 	}
 	// If the line is "tokens" then we will print out the tokens that the lexer produces later
 	else if first_word.eq_ignore_ascii_case("tokens") {
-		(None, line, true)
+		(None, line_without_first_word, true)
 	}
 	// Exit the interpreter is exit is entered
 	else if first_word.eq_ignore_ascii_case("exit") {
