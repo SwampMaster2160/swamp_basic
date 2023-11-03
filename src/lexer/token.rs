@@ -1,3 +1,5 @@
+use std::mem;
+
 use crate::{Main, error::BasicError};
 
 use super::{keyword::Keyword, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
@@ -98,9 +100,55 @@ pub fn tokenize_line(main_struct: &mut Main, line: &str) -> Result<Vec<Token>, B
 		match next_char {
 			None => end_token = true,
 			Some(next_char) => {
-				
+				let is_non_alphabetic_operator_char = Operator::is_char_in_non_alphabetic_character_set(main_struct, next_char);
+				match parsing_type {
+					ParsingType::IdentifierKeywordOperatorAlphabeticBuiltInFunction => {
+						let is_seperator = Separator::from_char(main_struct, next_char).is_some();
+						let is_whitespace = next_char.is_ascii_whitespace();
+						let is_string_start_char = next_char == '"';
+						if is_non_alphabetic_operator_char || is_seperator || is_whitespace || is_string_start_char {
+							end_token = true;
+						}
+					}
+					ParsingType::NumericalLiteral => {
+						if !(next_char.is_ascii_alphanumeric() || next_char == '.' || next_char == '_') {
+							end_token = true;
+						}
+					}
+					ParsingType::OperatorNonAlphabetic => {
+						if !is_non_alphabetic_operator_char {
+							end_token = true;
+						}
+					}
+					_ => {},
+				}
 			}
 		}
+		// If the token should end
+		if !end_token {
+			continue;
+		}
+		if string_char_escaped {
+			return Err(BasicError::CharEscapeAtLineEnd);
+		}
+		match parsing_type {
+			ParsingType::Comment => out.push(Token::Comment(mem::take(&mut current_token_string))),
+			ParsingType::NumericalLiteral => out.push(Token::NumericalLiteral(mem::take(&mut current_token_string))),
+			ParsingType::StringLiteral => out.push(Token::StringLiteral(mem::take(&mut current_token_string))),
+			ParsingType::OperatorNonAlphabetic => {
+				let operator = Operator::from_str(main_struct, &current_token_string);
+				match operator {
+					Some(operator) => out.push(Token::Operator(operator)),
+					None => return Err(BasicError::InvalidNonAlphabeticOperator(current_token_string)),
+				}
+				current_token_string = String::new();
+			}
+			ParsingType::IdentifierKeywordOperatorAlphabeticBuiltInFunction => {
+				todo!();
+			}
+			ParsingType::None => {},
+		}
+		parsing_type = ParsingType::None;
 	}
 	// Parsing type should be None after parsing line
 	#[cfg(debug_assertions)]
