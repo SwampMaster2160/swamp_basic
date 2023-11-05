@@ -5,7 +5,7 @@ use strum_macros::EnumIter;
 
 use crate::Main;
 
-#[derive(Debug, Clone, Copy, EnumIter)]
+#[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Operator {
 	AddConcatenate,

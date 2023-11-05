@@ -4,6 +4,7 @@ pub mod error;
 use std::{io::stdin, collections::{HashMap, HashSet}};
 
 use lexer::{token::tokenize_line, keyword::Keyword, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
+use num::BigInt;
 
 fn main() {
 	// Create main struct
@@ -43,11 +44,12 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 
 	// Get the line number if there is one, the main part of the line to be converted to tokens and weather to just print the tokens
 	// The line is numbered if it's first char is a digit
-	let (line_number, line_body, print_tokens) = if first_word.chars().next().unwrap().is_ascii_digit() {
+	let first_digit = first_word.chars().next().unwrap();
+	let (line_number, line_body, print_tokens) = if first_digit.is_ascii_digit() || first_digit == '-' {
 		// Get the line number
-		let line_number = match first_word.parse::<i32>() {
+		let line_number = match first_word.parse::<BigInt>() {
 			Err(_) => {
-				println!("Error: Line number \"{}\" is not a valid signed 32-bit integer.", first_word);
+				println!("Error: Line number \"{}\" is not a valid integer.", first_word);
 				return false;
 			},
 			Ok(line_number) => line_number,
@@ -85,7 +87,7 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 		return false;
 	}
 	//
-	println!("Line {:?}: \"{}\"", line_number, line_body);
+	println!("Line {:?}: \"{:?}\"", line_number, tokens);
 	// Return false (do not exit interpreter)
 	false
 }

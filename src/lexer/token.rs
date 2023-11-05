@@ -4,7 +4,7 @@ use crate::{Main, error::BasicError};
 
 use super::{keyword::Keyword, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Token {
 	Identifier(String, TypeRestriction),
@@ -95,6 +95,12 @@ pub fn tokenize_line(main_struct: &mut Main, line: &str) -> Result<Vec<Token>, B
 				}
 			}
 		}
+		// A type restruction should end a token
+		if parsing_type == ParsingType::IdentifierKeywordOperatorAlphabeticBuiltInFunction {
+			if TypeRestriction::from_suffix_char(main_struct, this_char).is_some() {
+				end_token = true;
+			}
+		}
 		// Check if we should end the token here
 		let next_char = chars.get(index + 1).copied();
 		match next_char {
@@ -106,7 +112,8 @@ pub fn tokenize_line(main_struct: &mut Main, line: &str) -> Result<Vec<Token>, B
 						let is_seperator = Separator::from_char(main_struct, next_char).is_some();
 						let is_whitespace = next_char.is_ascii_whitespace();
 						let is_string_start_char = next_char == '"';
-						if is_non_alphabetic_operator_char || is_seperator || is_whitespace || is_string_start_char {
+						let is_comment_start = next_char == '\'';
+						if is_non_alphabetic_operator_char || is_seperator || is_whitespace || is_string_start_char || is_comment_start {
 							end_token = true;
 						}
 					}
@@ -181,6 +188,10 @@ pub fn tokenize_line(main_struct: &mut Main, line: &str) -> Result<Vec<Token>, B
 			ParsingType::None => {},
 		}
 		parsing_type = ParsingType::None;
+		// A remark should put the parser into comment mode
+		if *out.last().unwrap() == Token::Keyword(Keyword::Remark) {
+			parsing_type = ParsingType::Comment;
+		}
 	}
 	// Parsing type should be None after parsing line
 	#[cfg(debug_assertions)]

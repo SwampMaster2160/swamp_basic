@@ -9,3 +9,4 @@ description = "A BASIC interpreter"
 [dependencies]
 strum = "0.25.0"
 strum_macros = "0.25.0"
+num = "0.4.1"
