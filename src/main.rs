@@ -43,13 +43,13 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 	let line_without_first_word = &line[first_word_end..];
 
 	// Get the line number if there is one, the main part of the line to be converted to tokens and weather to just print the tokens
-	// The line is numbered if it's first char is a digit
+	// The line is numbered if it's first char is a digit or negative sign
 	let first_digit = first_word.chars().next().unwrap();
 	let (line_number, line_body, print_tokens) = if first_digit.is_ascii_digit() || first_digit == '-' {
 		// Get the line number
 		let line_number = match first_word.parse::<BigInt>() {
 			Err(_) => {
-				println!("Error: Line number \"{}\" is not a valid integer.", first_word);
+				println!("Error: Line number \"{first_word}\" is not a valid integer.");
 				return false;
 			},
 			Ok(line_number) => line_number,
