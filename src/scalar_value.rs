@@ -1,6 +1,6 @@
 use std::{rc::Rc, fmt::Display};
 
-use num::{BigInt, complex::Complex64, bigint::Sign, ToPrimitive};
+use num::{BigInt, complex::Complex64, bigint::{Sign, ToBigInt}, ToPrimitive, Zero};
 use strum_macros::EnumDiscriminants;
 
 use crate::{lexer::type_restriction::TypeRestriction, error::BasicError};
@@ -13,6 +13,8 @@ pub enum ScalarValue {
 	Size(usize),
 	/// An unsigned byte
 	Byte(u8),
+	/// An unsigned 32-bit integer
+	U32(u32),
 	/// A 64-bit floating point number
 	Float(f64),
 	/// A complex number with 64-bit float real and imaginary parts
@@ -29,7 +31,7 @@ pub enum ScalarValue {
 
 impl ScalarValue {
 	fn is_integer(&self) -> bool {
-		matches!(self, Self::BigInteger(_) | Self::Size(_) | Self::Byte(_))
+		matches!(self, Self::BigInteger(_) | Self::Size(_) | Self::Byte(_) | Self::U32(_))
 	}
 
 	fn is_float(&self) -> bool {
@@ -66,6 +68,16 @@ impl ScalarValue {
 					false => Err(BasicError::IndexOutOfBounds(self.clone(), container_length)),
 				}
 			}
+			ScalarValue::U32(index) => {
+				let index = match (*index).try_into() {
+					Ok(index) => index,
+					Err(_) => return Err(BasicError::IndexOutOfBounds(self.clone(), container_length)),
+				};
+				match index < container_length {
+					true => Ok(index),
+					false => Err(BasicError::IndexOutOfBounds(self.clone(), container_length)),
+				}
+			}
 			ScalarValue::BigInteger(index) => {
 				// If the index is negative, add the length of the container to convert it from the -container_length..0 range to the 0..container_length range
 				let index = match index.sign() == Sign::Minus {
@@ -92,7 +104,7 @@ impl ScalarValue {
 		match (self, cast_to) {
 			// Do nothing to a value if it already conforms to the type restriction
 			(_, TypeRestriction::Any) |
-			(Self::BigInteger(..) | Self::Size(..) | Self::Byte(..), TypeRestriction::Integer | TypeRestriction::Number) |
+			(Self::BigInteger(..) | Self::Size(..) | Self::Byte(..) | Self::U32(..), TypeRestriction::Integer | TypeRestriction::Number) |
 			(Self::Float(..) | Self::Complex(..), TypeRestriction::Float | TypeRestriction::Number) |
 			(Self::String(..) | Self::Char(..) | Self::EmptyString, TypeRestriction::String) |
 			(Self::Bool(..), TypeRestriction::Boolean) => Ok(self.clone()),
@@ -115,15 +127,49 @@ impl ScalarValue {
 				_ if value.eq_ignore_ascii_case(&'f') || value.eq_ignore_ascii_case(&'n') || value.eq_ignore_ascii_case(&'0') => Ok(ScalarValue::Bool(false)),
 				_ => Err(BasicError::UnableToCast(self.clone(), cast_to)),
 			}
-			
+
 			// Numbers are false if 0 or true otherwise
 			(Self::BigInteger(value), TypeRestriction::Boolean) => Ok(Self::Bool(value.sign() != Sign::NoSign)),
 			(Self::Size(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != 0)),
 			(Self::Byte(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != 0)),
+			(Self::U32(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != 0)),
 			(Self::Float(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != 0.)),
 			(Self::Complex(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != Complex64{ re: 0., im: 0. })),
+			// To float
+			(Self::Char(value), TypeRestriction::Float | TypeRestriction::Number) if *value == '.' => Ok(Self::Float(0.)),
+			(Self::Char(value), TypeRestriction::Float | TypeRestriction::Number) if *value == 'i' => Ok(Self::Complex(Complex64::i())),
+			// To integer
+			(Self::Bool(value), TypeRestriction::Integer | TypeRestriction::Number) => Ok(Self::Byte(*value as u8)),
+			(Self::Char(value), TypeRestriction::Integer | TypeRestriction::Number) => Ok(Self::Byte(value.to_digit(10).ok_or(BasicError::UnableToCast(self.clone(), cast_to))? as u8)),
+			(Self::String(value), TypeRestriction::Integer) => match value.parse::<BigInt>() {
+				Ok(value) => Ok(Self::BigInteger(Rc::new(value))),
+				Err(_) => Err(BasicError::UnableToCast(self.clone(), cast_to)),
+			}
+			(Self::Float(value), TypeRestriction::Integer) => match value.to_bigint() {
+				Some(value) => Ok(Self::BigInteger(Rc::new(value))),
+				None => Err(BasicError::UnableToCast(self.clone(), cast_to)),
+			}
+			(Self::Complex(value), TypeRestriction::Integer) if value.im.is_zero() => match value.re.to_bigint() {
+				Some(value) => Ok(Self::BigInteger(Rc::new(value))),
+				None => Err(BasicError::UnableToCast(self.clone(), cast_to)),
+			}
+			// To float
+			(Self::Bool(value), TypeRestriction::Float) => Ok(Self::Float(*value as u8 as f64)),
+			(Self::Char(value), TypeRestriction::Float) => Ok(Self::Float(value.to_digit(10).ok_or(BasicError::UnableToCast(self.clone(), cast_to))? as u8 as f64)),
+			(Self::String(value), TypeRestriction::Float) => match value.parse::<Complex64>() {
+				Ok(value) => Ok(Self::Complex(value)),
+				Err(_) => Err(BasicError::UnableToCast(self.clone(), cast_to)),
+			}
+			// To number
+			(Self::String(value), TypeRestriction::Number) => match value.parse::<BigInt>() {
+				Ok(value) => Ok(Self::BigInteger(Rc::new(value))),
+				Err(_) => match value.parse::<Complex64>() {
+					Ok(value) => Ok(Self::Complex(value)),
+					Err(_) => Err(BasicError::UnableToCast(self.clone(), cast_to)),
+				}
+			}
 
-			_ => todo!()
+			_ => Err(BasicError::UnableToCast(self.clone(), cast_to)),
 		}
 	}
 }
@@ -134,6 +180,7 @@ impl Display for ScalarValue {
 			Self::BigInteger(value) => write!(formatter, "{value}"),
 			Self::Size(value) => write!(formatter, "{value}"),
 			Self::Byte(value) => write!(formatter, "{value}"),
+			Self::U32(value) => write!(formatter, "{value}"),
 			Self::Bool(value) => write!(formatter, "{value}"),
 			Self::Float(value) => write!(formatter, "{value}"),
 			Self::String(value) => write!(formatter, "{value}"),
