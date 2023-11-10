@@ -9,6 +9,7 @@ pub enum BasicError {
 	InvalidNonAlphabeticOperator(String),
 	IndexOutOfBounds(ScalarValue, usize),
 	TypeMismatch(ScalarValue, TypeRestriction),
+	UnableToCast(ScalarValue, TypeRestriction),
 }
 
 impl Display for BasicError {
@@ -17,8 +18,9 @@ impl Display for BasicError {
 			Self::CharEscapeInvalidChar(chr) => write!(formatter, "Invalid character '{chr}' after '\\' escape character."),
 			Self::CharEscapeAtLineEnd => write!(formatter, "'\\' string escape character at end of line."),
 			Self::InvalidNonAlphabeticOperator(operator) => write!(formatter, "\"{operator}\" is an invalid non-alphabetic operator."),
-			Self::IndexOutOfBounds(..) => todo!(),
-			Self::TypeMismatch(..) => todo!(),
+			Self::IndexOutOfBounds(value, size) => write!(formatter, "Index {value} is out of bounds for indexee of size {size}."),
+			Self::TypeMismatch(value, type_restriction) => write!(formatter, "Value {value} does not conform to type restriction of {type_restriction}."),
+			Self::UnableToCast(value, type_restriction) => write!(formatter, "Unable to cast value {value} to conform to type restriction of {type_restriction}."),
 		}
 	}
 }

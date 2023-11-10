@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, fmt::Display};
 
 use num::{BigInt, complex::Complex64, bigint::Sign, ToPrimitive};
 use strum_macros::EnumDiscriminants;
@@ -84,6 +84,59 @@ impl ScalarValue {
 				}
 			}
 			_ => Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
+		}
+	}
+
+	/// Casts a the value to conform to the given type restriction.
+	pub fn cast_to(&self, cast_to: TypeRestriction) -> Result<Self, BasicError> {
+		match (self, cast_to) {
+			(_, TypeRestriction::Any) |
+			(Self::BigInteger(..) | Self::Size(..) | Self::Byte(..), TypeRestriction::Integer | TypeRestriction::Number) |
+			(Self::Float(..) | Self::Complex(..), TypeRestriction::Float | TypeRestriction::Number) |
+			(Self::String(..) | Self::Char(..) | Self::EmptyString, TypeRestriction::String) |
+			(Self::Bool(..), TypeRestriction::Boolean) => Ok(self.clone()),
+
+			(_, TypeRestriction::String) => Ok(Self::String(Rc::new(self.to_string()))),
+
+			(Self::String(string), TypeRestriction::Boolean) => match string {
+				_ if string.eq_ignore_ascii_case("true") || string.eq_ignore_ascii_case("t") ||
+				string.eq_ignore_ascii_case("yes") || string.eq_ignore_ascii_case("y") ||string.eq_ignore_ascii_case("1") => Ok(ScalarValue::Bool(true)),
+
+				_ if string.eq_ignore_ascii_case("false") || string.eq_ignore_ascii_case("f") ||
+				string.eq_ignore_ascii_case("no") || string.eq_ignore_ascii_case("n") || string.eq_ignore_ascii_case("0") => Ok(ScalarValue::Bool(false)),
+
+				_ => Err(BasicError::UnableToCast(self.clone(), cast_to)),
+			}
+
+			(Self::Char(value), TypeRestriction::Boolean) => match value {
+				_ if value.eq_ignore_ascii_case(&'t') || value.eq_ignore_ascii_case(&'y') || value.eq_ignore_ascii_case(&'1') => Ok(ScalarValue::Bool(true)),
+				_ if value.eq_ignore_ascii_case(&'f') || value.eq_ignore_ascii_case(&'n') || value.eq_ignore_ascii_case(&'0') => Ok(ScalarValue::Bool(false)),
+				_ => Err(BasicError::UnableToCast(self.clone(), cast_to)),
+			}
+
+			(Self::BigInteger(value), TypeRestriction::Boolean) => Ok(Self::Bool(value.sign() != Sign::NoSign)),
+			(Self::Size(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != 0)),
+			(Self::Byte(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != 0)),
+			(Self::Float(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != 0.)),
+			(Self::Complex(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != Complex64{ re: 0., im: 0. })),
+
+			_ => todo!()
+		}
+	}
+}
+
+impl Display for ScalarValue {
+	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::BigInteger(value) => write!(formatter, "{value}"),
+			Self::Size(value) => write!(formatter, "{value}"),
+			Self::Byte(value) => write!(formatter, "{value}"),
+			Self::Bool(value) => write!(formatter, "{value}"),
+			Self::Float(value) => write!(formatter, "{value}"),
+			Self::String(value) => write!(formatter, "{value}"),
+			Self::EmptyString => write!(formatter, ""),
+			Self::Char(value) => write!(formatter, "{value}"),
+			Self::Complex(value) => write!(formatter, "{value}"),
 		}
 	}
 }

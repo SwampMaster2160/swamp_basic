@@ -1,5 +1,5 @@
 use strum::IntoEnumIterator;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use strum_macros::EnumIter;
 
@@ -47,5 +47,18 @@ impl TypeRestriction {
 			};
 		}
 		out
+	}
+}
+
+impl Display for TypeRestriction {
+	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			TypeRestriction::Any => write!(formatter, "any"),
+			TypeRestriction::Number => write!(formatter, "number"),
+			TypeRestriction::Integer => write!(formatter, "integer"),
+			TypeRestriction::Float => write!(formatter, "floating-point number"),
+			TypeRestriction::String => write!(formatter, "string"),
+			TypeRestriction::Boolean => write!(formatter, "boolean"),
+		}
 	}
 }
