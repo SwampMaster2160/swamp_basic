@@ -90,14 +90,17 @@ impl ScalarValue {
 	/// Casts a the value to conform to the given type restriction.
 	pub fn cast_to(&self, cast_to: TypeRestriction) -> Result<Self, BasicError> {
 		match (self, cast_to) {
+			// Do nothing to a value if it already conforms to the type restriction
 			(_, TypeRestriction::Any) |
 			(Self::BigInteger(..) | Self::Size(..) | Self::Byte(..), TypeRestriction::Integer | TypeRestriction::Number) |
 			(Self::Float(..) | Self::Complex(..), TypeRestriction::Float | TypeRestriction::Number) |
 			(Self::String(..) | Self::Char(..) | Self::EmptyString, TypeRestriction::String) |
 			(Self::Bool(..), TypeRestriction::Boolean) => Ok(self.clone()),
-
+			// To string
 			(_, TypeRestriction::String) => Ok(Self::String(Rc::new(self.to_string()))),
+			// To boolean
 
+			// strings yes/no, y/n, true/false, t/f and 1/0 convert to booleans true/false
 			(Self::String(string), TypeRestriction::Boolean) => match string {
 				_ if string.eq_ignore_ascii_case("true") || string.eq_ignore_ascii_case("t") ||
 				string.eq_ignore_ascii_case("yes") || string.eq_ignore_ascii_case("y") ||string.eq_ignore_ascii_case("1") => Ok(ScalarValue::Bool(true)),
@@ -107,13 +110,13 @@ impl ScalarValue {
 
 				_ => Err(BasicError::UnableToCast(self.clone(), cast_to)),
 			}
-
 			(Self::Char(value), TypeRestriction::Boolean) => match value {
 				_ if value.eq_ignore_ascii_case(&'t') || value.eq_ignore_ascii_case(&'y') || value.eq_ignore_ascii_case(&'1') => Ok(ScalarValue::Bool(true)),
 				_ if value.eq_ignore_ascii_case(&'f') || value.eq_ignore_ascii_case(&'n') || value.eq_ignore_ascii_case(&'0') => Ok(ScalarValue::Bool(false)),
 				_ => Err(BasicError::UnableToCast(self.clone(), cast_to)),
 			}
-
+			
+			// Numbers are false if 0 or true otherwise
 			(Self::BigInteger(value), TypeRestriction::Boolean) => Ok(Self::Bool(value.sign() != Sign::NoSign)),
 			(Self::Size(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != 0)),
 			(Self::Byte(value), TypeRestriction::Boolean) => Ok(Self::Bool(*value != 0)),
