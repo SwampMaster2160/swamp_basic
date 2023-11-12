@@ -1,6 +1,7 @@
 pub mod lexer;
 pub mod error;
 pub mod scalar_value;
+pub mod program;
 
 use std::{io::stdin, collections::{HashMap, HashSet}};
 

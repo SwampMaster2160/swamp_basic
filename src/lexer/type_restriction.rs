@@ -19,7 +19,7 @@ pub enum TypeRestriction {
 impl TypeRestriction {
 	/// Takes a char and returns the type restriction that is associated with the char if it is a symbol for a type restriction.
 	#[inline(always)]
-	pub fn from_suffix_char(main_data: &mut Main, suffix: char) -> Option<Self> {
+	pub fn from_suffix_char(main_data: &Main, suffix: char) -> Option<Self> {
 		main_data.char_to_type_restriction_mapping.get(&suffix).copied()
 	}
 

@@ -18,7 +18,7 @@ pub enum Separator {
 impl Separator {
 	/// Takes a char and returns the seperator that is associated with the char if it is a symbol for a separator.
 	#[inline(always)]
-	pub fn from_char(main_data: &mut Main, symbol: char) -> Option<Self> {
+	pub fn from_char(main_data: &Main, symbol: char) -> Option<Self> {
 		main_data.char_to_separator_mapping.get(&symbol).copied()
 	}
 

@@ -29,7 +29,7 @@ enum ParsingType {
 }
 
 /// Converts a line of code without a line number into a vector of tokens
-pub fn tokenize_line(main_struct: &mut Main, line: &str) -> Result<Vec<Token>, BasicError> {
+pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, BasicError> {
 	let mut out = Vec::new();
 	let mut current_token_string = String::new();
 	let mut parsing_type = ParsingType::None;

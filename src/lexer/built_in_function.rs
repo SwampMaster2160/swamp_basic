@@ -24,7 +24,7 @@ pub enum BuiltInFunction {
 impl BuiltInFunction {
 	/// Takes a string and returns the built-in function that is associated with the string if it is a name or alias for a built-in function.
 	#[inline(always)]
-	pub fn from_str(main_data: &mut Main, string: &str) -> Option<Self> {
+	pub fn from_str(main_data: &Main, string: &str) -> Option<Self> {
 		main_data.string_to_built_in_keyword_mapping.get(string.to_lowercase().as_str()).copied()
 	}
 

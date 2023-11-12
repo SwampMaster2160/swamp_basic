@@ -32,7 +32,7 @@ impl Operator {
 
 	/// Takes a string and returns the operator that is associated with the string if it is a name or alias for an operator.
 	#[inline(always)]
-	pub fn from_str(main_data: &mut Main, string: &str) -> Option<Self> {
+	pub fn from_str(main_data: &Main, string: &str) -> Option<Self> {
 		main_data.string_to_operator_mapping.get(string.to_lowercase().as_str()).copied()
 	}
 
