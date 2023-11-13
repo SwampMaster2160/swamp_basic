@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use num::BigInt;
 
 use crate::error::BasicError;
@@ -56,7 +54,7 @@ impl Program {
 		for (_, bytecode_index) in &mut self.line_numbers.iter_mut().skip(line_numbers_index) {
 			*bytecode_index -= length_of_bytecode_to_remove;
 		}
-		
+
 		Ok(())
 	}
 

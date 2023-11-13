@@ -3,13 +3,14 @@ pub mod error;
 pub mod scalar_value;
 pub mod program;
 pub mod bytecode;
+pub mod compile;
 
 use std::{io::stdin, collections::{HashMap, HashSet}};
 
 use lexer::{token::tokenize_line, keyword::Keyword, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
 use num::BigInt;
 
-use crate::bytecode::compile_tokens_to_bytecode;
+use crate::compile::compile_tokens_to_bytecode;
 
 fn main() {
 	// Create main struct
@@ -96,7 +97,13 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 		return false;
 	}
 	// Compile tokens to bytecode
-	let bytecode = compile_tokens_to_bytecode(tokens);
+	let (bytecode, _comment) = match compile_tokens_to_bytecode(tokens) {
+		Ok(result) => result,
+		Err(error) => {
+			println!("Error: {}", error);
+			return false;
+		}
+	};
 	// Print bytecode if asked to and return
 	if print_bytecode {
 		let mut print_comma = false;
