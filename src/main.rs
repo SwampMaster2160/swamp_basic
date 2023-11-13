@@ -2,11 +2,14 @@ pub mod lexer;
 pub mod error;
 pub mod scalar_value;
 pub mod program;
+pub mod bytecode;
 
 use std::{io::stdin, collections::{HashMap, HashSet}};
 
 use lexer::{token::tokenize_line, keyword::Keyword, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
 use num::BigInt;
+
+use crate::bytecode::compile_tokens_to_bytecode;
 
 fn main() {
 	// Create main struct
@@ -47,7 +50,7 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 	// Get the line number if there is one, the main part of the line to be converted to tokens and weather to just print the tokens
 	// The line is numbered if it's first char is a digit or negative sign
 	let first_digit = first_word.chars().next().unwrap();
-	let (line_number, line_body, print_tokens) = if first_digit.is_ascii_digit() || first_digit == '-' {
+	let (line_number, line_body, print_tokens, print_bytecode) = if first_digit.is_ascii_digit() || first_digit == '-' {
 		// Get the line number
 		let line_number = match first_word.parse::<BigInt>() {
 			Err(_) => {
@@ -57,11 +60,15 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 			Ok(line_number) => line_number,
 		};
 		// Get rest of line
-		(Some(line_number), line_without_first_word, false)
+		(Some(line_number), line_without_first_word, false, false)
 	}
 	// If the line is "tokens" then we will print out the tokens that the lexer produces later
 	else if first_word.eq_ignore_ascii_case("tokens") {
-		(None, line_without_first_word, true)
+		(None, line_without_first_word, true, false)
+	}
+	// If the line is "bytecode" then we will print out the bytecode that the compiler produces later
+	else if first_word.eq_ignore_ascii_case("bytecode") {
+		(None, line_without_first_word, false, true)
 	}
 	// Exit the interpreter is exit is entered
 	else if first_word.eq_ignore_ascii_case("exit") {
@@ -69,7 +76,7 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 	}
 	// If there is no line number or special word then the line body is the entire line
 	else {
-		(None, line, false)
+		(None, line, false, false)
 	};
 
 	// Tokenize line body
@@ -88,8 +95,24 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 		}
 		return false;
 	}
+	// Compile tokens to bytecode
+	let bytecode = compile_tokens_to_bytecode(tokens);
+	// Print bytecode if asked to and return
+	if print_bytecode {
+		let mut print_comma = false;
+		print!("[");
+		for byte in bytecode {
+			if print_comma {
+				print!(", ")
+			}
+			print!("{byte:02X}");
+			print_comma = true;
+		}
+		println!("]");
+		return false;
+	}
 	//
-	println!("Line {:?}: \"{:?}\"", line_number, tokens);
+	println!("Line {:?}: \"{:?}\"", line_number, bytecode);
 	// Return false (do not exit interpreter)
 	false
 }

@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use num::BigInt;
 
 use crate::error::BasicError;
@@ -16,6 +18,14 @@ impl Program {
 		match self.line_numbers.binary_search_by(|(line_number, _)| line_number.cmp(target_line_number)) {
 			Ok(line_numbers_index) => Ok(line_numbers_index),
 			Err(_) => Err(BasicError::LineNotFound(target_line_number.clone())),
+		}
+	}
+
+	/// Returns the index into `line_numbers` where a line could be inserted.
+	fn get_line_numbers_index_to_insert_line(&self, target_line_number: &BigInt) -> usize {
+		match self.line_numbers.binary_search_by(|(line_number, _)| line_number.cmp(target_line_number)) {
+			Ok(line_numbers_index) => line_numbers_index,
+			Err(line_numbers_index) => line_numbers_index,
 		}
 	}
 
@@ -46,12 +56,33 @@ impl Program {
 		for (_, bytecode_index) in &mut self.line_numbers.iter_mut().skip(line_numbers_index) {
 			*bytecode_index -= length_of_bytecode_to_remove;
 		}
+		
 		Ok(())
 	}
 
-	pub fn add_line(&mut self, line_number: &BigInt, bytecode: &[u8]) {
-		// Remove the line if it exists
+	/// Inserts or updates a line and it's bytecode. Lines afterwards will have their bytecode indicies adjusted.
+	/// If the line's bytecode is empty then will remove the line if it exists or else do nothing.
+	pub fn add_line(&mut self, line_number: &BigInt, bytecode_to_insert: &[u8]) {
+		// Remove the line if it exists ignoring an error that will be returned if the line does not exist
 		self.remove_line(line_number).ok();
-		
+		// Return and do not insert the line if it is blank
+		if bytecode_to_insert.is_empty() {
+			return;
+		}
+		// Get the index to insert the line number and the bytecode
+		let insert_index = self.get_line_numbers_index_to_insert_line(line_number);
+		let bytecode_insert_index = match self.line_numbers.get(insert_index) {
+			Some((_, bytecode_insert_index)) => *bytecode_insert_index,
+			None => self.bytecode.len(),
+		};
+		let insert_length = bytecode_to_insert.len();
+		// Insert the bytecode
+		self.bytecode.splice(bytecode_insert_index..bytecode_insert_index, bytecode_to_insert.iter().map(|byte| *byte));
+		// Insert the line
+		self.line_numbers.insert(insert_index, (line_number.clone(), bytecode_insert_index));
+		// Repoint all the lines after the line inserted
+		for(_, bytecode_index) in &mut self.line_numbers.iter_mut().skip(insert_index + 1) {
+			*bytecode_index += insert_length;
+		}
 	}
 }
