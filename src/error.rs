@@ -13,6 +13,8 @@ pub enum BasicError {
 	TypeMismatch(ScalarValue, TypeRestriction),
 	UnableToCast(ScalarValue, TypeRestriction),
 	LineNotFound(BigInt),
+	ExpectedStatment,
+	FeatureNotYetSupported,
 }
 
 impl Display for BasicError {
@@ -25,6 +27,8 @@ impl Display for BasicError {
 			Self::TypeMismatch(value, type_restriction) => write!(formatter, "Value {value} does not conform to type restriction of {type_restriction}."),
 			Self::UnableToCast(value, type_restriction) => write!(formatter, "Unable to cast value {value} to conform to type restriction of {type_restriction}."),
 			Self::LineNotFound(line) => write!(formatter, "The program does not have a line {line}."),
+			Self::ExpectedStatment => write!(formatter, "Expected a statment."),
+			Self::FeatureNotYetSupported => write!(formatter, "Feature not yet supported."),
 		}
 	}
 }
