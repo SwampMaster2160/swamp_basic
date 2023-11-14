@@ -1,4 +1,4 @@
-use crate::{lexer::{token::Token, separator::Separator, command::{Command, self}}, error::BasicError};
+use crate::{lexer::{token::Token, separator::Separator, command::{Command, self}}, error::BasicError, bytecode::Bytecode};
 
 pub fn compile_tokens_to_bytecode(mut tokens: Vec<Token>) -> Result<(Vec<u8>, Option<String>), BasicError> {
 	let mut compiled_bytecode = Vec::new();
@@ -35,19 +35,36 @@ pub fn compile_tokens_to_bytecode(mut tokens: Vec<Token>) -> Result<(Vec<u8>, Op
 }
 
 /// Compiles a statment (does not produce a value) to bytecode.
-pub fn compile_statment_to_bytecode(mut tokens: &[Token]) -> Result<Vec<u8>, BasicError> {
-	let mut out = Vec::new();
-	// Pop off the first token
-	let first_token = &tokens[0];
-	tokens = &tokens[1..];
-	// Token should be a command
-	let command = match first_token {
-		Token::Command(command) => command,
-		Token::Identifier(..) => return Err(BasicError::FeatureNotYetSupported),
-		_ => return Err(BasicError::ExpectedStatment),
-	};
-	//
+pub fn compile_statment_to_bytecode(tokens: &[Token]) -> Result<Vec<u8>, BasicError> {
+	return match &tokens[0] {
+		Token::Command(command) => compile_command_to_bytecode(command, &tokens[1..]),
+		Token::Identifier(..) => Err(BasicError::FeatureNotYetSupported),
+		_ => Err(BasicError::ExpectedStatment),
+	}
+}
 
-	// Return
-	return Ok(out);
+/// Compiles a command to bytecode.
+pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> Result<Vec<u8>, BasicError> {
+	let mut out = Vec::new();
+	match command {
+		Command::End => {
+			if !tokens.is_empty() {
+				return Err(BasicError::ExpectedStatmentEnd);
+			}
+			out.push(Bytecode::End as u8);
+		}
+		Command::Print => {
+			while !tokens.is_empty() {
+				out.extend(compile_expression_to_bytecode(&mut tokens)?);
+			}
+		}
+		Command::Remark => unreachable!(),
+		_ => return Err(BasicError::FeatureNotYetSupported),
+	}
+	Ok(out)
+}
+
+/// Compiles an expressing to bytecode.
+pub fn compile_expression_to_bytecode(tokens: &mut &[Token]) -> Result<Vec<u8>, BasicError> {
+	todo!();
 }
