@@ -66,8 +66,8 @@ impl Operator {
 		for operator in Self::iter() {
 			let (operator_name, operator_aliases) = operator.get_names();
 			out.insert(operator_name, operator);
-			for keyword_alias in operator_aliases {
-				out.insert(keyword_alias, operator);
+			for operator_alias in operator_aliases {
+				out.insert(operator_alias, operator);
 			}
 		}
 		out

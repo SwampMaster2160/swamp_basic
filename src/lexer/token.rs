@@ -2,13 +2,13 @@ use std::mem;
 
 use crate::{Main, error::BasicError};
 
-use super::{keyword::Keyword, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
+use super::{command::Command, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Token {
 	Identifier(String, TypeRestriction),
-	Keyword(Keyword),
+	Command(Command),
 	BuiltInFunction(BuiltInFunction, TypeRestriction),
 	Separator(Separator),
 	Operator(Operator),
@@ -25,7 +25,7 @@ enum ParsingType {
 	NumericalLiteral,
 	Comment,
 	OperatorNonAlphabetic,
-	IdentifierKeywordOperatorAlphabeticBuiltInFunction,
+	IdentifierKeyword,
 }
 
 /// Converts a line of code without a line number into a vector of tokens
@@ -53,7 +53,7 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 				chr if Operator::is_char_in_non_alphabetic_character_set(main_struct, chr) => parsing_type = ParsingType::OperatorNonAlphabetic,
 				'\'' => parsing_type = ParsingType::Comment,
 				'"' => parsing_type = ParsingType::StringLiteral,
-				_ => parsing_type = ParsingType::IdentifierKeywordOperatorAlphabeticBuiltInFunction,
+				_ => parsing_type = ParsingType::IdentifierKeyword,
 			}
 			// Add the first char to the parsed token unless we are parsing a comment or string which start with a starting char
 			if !matches!(parsing_type, ParsingType::Comment | ParsingType::StringLiteral) {
@@ -61,7 +61,7 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 			}
 		}
 		// For many tokens types just add the char to the parsing token string
-		else if matches!(parsing_type, ParsingType::Comment | ParsingType::NumericalLiteral | ParsingType::OperatorNonAlphabetic | ParsingType::IdentifierKeywordOperatorAlphabeticBuiltInFunction) {
+		else if matches!(parsing_type, ParsingType::Comment | ParsingType::NumericalLiteral | ParsingType::OperatorNonAlphabetic | ParsingType::IdentifierKeyword) {
 			current_token_string.push(this_char);
 		}
 		// Manage string literal parsing
@@ -96,7 +96,7 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 			}
 		}
 		// A type restruction should end a token
-		if parsing_type == ParsingType::IdentifierKeywordOperatorAlphabeticBuiltInFunction {
+		if parsing_type == ParsingType::IdentifierKeyword {
 			if TypeRestriction::from_suffix_char(main_struct, this_char).is_some() {
 				end_token = true;
 			}
@@ -108,7 +108,7 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 			Some(next_char) => {
 				let is_non_alphabetic_operator_char = Operator::is_char_in_non_alphabetic_character_set(main_struct, next_char);
 				match parsing_type {
-					ParsingType::IdentifierKeywordOperatorAlphabeticBuiltInFunction => {
+					ParsingType::IdentifierKeyword => {
 						let is_seperator = Separator::from_char(main_struct, next_char).is_some();
 						let is_whitespace = next_char.is_ascii_whitespace();
 						let is_string_start_char = next_char == '"';
@@ -150,10 +150,10 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 				}
 				current_token_string = String::new();
 			}
-			ParsingType::IdentifierKeywordOperatorAlphabeticBuiltInFunction => 'end_parse_other: {
-				let as_keyword = Keyword::from_str(main_struct, &current_token_string);
-				if let Some(keyword) = as_keyword {
-					out.push(Token::Keyword(keyword));
+			ParsingType::IdentifierKeyword => 'end_parse_other: {
+				let as_command = Command::from_str(main_struct, &current_token_string);
+				if let Some(command) = as_command {
+					out.push(Token::Command(command));
 					current_token_string = String::new();
 					break 'end_parse_other;
 				}
@@ -189,7 +189,7 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 		}
 		parsing_type = ParsingType::None;
 		// A remark should put the parser into comment mode
-		if *out.last().unwrap() == Token::Keyword(Keyword::Remark) {
+		if *out.last().unwrap() == Token::Command(Command::Remark) {
 			parsing_type = ParsingType::Comment;
 		}
 	}

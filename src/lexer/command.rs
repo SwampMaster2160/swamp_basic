@@ -7,7 +7,7 @@ use crate::Main;
 
 #[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(u8)]
-pub enum Keyword {
+pub enum Command {
 	Base,
 	Data,
 	Define,
@@ -37,14 +37,14 @@ pub enum Keyword {
 	To,
 }
 
-impl Keyword {
-	/// Takes a string and returns the keyword that is associated with the string if it is a name or alias for a keyword.
+impl Command {
+	/// Takes a string and returns the command that is associated with the string if it is a name or alias for a command.
 	#[inline(always)]
 	pub fn from_str(main_data: &Main, string: &str) -> Option<Self> {
-		main_data.string_to_keyword_mapping.get(string.to_lowercase().as_str()).copied()
+		main_data.string_to_command_mapping.get(string.to_lowercase().as_str()).copied()
 	}
 
-	/// Returns the name of the keyword and a list of aliases.
+	/// Returns the name of the command and a list of aliases.
 	#[inline(always)]
 	const fn get_names(self) -> (&'static str, &'static[&'static str]) {
 		match self {
@@ -78,15 +78,15 @@ impl Keyword {
 		}
 	}
 
-	/// Returns a hashmap mapping keyword names and aliases to keywords
+	/// Returns a hashmap mapping command names and aliases to commands
 	#[inline(always)]
-	pub fn get_string_to_keyword_mapping() -> HashMap<&'static str, Self> {
+	pub fn get_string_to_command_mapping() -> HashMap<&'static str, Self> {
 		let mut out = HashMap::new();
-		for keyword in Self::iter() {
-			let (keyword_name, keyword_aliases) = keyword.get_names();
-			out.insert(keyword_name, keyword);
-			for keyword_alias in keyword_aliases {
-				out.insert(keyword_alias, keyword);
+		for command in Self::iter() {
+			let (command_name, command_aliases) = command.get_names();
+			out.insert(command_name, command);
+			for command_alias in command_aliases {
+				out.insert(command_alias, command);
 			}
 		}
 		out
