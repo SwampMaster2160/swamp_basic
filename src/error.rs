@@ -16,6 +16,8 @@ pub enum BasicError {
 	ExpectedStatment,
 	ExpectedStatmentEnd,
 	FeatureNotYetSupported,
+	TooManyClosingBrackets,
+	TooManyOpeningBrackets,
 }
 
 impl Display for BasicError {
@@ -31,6 +33,8 @@ impl Display for BasicError {
 			Self::ExpectedStatment => write!(formatter, "Expected a statment."),
 			Self::ExpectedStatmentEnd => write!(formatter, "Expected a statment end."),
 			Self::FeatureNotYetSupported => write!(formatter, "Feature not yet supported."),
+			Self::TooManyClosingBrackets => write!(formatter, "Too many closing brackets."),
+			Self::TooManyOpeningBrackets => write!(formatter, "Too many opening brackets."),
 		}
 	}
 }

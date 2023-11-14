@@ -8,8 +8,8 @@ use crate::Main;
 #[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Separator {
-	OpenBracket,
-	ClosedBracket,
+	OpeningBracket,
+	ClosingBracket,
 	Comma,
 	Semicolon,
 	Colon,
@@ -25,8 +25,8 @@ impl Separator {
 	/// Returns the separator character
 	pub const fn get_symbol_char(&self) -> char {
 		match self {
-			Self::OpenBracket => '(',
-			Self::ClosedBracket => ')',
+			Self::OpeningBracket => '(',
+			Self::ClosingBracket => ')',
 			Self::Comma => ',',
 			Self::Semicolon => ';',
 			Self::Colon => ':',

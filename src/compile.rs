@@ -1,4 +1,12 @@
-use crate::{lexer::{token::Token, separator::Separator, command::{Command, self}}, error::BasicError, bytecode::Bytecode};
+use crate::{lexer::{token::Token, separator::Separator, command::Command}, error::BasicError, bytecode::Bytecode};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum ExpressionStartSeparator {
+	None,
+	Coma,
+	SemiColon,
+}
 
 pub fn compile_tokens_to_bytecode(mut tokens: Vec<Token>) -> Result<(Vec<u8>, Option<String>), BasicError> {
 	let mut compiled_bytecode = Vec::new();
@@ -55,7 +63,15 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 		}
 		Command::Print => {
 			while !tokens.is_empty() {
-				out.extend(compile_expression_to_bytecode(&mut tokens)?);
+				out.push(Bytecode::Print as u8);
+				while !tokens.is_empty() {
+					let (expression_start_separator, expression_tokens) = extract_expression_tokens(&mut tokens)?;
+					if expression_start_separator == ExpressionStartSeparator::Coma {
+						return Err(BasicError::FeatureNotYetSupported);
+					}
+					out.extend(compile_expression_to_bytecode(&mut expression_tokens.as_slice())?);
+				}
+				out.push(Bytecode::End as u8);
 			}
 		}
 		Command::Remark => unreachable!(),
@@ -64,7 +80,73 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 	Ok(out)
 }
 
-/// Compiles an expressing to bytecode.
+/// Compiles a single expression to bytecode.
 pub fn compile_expression_to_bytecode(tokens: &mut &[Token]) -> Result<Vec<u8>, BasicError> {
-	todo!();
+	// TODO: This is a work of concept
+	let mut out = Vec::new();
+	let token = match tokens.first() {
+		Some(token) => token,
+		None => return Err(BasicError::FeatureNotYetSupported),
+	};
+	if tokens.len() != 1 {
+		return Err(BasicError::FeatureNotYetSupported);
+	}
+	match token {
+		Token::StringLiteral(string) => {
+			out.push(Bytecode::StringLiteral as u8);
+			out.extend(string.as_bytes());
+			out.push(0);
+		}
+		Token::NumericalLiteral(string) => {
+			out.push(Bytecode::StringLiteral as u8);
+			out.extend(string.as_bytes());
+			out.push(0);
+		}
+		_ => return Err(BasicError::FeatureNotYetSupported),
+	}
+	Ok(out)
+}
+
+/// Takes in a slice of tokens and removes an expression, the start of said expression is separated.
+fn extract_expression_tokens(tokens: &mut &[Token]) -> Result<(ExpressionStartSeparator, Vec<Token>), BasicError> {
+	let expression_length = get_expression_length(&tokens)?;
+	let (extracted_tokens_start, expression_start_separator) = match tokens.get(0) {
+		Some(Token::Separator(Separator::Comma)) => (1, ExpressionStartSeparator::Coma),
+		Some(Token::Separator(Separator::Semicolon)) => (1, ExpressionStartSeparator::SemiColon),
+		_ => (0, ExpressionStartSeparator::None),
+	};
+	let extracted_tokens = &tokens[extracted_tokens_start..expression_length];
+	*tokens = &tokens[expression_length..];
+	Ok((expression_start_separator, extracted_tokens.to_vec()))
+}
+
+fn get_expression_length(tokens: &[Token]) -> Result<usize, BasicError> {
+	let mut bracket_nesting_depth = 0usize;
+	for (index, token) in tokens.iter().enumerate() {
+		if matches!(token, Token::Separator(Separator::OpeningBracket)) {
+			bracket_nesting_depth += 1;
+		}
+		if matches!(token, Token::Separator(Separator::ClosingBracket)) {
+			bracket_nesting_depth = match bracket_nesting_depth.checked_sub(1) {
+				Some(new_depth) => new_depth,
+				None => return Err(BasicError::TooManyClosingBrackets),
+			};
+		}
+		if bracket_nesting_depth > 0 {
+			continue;
+		}
+		if matches!(token, Token::Separator(Separator::Comma | Separator::Semicolon)) {
+			return Ok(index)
+		}
+		let next_token = tokens.get(index + 1);
+		if matches!(token, Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::Separator(Separator::ClosingBracket)) &&
+			matches!(next_token, Some(Token::BuiltInFunction(..) | Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::Separator(Separator::OpeningBracket)))
+		{
+			return Ok(index + 1)
+		}
+	}
+	match bracket_nesting_depth {
+		0 => Ok(tokens.len()),
+		_ => Err(BasicError::TooManyOpeningBrackets),
+	}
 }
