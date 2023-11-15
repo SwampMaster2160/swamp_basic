@@ -30,10 +30,13 @@ pub fn compile_tokens_to_bytecode(mut tokens: Vec<Token>) -> Result<(Vec<u8>, Op
 	// A statment ends when another command is reached, when a colon is reached or when the end of the line is reached
 	for mut statment_tokens in tokens.split(|token| *token == Token::Separator(Separator::Colon)) {
 		while !statment_tokens.is_empty() {
-			let end = statment_tokens
+			let end = match statment_tokens
 				.iter()
-				.position(|token| matches!(token, Token::Command(_)))
-				.unwrap_or(statment_tokens.len());
+				.skip(1)
+				.position(|token| matches!(token, Token::Command(_))) {
+					None => statment_tokens.len(),
+					Some(end) => end + 1,
+				};
 			compiled_bytecode.extend(compile_statment_to_bytecode(&statment_tokens[..end])?);
 			statment_tokens = &statment_tokens[end..];
 		}
@@ -62,8 +65,8 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 			out.push(Bytecode::End as u8);
 		}
 		Command::Print => {
+			out.push(Bytecode::Print as u8);
 			while !tokens.is_empty() {
-				out.push(Bytecode::Print as u8);
 				while !tokens.is_empty() {
 					let (expression_start_separator, expression_tokens) = extract_expression_tokens(&mut tokens)?;
 					if expression_start_separator == ExpressionStartSeparator::Coma {
@@ -71,8 +74,8 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 					}
 					out.extend(compile_expression_to_bytecode(&mut expression_tokens.as_slice())?);
 				}
-				out.push(Bytecode::End as u8);
 			}
+			out.push(Bytecode::End as u8);
 		}
 		Command::Remark => unreachable!(),
 		_ => return Err(BasicError::FeatureNotYetSupported),
@@ -98,7 +101,7 @@ pub fn compile_expression_to_bytecode(tokens: &mut &[Token]) -> Result<Vec<u8>, 
 			out.push(0);
 		}
 		Token::NumericalLiteral(string) => {
-			out.push(Bytecode::StringLiteral as u8);
+			out.push(Bytecode::NumericalLiteral as u8);
 			out.extend(string.as_bytes());
 			out.push(0);
 		}
@@ -111,6 +114,7 @@ pub fn compile_expression_to_bytecode(tokens: &mut &[Token]) -> Result<Vec<u8>, 
 fn extract_expression_tokens(tokens: &mut &[Token]) -> Result<(ExpressionStartSeparator, Vec<Token>), BasicError> {
 	let expression_length = get_expression_length(&tokens)?;
 	let (extracted_tokens_start, expression_start_separator) = match tokens.get(0) {
+		_ if expression_length == 0 => (0, ExpressionStartSeparator::None),
 		Some(Token::Separator(Separator::Comma)) => (1, ExpressionStartSeparator::Coma),
 		Some(Token::Separator(Separator::Semicolon)) => (1, ExpressionStartSeparator::SemiColon),
 		_ => (0, ExpressionStartSeparator::None),
