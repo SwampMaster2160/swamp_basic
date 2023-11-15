@@ -11,6 +11,14 @@ pub struct Program {
 }
 
 impl Program {
+	/// Construct a new blank program.
+	pub fn new() -> Self {
+		Self {
+			bytecode: Vec::new(),
+			line_numbers: Vec::new(),
+		}
+	}
+
 	/// Returns the index into `line_numbers` that contains the line number or an error if the line number does not exist in the program.
 	fn get_line_numbers_index_from_line_number(&self, target_line_number: &BigInt) -> Result<usize, BasicError> {
 		match self.line_numbers.binary_search_by(|(line_number, _)| line_number.cmp(target_line_number)) {

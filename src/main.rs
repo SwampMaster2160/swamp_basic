@@ -9,6 +9,7 @@ use std::{io::stdin, collections::{HashMap, HashSet}};
 
 use lexer::{token::tokenize_line, command::Command, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
 use num::BigInt;
+use program::Program;
 
 use crate::compile::compile_tokens_to_bytecode;
 
@@ -118,8 +119,12 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 		println!("]");
 		return false;
 	}
-	//
-	println!("Line {:?}: \"{:?}\"", line_number, bytecode);
+	// Add line to program if it has a line number
+	if let Some(line_number) = line_number {
+		main_struct.program.add_line(&line_number, &bytecode);
+		return false;
+	}
+	println!("{:?}", bytecode);
 	// Return false (do not exit interpreter)
 	false
 }
@@ -131,6 +136,8 @@ pub struct Main {
 	char_to_type_restriction_mapping: HashMap<char, TypeRestriction>,
 	char_to_separator_mapping: HashMap<char, Separator>,
 	operator_character_set: HashSet<char>,
+	
+	program: Program,
 }
 
 impl Main {
@@ -143,6 +150,7 @@ impl Main {
 			char_to_separator_mapping: Separator::get_char_to_separator_mapping(),
 			string_to_operator_mapping: Operator::get_string_to_operator_mapping(),
 			operator_character_set: Operator::get_character_set(),
+			program: Program::new(),
 		}
 	}
 }

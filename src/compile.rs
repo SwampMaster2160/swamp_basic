@@ -83,6 +83,20 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 			}
 			out.push(Bytecode::End as u8);
 		}
+		Command::Run => {
+			out.push(Bytecode::Run as u8);
+			if !tokens.is_empty() {
+				return Err(BasicError::FeatureNotYetSupported);
+			}
+			out.push(Bytecode::End as u8);
+		}
+		Command::List => {
+			out.push(Bytecode::List as u8);
+			if !tokens.is_empty() {
+				return Err(BasicError::FeatureNotYetSupported);
+			}
+			out.push(Bytecode::End as u8);
+		}
 		Command::Remark => unreachable!(),
 		_ => return Err(BasicError::FeatureNotYetSupported),
 	}
@@ -145,7 +159,7 @@ fn get_expression_length(tokens: &[Token]) -> Result<usize, BasicError> {
 		if bracket_nesting_depth > 0 {
 			continue;
 		}
-		if matches!(token, Token::Separator(Separator::Comma | Separator::Semicolon)) {
+		if index > 0 && matches!(token, Token::Separator(Separator::Comma | Separator::Semicolon)) {
 			return Ok(index)
 		}
 		let next_token = tokens.get(index + 1);
