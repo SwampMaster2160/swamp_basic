@@ -3,4 +3,5 @@ pub enum Bytecode {
 	NumericalLiteral,
 	StringLiteral,
 	Print,
+	Goto,
 }

@@ -67,13 +67,19 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 		Command::Print => {
 			out.push(Bytecode::Print as u8);
 			while !tokens.is_empty() {
-				while !tokens.is_empty() {
-					let (expression_start_separator, expression_tokens) = extract_expression_tokens(&mut tokens)?;
-					if expression_start_separator == ExpressionStartSeparator::Coma {
-						return Err(BasicError::FeatureNotYetSupported);
-					}
-					out.extend(compile_expression_to_bytecode(&mut expression_tokens.as_slice())?);
+				let (expression_start_separator, expression_tokens) = extract_expression_tokens(&mut tokens)?;
+				if expression_start_separator != ExpressionStartSeparator::None {
+					return Err(BasicError::FeatureNotYetSupported);
 				}
+				out.extend(compile_expression_to_bytecode(&mut expression_tokens.as_slice())?);
+			}
+			out.push(Bytecode::End as u8);
+		}
+		Command::Goto => {
+			out.push(Bytecode::Goto as u8);
+			while !tokens.is_empty() {
+				let (_, expression_tokens) = extract_expression_tokens(&mut tokens)?;
+				out.extend(compile_expression_to_bytecode(&mut expression_tokens.as_slice())?);
 			}
 			out.push(Bytecode::End as u8);
 		}
