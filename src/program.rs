@@ -1,3 +1,5 @@
+use std::str::from_utf8;
+
 use num::BigInt;
 
 use crate::error::BasicError;
@@ -8,6 +10,8 @@ pub struct Program {
 	bytecode: Vec<u8>,
 	/// A list of (line number, bytecode index) tuples that exist, MUST be ordered in accending order.
 	line_numbers: Vec<(BigInt, usize)>,
+	/// Bytecode for a line program without lines.
+	line_bytecode: Vec<u8>,
 }
 
 impl Program {
@@ -16,6 +20,7 @@ impl Program {
 		Self {
 			bytecode: Vec::new(),
 			line_numbers: Vec::new(),
+			line_bytecode: Vec::new(),
 		}
 	}
 
@@ -39,10 +44,6 @@ impl Program {
 	pub fn get_bytecode_index_from_line_number(&self, target_line_number: &BigInt) -> Result<usize, BasicError> {
 		self.get_line_numbers_index_from_line_number(target_line_number)
 			.map(|line_numbers_index| self.line_numbers[line_numbers_index].1)
-	}
-
-	pub fn get_bytecode(&self) -> &[u8] {
-		&self.bytecode
 	}
 
 	/// Removes a line and it's bytecode. Lines afterwards will have their bytecode indicies adjusted.
@@ -90,5 +91,44 @@ impl Program {
 		for(_, bytecode_index) in &mut self.line_numbers.iter_mut().skip(insert_index + 1) {
 			*bytecode_index += insert_length;
 		}
+	}
+
+	#[inline(always)]
+	pub fn set_line_program(&mut self, line_bytecode: Vec<u8>) {
+		self.bytecode = line_bytecode;
+	}
+
+	#[inline(always)]
+	fn get_bytecode(&self, is_line_program: bool) -> &[u8] {
+		match is_line_program {
+			false => self.bytecode.as_slice(),
+			true => self.line_bytecode.as_slice(),
+		}
+	}
+
+	/// Returns the next byte from the program then increments the program counter. Returns None if the end of the program has been reached.
+	pub fn get_byte(&self, is_line_program: bool, program_counter: &mut usize) -> Option<u8> {
+		let byte = self.get_bytecode(is_line_program)
+			.get(*program_counter)
+			.cloned();
+		if byte.is_some() {
+			*program_counter += 1;
+		}
+		byte
+	}
+
+	/// Returns the null-terminated utf-8 encoded string that is pointed to in the program by the program counter.
+	///
+	/// The program counter is incremented to point to the byte after the string's null byte.
+	pub fn get_string(&self, is_line_program: bool, program_counter: &mut usize) -> Result<&str, BasicError> {
+		let bytecode = self.get_bytecode(is_line_program);
+		let null_byte_index = bytecode.iter()
+			.skip(*program_counter)
+			.position(|byte| *byte == 0)
+			.ok_or(BasicError::UnterminatedString)?;
+		let utf_8_byte_slice = &bytecode[*program_counter..*program_counter + null_byte_index];
+		*program_counter += null_byte_index + 1;
+		from_utf8(utf_8_byte_slice)
+			.map_err(|_| BasicError::InvalidUtf8String)
 	}
 }

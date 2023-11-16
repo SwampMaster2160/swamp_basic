@@ -18,6 +18,8 @@ pub enum BasicError {
 	FeatureNotYetSupported,
 	TooManyClosingBrackets,
 	TooManyOpeningBrackets,
+	UnterminatedString,
+	InvalidUtf8String,
 }
 
 impl Display for BasicError {
@@ -35,6 +37,8 @@ impl Display for BasicError {
 			Self::FeatureNotYetSupported => write!(formatter, "Feature not yet supported."),
 			Self::TooManyClosingBrackets => write!(formatter, "Too many closing brackets."),
 			Self::TooManyOpeningBrackets => write!(formatter, "Too many opening brackets."),
+			Self::UnterminatedString => write!(formatter, "Unterminated string."),
+			Self::InvalidUtf8String => write!(formatter, "Invalid byte sequence for a UTF-8 string."),
 		}
 	}
 }

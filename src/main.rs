@@ -4,12 +4,14 @@ pub mod scalar_value;
 pub mod program;
 pub mod bytecode;
 pub mod compile;
+pub mod program_executer;
 
 use std::{io::stdin, collections::{HashMap, HashSet}};
 
 use lexer::{token::tokenize_line, command::Command, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
 use num::BigInt;
 use program::Program;
+use program_executer::ProgramExecuter;
 
 use crate::compile::compile_tokens_to_bytecode;
 
@@ -138,6 +140,7 @@ pub struct Main {
 	operator_character_set: HashSet<char>,
 	
 	program: Program,
+	program_executer: ProgramExecuter,
 }
 
 impl Main {
@@ -151,6 +154,7 @@ impl Main {
 			string_to_operator_mapping: Operator::get_string_to_operator_mapping(),
 			operator_character_set: Operator::get_character_set(),
 			program: Program::new(),
+			program_executer: ProgramExecuter::new(),
 		}
 	}
 }
