@@ -20,6 +20,7 @@ pub enum BasicError {
 	TooManyOpeningBrackets,
 	UnterminatedString,
 	InvalidUtf8String,
+	InvalidOpcode(u8),
 }
 
 impl Display for BasicError {
@@ -39,6 +40,7 @@ impl Display for BasicError {
 			Self::TooManyOpeningBrackets => write!(formatter, "Too many opening brackets."),
 			Self::UnterminatedString => write!(formatter, "Unterminated string."),
 			Self::InvalidUtf8String => write!(formatter, "Invalid byte sequence for a UTF-8 string."),
+			Self::InvalidOpcode(opcode) => write!(formatter, "Invalid opcode: {opcode}."),
 		}
 	}
 }

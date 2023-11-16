@@ -18,6 +18,7 @@ use crate::compile::compile_tokens_to_bytecode;
 fn main() {
 	// Create main struct
 	let mut main_struct = Main::new();
+	let mut program_executer = ProgramExecuter::new();
 	// Starting message
 	println!("--- Swamp BASIC, type \"exit\" to exit interpreter. ---");
 	// Main loop untill exit typed
@@ -28,7 +29,7 @@ fn main() {
 		// For each line
 		for line in input_text.lines() {
 			// Interpret line
-			let exit = interpret_line(&mut main_struct, line);
+			let exit = interpret_line(&mut main_struct, &mut program_executer, line);
 			// Exit if the function returned true
 			if exit {
 				break 'main_loop;
@@ -40,7 +41,7 @@ fn main() {
 /// Interpret a line that is a string slice.
 /// Should not contain any newline chars.
 /// Returns weather to exit the interpreter.
-fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
+fn interpret_line(main_struct: &mut Main, program_executer: &mut ProgramExecuter, line: &str) -> bool {
 	// Remove starting whitespaces
 	let line = line.trim_start();
 	// Get first word of line
@@ -88,7 +89,7 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 	let tokens = match tokens {
 		Ok(tokens) => tokens,
 		Err(error) => {
-			println!("Error: {}", error);
+			println!("Lexer error: {error}");
 			return false;
 		}
 	};
@@ -103,7 +104,7 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 	let (bytecode, _comment) = match compile_tokens_to_bytecode(tokens) {
 		Ok(result) => result,
 		Err(error) => {
-			println!("Error: {}", error);
+			println!("Compile error: {error}");
 			return false;
 		}
 	};
@@ -126,7 +127,9 @@ fn interpret_line(main_struct: &mut Main, line: &str) -> bool {
 		main_struct.program.add_line(&line_number, &bytecode);
 		return false;
 	}
-	println!("{:?}", bytecode);
+	// Set the line's bytecode and execute line
+	main_struct.program.set_line_program(bytecode);
+	program_executer.execute_line(main_struct);
 	// Return false (do not exit interpreter)
 	false
 }
@@ -140,7 +143,6 @@ pub struct Main {
 	operator_character_set: HashSet<char>,
 	
 	program: Program,
-	program_executer: ProgramExecuter,
 }
 
 impl Main {
@@ -154,7 +156,6 @@ impl Main {
 			string_to_operator_mapping: Operator::get_string_to_operator_mapping(),
 			operator_character_set: Operator::get_character_set(),
 			program: Program::new(),
-			program_executer: ProgramExecuter::new(),
 		}
 	}
 }
