@@ -1,4 +1,4 @@
-use crate::{lexer::{token::Token, separator::Separator, command::Command}, error::BasicError, bytecode::Bytecode};
+use crate::{lexer::{token::Token, separator::Separator, command::Command}, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -26,27 +26,27 @@ pub fn compile_tokens_to_bytecode(mut tokens: Vec<Token>) -> Result<(Vec<u8>, Op
 	if tokens.contains(&Token::Command(Command::Remark)) {
 		panic!();
 	}
-	// Compile each statment
-	// A statment ends when another command is reached, when a colon is reached or when the end of the line is reached
-	for mut statment_tokens in tokens.split(|token| *token == Token::Separator(Separator::Colon)) {
-		while !statment_tokens.is_empty() {
-			let end = match statment_tokens
+	// Compile each statement
+	// A statement ends when another command is reached, when a colon is reached or when the end of the line is reached
+	for mut statement_tokens in tokens.split(|token| *token == Token::Separator(Separator::Colon)) {
+		while !statement_tokens.is_empty() {
+			let end = match statement_tokens
 				.iter()
 				.skip(1)
 				.position(|token| matches!(token, Token::Command(_))) {
-					None => statment_tokens.len(),
+					None => statement_tokens.len(),
 					Some(end) => end + 1,
 				};
-			compiled_bytecode.extend(compile_statment_to_bytecode(&statment_tokens[..end])?);
-			statment_tokens = &statment_tokens[end..];
+			compiled_bytecode.extend(compile_statement_to_bytecode(&statement_tokens[..end])?);
+			statement_tokens = &statement_tokens[end..];
 		}
 	}
 	// Return
 	Ok((compiled_bytecode, comment))
 }
 
-/// Compiles a statment (does not produce a value) to bytecode.
-pub fn compile_statment_to_bytecode(tokens: &[Token]) -> Result<Vec<u8>, BasicError> {
+/// Compiles a statement (does not produce a value) to bytecode.
+pub fn compile_statement_to_bytecode(tokens: &[Token]) -> Result<Vec<u8>, BasicError> {
 	return match &tokens[0] {
 		Token::Command(command) => compile_command_to_bytecode(command, &tokens[1..]),
 		Token::Identifier(..) => Err(BasicError::FeatureNotYetSupported),
@@ -60,12 +60,12 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 	match command {
 		Command::End => {
 			if !tokens.is_empty() {
-				return Err(BasicError::ExpectedStatmentEnd);
+				return Err(BasicError::ExpectedStatementEnd);
 			}
-			out.push(Bytecode::End as u8);
+			out.push(StatementOpcode::End as u8);
 		}
 		Command::Print => {
-			out.push(Bytecode::Print as u8);
+			out.push(StatementOpcode::Print as u8);
 			while !tokens.is_empty() {
 				let (expression_start_separator, expression_tokens) = extract_expression_tokens(&mut tokens)?;
 				if expression_start_separator != ExpressionStartSeparator::None {
@@ -73,29 +73,29 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 				}
 				out.extend(compile_expression_to_bytecode(&mut expression_tokens.as_slice())?);
 			}
-			out.push(Bytecode::End as u8);
+			out.push(StatementOpcode::End as u8);
 		}
 		Command::Goto => {
-			out.push(Bytecode::Goto as u8);
+			out.push(StatementOpcode::Goto as u8);
 			while !tokens.is_empty() {
 				let (_, expression_tokens) = extract_expression_tokens(&mut tokens)?;
 				out.extend(compile_expression_to_bytecode(&mut expression_tokens.as_slice())?);
 			}
-			out.push(Bytecode::End as u8);
+			out.push(StatementOpcode::End as u8);
 		}
 		Command::Run => {
-			out.push(Bytecode::Run as u8);
+			out.push(StatementOpcode::Run as u8);
 			if !tokens.is_empty() {
 				return Err(BasicError::FeatureNotYetSupported);
 			}
-			out.push(Bytecode::End as u8);
+			out.push(StatementOpcode::End as u8);
 		}
 		Command::List => {
-			out.push(Bytecode::List as u8);
+			out.push(StatementOpcode::List as u8);
 			if !tokens.is_empty() {
 				return Err(BasicError::FeatureNotYetSupported);
 			}
-			out.push(Bytecode::End as u8);
+			out.push(StatementOpcode::End as u8);
 		}
 		Command::Remark => unreachable!(),
 		_ => return Err(BasicError::FeatureNotYetSupported),
@@ -116,12 +116,12 @@ pub fn compile_expression_to_bytecode(tokens: &mut &[Token]) -> Result<Vec<u8>, 
 	}
 	match token {
 		Token::StringLiteral(string) => {
-			out.push(Bytecode::StringLiteral as u8);
+			out.push(ExpressionOpcode::StringLiteral as u8);
 			out.extend(string.as_bytes());
 			out.push(0);
 		}
 		Token::NumericalLiteral(string) => {
-			out.push(Bytecode::NumericalLiteral as u8);
+			out.push(ExpressionOpcode::NumericalLiteral as u8);
 			out.extend(string.as_bytes());
 			out.push(0);
 		}

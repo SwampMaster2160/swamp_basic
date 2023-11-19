@@ -1,12 +1,13 @@
-use num::BigInt;
+use std::rc::Rc;
+
 use num_traits::FromPrimitive;
 
-use crate::{program::Program, Main, error::BasicError, bytecode::Bytecode};
+use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, scalar_value::ScalarValue, lexer::type_restriction::TypeRestriction};
 
 pub struct ProgramExecuter {
 	program_counter: usize,
 	line_program_counter: usize,
-	continue_line: Option<BigInt>,
+	//continue_counter: Option<usize>,
 	is_executing_line_program: bool,
 }
 
@@ -24,7 +25,7 @@ impl ProgramExecuter {
 		ProgramExecuter {
 			program_counter: 0,
 			line_program_counter: 0,
-			continue_line: None,
+			//continue_counter: None,
 			is_executing_line_program: false,
 		}
 	}
@@ -47,32 +48,72 @@ impl ProgramExecuter {
 		main_struct.program.get_string(self.is_executing_line_program, self.get_program_counter())
 	}
 
-	/// Executes a single instruction.
-	fn execute_instruction(&mut self, main_struct: &mut Main) -> Result<InstructionExecutionSuccessResult, BasicError> {
+	/// Executes a single statement.
+	fn execute_statement(&mut self, main_struct: &mut Main) -> Result<InstructionExecutionSuccessResult, BasicError> {
 		// Get opcode
 		let opcode_id = match self.get_program_byte(main_struct) {
 			Some(opcode_id) => opcode_id,
 			None => return Ok(InstructionExecutionSuccessResult::ProgramEnd),
 		};
-		let opcode: Option<Bytecode> = FromPrimitive::from_u8(opcode_id);
-		let opcode = match opcode {
-			Some(opcode) => opcode,
-			None => return Err(BasicError::InvalidOpcode(opcode_id)),
-		};
-		// Execute instruction
+		let opcode: StatementOpcode = FromPrimitive::from_u8(opcode_id)
+			.ok_or(BasicError::InvalidCommandOpcode(opcode_id))?;
+		// Execute statment instruction
 		match opcode {
-			Bytecode::End => return Ok(InstructionExecutionSuccessResult::ProgramStopped),
+			StatementOpcode::End => return Ok(InstructionExecutionSuccessResult::ProgramStopped),
+			StatementOpcode::Print => {
+				loop {
+					let expression_opcode = match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => expression_opcode,
+						None => break,
+					};
+					let result = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+					print!("{result}");
+				}
+				println!();
+			}
 			_ => todo!(),
 		}
 		// Continue onto next instruction
 		Ok(InstructionExecutionSuccessResult::ContinueToNextInstruction)
 	}
 
+	/// Retrives an expression opcode from the program and increments the current program counter. Returns:
+	/// * `Ok(Some(opcode))` if we get a valid non-zero opcode from the program.
+	/// * `Ok(None)` if we a zero opcode from the program.
+	/// * `Err(error)` otherwise.
+	fn get_expression_opcode(&mut self, main_struct: &mut Main) -> Result<Option<ExpressionOpcode>, BasicError> {
+		let opcode_id = self.get_program_byte(main_struct)
+			.ok_or(BasicError::ExpectedFunctionOpcodeButEnd)?;
+		Ok(match opcode_id {
+			0 => None,
+			_ => Some(FromPrimitive::from_u8(opcode_id).ok_or(BasicError::InvalidFunctionOpcode(opcode_id))?)
+		})
+	}
+
+	fn execute_expression(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, _preferred_type: TypeRestriction) -> Result<ScalarValue, BasicError> {
+		// Execute function
+		let out = match opcode {
+			ExpressionOpcode::NumericalLiteral => {
+				// TODO: Better number parsing
+				let string = self.get_program_string(main_struct)?;
+				let number = string.parse()
+					.map_err(|_| BasicError::InvalidNumericalLiteral(string.to_string()))?;
+				ScalarValue::BigInteger(Rc::new(number))
+			},
+			ExpressionOpcode::StringLiteral => {
+				let string = self.get_program_string(main_struct)?
+					.to_string();
+				ScalarValue::String(Rc::new(string))
+			}
+		};
+		Ok(out)
+	}
+
 	/// Executes the program untill it stops.
 	fn execute(&mut self, main_struct: &mut Main) {
 		// Execute instructions
 		loop {
-			let instruction_result = self.execute_instruction(main_struct);
+			let instruction_result = self.execute_statement(main_struct);
 			match instruction_result {
 				Err(error) => {
 					println!("Runtime error: {error}");

@@ -14,13 +14,16 @@ pub enum BasicError {
 	UnableToCast(ScalarValue, TypeRestriction),
 	LineNotFound(BigInt),
 	ExpectedStatment,
-	ExpectedStatmentEnd,
+	ExpectedStatementEnd,
 	FeatureNotYetSupported,
 	TooManyClosingBrackets,
 	TooManyOpeningBrackets,
 	UnterminatedString,
 	InvalidUtf8String,
-	InvalidOpcode(u8),
+	InvalidCommandOpcode(u8),
+	InvalidFunctionOpcode(u8),
+	ExpectedFunctionOpcodeButEnd,
+	InvalidNumericalLiteral(String),
 }
 
 impl Display for BasicError {
@@ -34,13 +37,16 @@ impl Display for BasicError {
 			Self::UnableToCast(value, type_restriction) => write!(formatter, "Unable to cast value {value} to conform to type restriction of {type_restriction}."),
 			Self::LineNotFound(line) => write!(formatter, "The program does not have a line {line}."),
 			Self::ExpectedStatment => write!(formatter, "Expected a statment."),
-			Self::ExpectedStatmentEnd => write!(formatter, "Expected a statment end."),
+			Self::ExpectedStatementEnd => write!(formatter, "Expected a statment end."),
 			Self::FeatureNotYetSupported => write!(formatter, "Feature not yet supported."),
 			Self::TooManyClosingBrackets => write!(formatter, "Too many closing brackets."),
 			Self::TooManyOpeningBrackets => write!(formatter, "Too many opening brackets."),
 			Self::UnterminatedString => write!(formatter, "Unterminated string."),
 			Self::InvalidUtf8String => write!(formatter, "Invalid byte sequence for a UTF-8 string."),
-			Self::InvalidOpcode(opcode) => write!(formatter, "Invalid opcode: {opcode}."),
+			Self::InvalidCommandOpcode(opcode) => write!(formatter, "Invalid command opcode: {:#04X}.", opcode),
+			Self::InvalidFunctionOpcode(opcode) => write!(formatter, "Invalid function opcode: {:#04X}.", opcode),
+			Self::ExpectedFunctionOpcodeButEnd => write!(formatter, "Expected function opcode but bytecode ended."),
+			Self::InvalidNumericalLiteral(string) => write!(formatter, "Invalid numerical literal: {string}."),
 		}
 	}
 }
