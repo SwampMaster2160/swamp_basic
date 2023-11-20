@@ -1,11 +1,21 @@
 use crate::{lexer::{token::Token, separator::Separator, command::Command}, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
-enum ExpressionStartSeparator {
+pub enum ExpressionStartSeparator {
 	None,
 	Coma,
 	SemiColon,
+}
+
+impl ExpressionStartSeparator {
+	pub const fn get_name(self) -> &'static str {
+		match self {
+			Self::None => "<none>",
+			Self::Coma => ",",
+			Self::SemiColon => ";",
+		}
+	}
 }
 
 pub fn compile_tokens_to_bytecode(mut tokens: Vec<Token>) -> Result<(Vec<u8>, Option<String>), BasicError> {
@@ -75,18 +85,21 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 			}
 			out.push(StatementOpcode::End as u8);
 		}
-		Command::Goto => {
-			out.push(StatementOpcode::Goto as u8);
-			while !tokens.is_empty() {
-				let (_, expression_tokens) = extract_expression_tokens(&mut tokens)?;
+		Command::Run | Command::Goto => {
+			out.push(match command {
+				Command::Run => StatementOpcode::Run,
+				Command::Goto => StatementOpcode::Goto,
+				_ => unreachable!(),
+			} as u8);
+			let (expression_start_separator, expression_tokens) = extract_expression_tokens(&mut tokens)?;
+			if !expression_tokens.is_empty() {
 				out.extend(compile_expression_to_bytecode(&mut expression_tokens.as_slice())?);
 			}
-			out.push(StatementOpcode::End as u8);
-		}
-		Command::Run => {
-			out.push(StatementOpcode::Run as u8);
+			if expression_start_separator != ExpressionStartSeparator::None {
+				return Err(BasicError::InvalidSeparator(expression_start_separator));
+			}
 			if !tokens.is_empty() {
-				return Err(BasicError::FeatureNotYetSupported);
+				return Err(BasicError::ExpectedStatementEnd);
 			}
 			out.push(StatementOpcode::End as u8);
 		}

@@ -2,7 +2,7 @@ use std::{error::Error, fmt::Display};
 
 use num::BigInt;
 
-use crate::{scalar_value::ScalarValue, lexer::type_restriction::TypeRestriction};
+use crate::{scalar_value::ScalarValue, lexer::type_restriction::TypeRestriction, compile::ExpressionStartSeparator};
 
 #[derive(Debug, Clone)]
 pub enum BasicError {
@@ -24,6 +24,7 @@ pub enum BasicError {
 	InvalidFunctionOpcode(u8),
 	ExpectedFunctionOpcodeButEnd,
 	InvalidNumericalLiteral(String),
+	InvalidSeparator(ExpressionStartSeparator),
 }
 
 impl Display for BasicError {
@@ -47,6 +48,7 @@ impl Display for BasicError {
 			Self::InvalidFunctionOpcode(opcode) => write!(formatter, "Invalid function opcode: {:#04X}.", opcode),
 			Self::ExpectedFunctionOpcodeButEnd => write!(formatter, "Expected function opcode but bytecode ended."),
 			Self::InvalidNumericalLiteral(string) => write!(formatter, "Invalid numerical literal: {string}."),
+			Self::InvalidSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_name()),
 		}
 	}
 }

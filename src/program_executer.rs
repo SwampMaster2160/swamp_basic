@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use num::BigInt;
 use num_traits::FromPrimitive;
 
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, scalar_value::ScalarValue, lexer::type_restriction::TypeRestriction};
@@ -53,7 +54,9 @@ impl ProgramExecuter {
 		// Get opcode
 		let opcode_id = match self.get_program_byte(main_struct) {
 			Some(opcode_id) => opcode_id,
-			None => return Ok(InstructionExecutionSuccessResult::ProgramEnd),
+			None => {
+				return Ok(InstructionExecutionSuccessResult::ProgramEnd)
+			},
 		};
 		let opcode: StatementOpcode = FromPrimitive::from_u8(opcode_id)
 			.ok_or(BasicError::InvalidCommandOpcode(opcode_id))?;
@@ -70,6 +73,32 @@ impl ProgramExecuter {
 					print!("{result}");
 				}
 				println!();
+			}
+			StatementOpcode::Run => {
+				let expression_opcode = self.get_expression_opcode(main_struct)?;
+				let new_program_counter = match expression_opcode {
+					None => 0,
+					Some(opcode) => {
+						let result = self.execute_expression(main_struct, opcode, TypeRestriction::Integer)?;
+						let line_number = result.as_big_int()?;
+						main_struct.program.get_bytecode_index_from_line_number(&line_number)?
+					}
+				};
+				self.program_counter = new_program_counter;
+				self.is_executing_line_program = false;
+			}
+			StatementOpcode::Goto => {
+				let expression_opcode = self.get_expression_opcode(main_struct)?;
+				let new_program_counter = match expression_opcode {
+					None => 0,
+					Some(opcode) => {
+						let result = self.execute_expression(main_struct, opcode, TypeRestriction::Integer)?;
+						let line_number = result.as_big_int()?;
+						main_struct.program.get_bytecode_index_from_line_number(&line_number)?
+					}
+				};
+				self.program_counter = new_program_counter;
+				self.is_executing_line_program = false;
 			}
 			_ => todo!(),
 		}
@@ -90,6 +119,7 @@ impl ProgramExecuter {
 		})
 	}
 
+	/// Executes an expression.
 	fn execute_expression(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, _preferred_type: TypeRestriction) -> Result<ScalarValue, BasicError> {
 		// Execute function
 		let out = match opcode {

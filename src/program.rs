@@ -95,7 +95,7 @@ impl Program {
 
 	#[inline(always)]
 	pub fn set_line_program(&mut self, line_bytecode: Vec<u8>) {
-		self.bytecode = line_bytecode;
+		self.line_bytecode = line_bytecode;
 	}
 
 	#[inline(always)]

@@ -99,6 +99,20 @@ impl ScalarValue {
 		}
 	}
 
+	pub fn as_big_int(self) -> Result<BigInt, BasicError> {
+		let out: BigInt = match self {
+			Self::BigInteger(value) => match Rc::try_unwrap(value) {
+				Ok(only_value) => only_value,
+				Err(value) => value.as_ref().clone(),
+			}
+			ScalarValue::Byte(value) => value.into(),
+			ScalarValue::Size(value) => value.into(),
+			ScalarValue::U32(value) => value.into(),
+			_ => return Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
+		};
+		Ok(out)
+	}
+
 	/// Casts a the value to conform to the given type restriction.
 	pub fn cast_to(&self, cast_to: TypeRestriction) -> Result<Self, BasicError> {
 		match (self, cast_to) {
