@@ -96,7 +96,7 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 				out.extend(compile_expression_to_bytecode(&mut expression_tokens.as_slice())?);
 			}
 			if expression_start_separator != ExpressionStartSeparator::None {
-				return Err(BasicError::InvalidSeparator(expression_start_separator));
+				return Err(BasicError::InvalidExpressionStartSeparator(expression_start_separator));
 			}
 			if !tokens.is_empty() {
 				return Err(BasicError::ExpectedStatementEnd);

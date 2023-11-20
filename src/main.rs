@@ -5,6 +5,7 @@ pub mod program;
 pub mod bytecode;
 pub mod compile;
 pub mod program_executer;
+pub mod parser;
 
 use std::{io::stdin, collections::{HashMap, HashSet}};
 
