@@ -103,13 +103,13 @@ pub fn compile_command_to_bytecode(command: &Command, mut tokens: &[Token]) -> R
 			}
 			out.push(StatementOpcode::End as u8);
 		}
-		Command::List => {
+		/*Command::List => {
 			out.push(StatementOpcode::List as u8);
 			if !tokens.is_empty() {
 				return Err(BasicError::FeatureNotYetSupported);
 			}
 			out.push(StatementOpcode::End as u8);
-		}
+		}*/
 		Command::Remark => unreachable!(),
 		_ => return Err(BasicError::FeatureNotYetSupported),
 	}

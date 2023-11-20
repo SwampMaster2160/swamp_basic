@@ -59,6 +59,8 @@ impl Program {
 		let length_of_bytecode_to_remove = bytecode_remove_end_index - bytecode_remove_start_index;
 		// Remove the line's bytecode from the bytecode vector
 		self.bytecode.drain(bytecode_remove_start_index..bytecode_remove_end_index);
+		// Remove line number
+		self.line_numbers.remove(line_numbers_index);
 		// Repoint all the lines after the line removed
 		for (_, bytecode_index) in &mut self.line_numbers.iter_mut().skip(line_numbers_index) {
 			*bytecode_index -= length_of_bytecode_to_remove;

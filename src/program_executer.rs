@@ -1,6 +1,5 @@
 use std::rc::Rc;
 
-use num::BigInt;
 use num_traits::FromPrimitive;
 
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, scalar_value::ScalarValue, lexer::type_restriction::TypeRestriction};
@@ -100,7 +99,7 @@ impl ProgramExecuter {
 				self.program_counter = new_program_counter;
 				self.is_executing_line_program = false;
 			}
-			_ => todo!(),
+			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Continue onto next instruction
 		Ok(InstructionExecutionSuccessResult::ContinueToNextInstruction)
@@ -145,6 +144,11 @@ impl ProgramExecuter {
 		loop {
 			let instruction_result = self.execute_statement(main_struct);
 			match instruction_result {
+				Err(error) if !self.is_executing_line_program => {
+					// TODO: Print the line number the error occured on
+					println!("Runtime error: {error}");
+					break;
+				}
 				Err(error) => {
 					println!("Runtime error: {error}");
 					break;
