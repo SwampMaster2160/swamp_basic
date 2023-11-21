@@ -1,4 +1,4 @@
-use crate::{lexer::{token::Token, separator::Separator, command::Command}, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}};
+use crate::{lexer::{token::Token, separator::Separator, command::Command}, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, parser::ParseTreeElement};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
@@ -18,9 +18,10 @@ impl ExpressionStartSeparator {
 	}
 }
 
-pub fn compile_tokens_to_bytecode(mut tokens: Vec<Token>) -> Result<(Vec<u8>, Option<String>), BasicError> {
+pub fn compile_parse_tree_elements_to_bytecode(mut tokens: Vec<ParseTreeElement>) -> Result<Vec<u8>, BasicError> {
 	let mut compiled_bytecode = Vec::new();
-	let mut comment = None;
+	todo!();
+	/*
 	// Separate comment
 	if let Some(Token::Comment(_)) = tokens.last() {
 		match tokens.pop() {
@@ -50,9 +51,9 @@ pub fn compile_tokens_to_bytecode(mut tokens: Vec<Token>) -> Result<(Vec<u8>, Op
 			compiled_bytecode.extend(compile_statement_to_bytecode(&statement_tokens[..end])?);
 			statement_tokens = &statement_tokens[end..];
 		}
-	}
+	}*/
 	// Return
-	Ok((compiled_bytecode, comment))
+	Ok(compiled_bytecode)
 }
 
 /// Compiles a statement (does not produce a value) to bytecode.
@@ -60,7 +61,7 @@ pub fn compile_statement_to_bytecode(tokens: &[Token]) -> Result<Vec<u8>, BasicE
 	return match &tokens[0] {
 		Token::Command(command) => compile_command_to_bytecode(command, &tokens[1..]),
 		Token::Identifier(..) => Err(BasicError::FeatureNotYetSupported),
-		_ => Err(BasicError::ExpectedStatment),
+		_ => Err(BasicError::ExpectedStatement),
 	}
 }
 

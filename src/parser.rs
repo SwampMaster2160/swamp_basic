@@ -1,6 +1,6 @@
 use std::mem;
 
-use crate::{lexer::{token::Token, separator::Separator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, operator::Operator}, error::BasicError};
+use crate::{lexer::{token::Token, separator::Separator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, operator::Operator, command::Command}, error::BasicError};
 
 #[derive(Debug, Clone)]
 pub enum ParseTreeElement {
@@ -12,6 +12,8 @@ pub enum ParseTreeElement {
 	Identifier(String, TypeRestriction),
 	BuiltInFunction(BuiltInFunction, TypeRestriction, Vec<ParseTreeElement>),
 	UserDefinedFunction(String, TypeRestriction, Vec<ParseTreeElement>),
+	Command(Command, Vec<ParseTreeElement>),
+	ExpressionSeparator(Separator),
 }
 
 impl ParseTreeElement {
@@ -19,7 +21,7 @@ impl ParseTreeElement {
 		Self::UnparsedToken(token)
 	}
 
-	const fn is_statment(&self) -> bool {
+	/*const fn is_statement(&self) -> bool {
 		match self {
 			Self::UnparsedToken(_) => false,
 			Self::NumericalLiteral(_) => false,
@@ -29,8 +31,10 @@ impl ParseTreeElement {
 			Self::BinaryOperator(_, _, _) => false,
 			Self::BuiltInFunction(_, _, _) => false,
 			Self::UserDefinedFunction(_, _, _) => false,
+			Self::Command(_, _) => true,
+			Self::ExpressionSeparator(_) => false,
 		}
-	}
+	}*/
 
 	const fn is_expression(&self) -> bool {
 		match self {
@@ -42,15 +46,119 @@ impl ParseTreeElement {
 			Self::BinaryOperator(_, _, _) => true,
 			Self::BuiltInFunction(_, _, _) => true,
 			Self::UserDefinedFunction(_, _, _) => true,
+			Self::Command(_, _) => false,
+			Self::ExpressionSeparator(_) => true,
 		}
 	}
 }
 
-pub fn parse_tokens(tokens: Vec<Token>) -> Result<Vec<ParseTreeElement>, BasicError> {
-	// Convert tokens to unparsed parse tree elements
-	let out = tokens.into_iter()
-		.map(|token| ParseTreeElement::from_token(token))
-		.collect();
+/// Parse a BASIC line into trees of parse tree elements
+pub fn parse_line(mut tokens: Vec<Token>) -> Result<(Vec<ParseTreeElement>, Option<String>), BasicError> {
+	// Separate comment
+	let mut comment = None;
+	if let Some(Token::Comment(_)) = tokens.last() {
+		match tokens.pop() {
+			Some(Token::Comment(token_comment)) => comment = Some(token_comment),
+			_ => unreachable!(),
+		}
+	}
+	if let Some(Token::Command(Command::Remark)) = tokens.last() {
+		tokens.pop();
+	}
+	// There should be no more remarks or comments
+	#[cfg(debug_assertions)]
+	if tokens.contains(&Token::Command(Command::Remark)) {
+		panic!();
+	}
+	#[cfg(debug_assertions)]
+	for token in tokens.iter() {
+		if matches!(token, Token::Comment(_)) {
+			panic!();
+		}
+	}
+	// Parse each semicolon separated section
+	let mut out = Vec::new();
+	for mut statements_tokens in tokens.split(|token| *token == Token::Separator(Separator::Colon)) {
+		while !statements_tokens.is_empty() {
+			out.push(parse_statement(&mut statements_tokens)?);
+		}
+	}
+	//
+	Ok((out, comment))
+}
+
+/// Parses and removes a single statement from `tokens`.
+fn parse_statement(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
+	let first_token = tokens.get(0).ok_or(BasicError::ExpectedStatement)?;
+	*tokens = &mut &tokens[1..];
+	match first_token {
+		Token::Identifier(_, _) => return Err(BasicError::FeatureNotYetSupported),
+		Token::Command(command) => parse_command(*command, tokens),
+		_ => return Err(BasicError::ExpectedStatement),
+	}
+}
+
+fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
+	Ok(match command {
+		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::List | Command::On | Command::Return | Command::Stop => {
+			// Get the length of the expression
+			let command_index = tokens.iter()
+				.position(|token| matches!(token, Token::Command(_)))
+				.unwrap_or_else(|| tokens.len());
+			let mut statements_tokens;
+			(statements_tokens, *tokens) = tokens.split_at(command_index);
+			// Parse expression
+			let expressions_parsed = parse_expressions(&mut statements_tokens)?;
+			ParseTreeElement::Command(command, expressions_parsed)
+		}
+		_ => return Err(BasicError::FeatureNotYetSupported),
+	})
+}
+
+/// Parse a list of expressions, commas and semicolons
+fn parse_expressions(tokens: &mut &[Token]) -> Result<Vec<ParseTreeElement>, BasicError> {
+	let mut out = Vec::new();
+	while !tokens.is_empty() {
+		// If we have a comma or semicolon then add that to the result
+		match &tokens[0] {
+			Token::Separator(separator) if matches!(separator, Separator::Comma | Separator::Semicolon) => {
+				out.push(ParseTreeElement::ExpressionSeparator(*separator));
+				*tokens = &tokens[1..];
+				continue;
+			}
+			_ => {}
+		}
+		// Find the length of the expression
+		let mut bracket_depth = 0usize;
+		let mut expression_length = tokens.len();
+		for (index, token) in tokens.iter().enumerate() {
+			match token {
+				Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::BuiltInFunction(..) | Token::Separator(Separator::OpeningBracket)
+					if bracket_depth == 0 && index != 0 &&
+					matches!(tokens[index - 1], Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::Separator(Separator::ClosingBracket)) &&
+					!(matches!(token, Token::Separator(Separator::OpeningBracket)) && matches!(tokens[index - 1], Token::Identifier(..))) =>
+				{
+					expression_length = index;
+					break;
+				}
+				Token::Separator(Separator::OpeningBracket) => bracket_depth += 1,
+				Token::Separator(Separator::ClosingBracket) => bracket_depth = bracket_depth.checked_sub(1)
+					.ok_or(BasicError::TooManyClosingBrackets)?,
+				Token::Separator(Separator::Comma | Separator::Semicolon) if bracket_depth == 0 => {
+					expression_length = index;
+					break;
+				}
+				_ => {}
+			}
+		}
+		// Extract expression
+		let expression_tokens;
+		(expression_tokens, *tokens) = tokens.split_at(expression_length);
+		let expression_parse_tree_elements: Vec<ParseTreeElement> = expression_tokens.into_iter()
+			.map(|token| ParseTreeElement::from_token(token.clone()))
+			.collect();
+		out.push(parse_expression(expression_parse_tree_elements)?);
+	}
 	Ok(out)
 }
 
@@ -83,6 +191,7 @@ fn find_bracket_pair_end(tokens: &[ParseTreeElement]) -> Result<usize, BasicErro
 	Err(BasicError::TooManyOpeningBrackets)
 }
 
+/// Parse an expression
 fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<ParseTreeElement, BasicError> {
 	// Parse bracketed pairs and functions
 	for index in 0.. {
@@ -132,7 +241,7 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 			// User defined functions
 			Token::Identifier(name, type_restriction) => {
 				let type_restriction = *type_restriction;
-				let name = mem::take(name);
+				let name = name.clone();
 				if !matches!(parse_tree_elements.get(index + 1), Some(ParseTreeElement::UnparsedToken(Token::Separator(Separator::OpeningBracket)))) {
 					continue;
 				}
@@ -221,6 +330,6 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 	Ok(parse_tree_elements.pop().unwrap())
 }
 
-fn parse_function_expressions(tokens: Vec<ParseTreeElement>) -> Result<Vec<ParseTreeElement>, BasicError> {
-	todo!()
+fn parse_function_expressions(_tokens: Vec<ParseTreeElement>) -> Result<Vec<ParseTreeElement>, BasicError> {
+	return Err(BasicError::FeatureNotYetSupported);
 }
