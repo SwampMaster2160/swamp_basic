@@ -8,6 +8,7 @@ pub enum ParseTreeElement {
 	NumericalLiteral(String),
 	StringLiteral(String),
 	UnaryOperator(Operator, Box<ParseTreeElement>),
+	Identifier(String, TypeRestriction),
 }
 
 impl ParseTreeElement {
@@ -21,6 +22,7 @@ impl ParseTreeElement {
 			Self::NumericalLiteral(_) => false,
 			Self::StringLiteral(_) => false,
 			Self::UnaryOperator(_, _) => false,
+			Self::Identifier(_, _) => false,
 		}
 	}
 
@@ -30,6 +32,7 @@ impl ParseTreeElement {
 			Self::NumericalLiteral(_) => true,
 			Self::StringLiteral(_) => true,
 			Self::UnaryOperator(_, _) => true,
+			Self::Identifier(_, _) => true,
 		}
 	}
 }
@@ -75,7 +78,7 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 	// Parse bracketed pairs and functions
 	for index in 0.. {
 		// Get each unparsed token
-		let parse_tree_element = match parse_tree_elements.get(index) {
+		let parse_tree_element = match parse_tree_elements.get_mut(index) {
 			Some(element) => element,
 			None => break,
 		};
@@ -116,7 +119,21 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 				let bracketed_area_parsed = parse_function(function, type_restriction, bracketed_area)?;
 				parse_tree_elements.insert(index, bracketed_area_parsed);
 			}
-			// TODO: User defined functions
+			// User defined functions
+			Token::Identifier(name, type_restriction) => {
+				let type_restriction = *type_restriction;
+				let name = mem::take(name);
+				if !matches!(parse_tree_elements.get(index + 1), Some(ParseTreeElement::UnparsedToken(Token::Separator(Separator::OpeningBracket)))) {
+					continue;
+				}
+				let bracketed_area_length = find_bracket_pair_end(&parse_tree_elements[index + 1..])?;
+				let mut bracketed_area: Vec<ParseTreeElement> = parse_tree_elements.drain(index..index + 1 + bracketed_area_length)
+					.skip(2)
+					.collect();
+				bracketed_area.pop();
+				let bracketed_area_parsed = parse_user_defined_function(name, type_restriction, bracketed_area)?;
+				parse_tree_elements.insert(index, bracketed_area_parsed);
+			}
 			_ => continue,
 		}
 	}
@@ -129,12 +146,26 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 		match token {
 			Token::NumericalLiteral(literal) => *parse_tree_element = ParseTreeElement::NumericalLiteral(mem::take(literal)),
 			Token::StringLiteral(literal) => *parse_tree_element = ParseTreeElement::StringLiteral(mem::take(literal)),
+			Token::Identifier(name, type_restriction) => *parse_tree_element = ParseTreeElement::Identifier(mem::take(name), *type_restriction),
 			_ => continue,
 		}
 	}
 	// Parse unary operators
 	for index in (0..parse_tree_elements.len()).rev() {
-		//TODO
+		let parse_tree_element = &parse_tree_elements[index];
+		let operator = match parse_tree_element {
+			ParseTreeElement::UnparsedToken(Token::Operator(operator)) => *operator,
+			_ => continue,
+		};
+		if index > 0 && parse_tree_elements[index - 1].is_expression() {
+			continue;
+		}
+		if parse_tree_elements.len() <= index + 1 {
+			return Err(BasicError::OperatorUsedOnNothing);
+		}
+		let operand = parse_tree_elements.remove(index + 1);
+		let new_parse_tree_element = ParseTreeElement::UnaryOperator(operator, Box::new(operand));
+		parse_tree_elements[index] = new_parse_tree_element;
 	}
 	// Return the first element of the parse tree elements
 	if parse_tree_elements.len() != 1 {
@@ -144,5 +175,9 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 }
 
 fn parse_function(function_type: BuiltInFunction, type_restriction: TypeRestriction, tokens: Vec<ParseTreeElement>) -> Result<ParseTreeElement, BasicError> {
+	todo!()
+}
+
+fn parse_user_defined_function(name: String, type_restriction: TypeRestriction, tokens: Vec<ParseTreeElement>) -> Result<ParseTreeElement, BasicError> {
 	todo!()
 }

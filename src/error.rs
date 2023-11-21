@@ -28,6 +28,7 @@ pub enum BasicError {
 	InvalidSeparator(Separator),
 	NoOpeningBracketAfterFunction,
 	TooManyExpressions,
+	OperatorUsedOnNothing,
 }
 
 impl Display for BasicError {
@@ -55,6 +56,7 @@ impl Display for BasicError {
 			Self::InvalidSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_symbol_char()),
 			Self::NoOpeningBracketAfterFunction => write!(formatter, "No opening bracket immediately after function name and type."),
 			Self::TooManyExpressions => write!(formatter, "Too many expressions."),
+			Self::OperatorUsedOnNothing => write!(formatter, "Operator used on nothing."),
 		}
 	}
 }
