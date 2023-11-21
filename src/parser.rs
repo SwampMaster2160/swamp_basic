@@ -8,7 +8,10 @@ pub enum ParseTreeElement {
 	NumericalLiteral(String),
 	StringLiteral(String),
 	UnaryOperator(Operator, Box<ParseTreeElement>),
+	BinaryOperator(Operator, Box<ParseTreeElement>, Box<ParseTreeElement>),
 	Identifier(String, TypeRestriction),
+	BuiltInFunction(BuiltInFunction, TypeRestriction, Vec<ParseTreeElement>),
+	UserDefinedFunction(String, TypeRestriction, Vec<ParseTreeElement>),
 }
 
 impl ParseTreeElement {
@@ -23,6 +26,9 @@ impl ParseTreeElement {
 			Self::StringLiteral(_) => false,
 			Self::UnaryOperator(_, _) => false,
 			Self::Identifier(_, _) => false,
+			Self::BinaryOperator(_, _, _) => false,
+			Self::BuiltInFunction(_, _, _) => false,
+			Self::UserDefinedFunction(_, _, _) => false,
 		}
 	}
 
@@ -33,6 +39,9 @@ impl ParseTreeElement {
 			Self::StringLiteral(_) => true,
 			Self::UnaryOperator(_, _) => true,
 			Self::Identifier(_, _) => true,
+			Self::BinaryOperator(_, _, _) => true,
+			Self::BuiltInFunction(_, _, _) => true,
+			Self::UserDefinedFunction(_, _, _) => true,
 		}
 	}
 }
@@ -116,8 +125,9 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 					.skip(2)
 					.collect();
 				bracketed_area.pop();
-				let bracketed_area_parsed = parse_function(function, type_restriction, bracketed_area)?;
-				parse_tree_elements.insert(index, bracketed_area_parsed);
+				let bracketed_area_parsed = parse_function_expressions(bracketed_area)?;
+				let new_parse_tree_element = ParseTreeElement::BuiltInFunction(function, type_restriction, bracketed_area_parsed);
+				parse_tree_elements.insert(index, new_parse_tree_element);
 			}
 			// User defined functions
 			Token::Identifier(name, type_restriction) => {
@@ -131,8 +141,9 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 					.skip(2)
 					.collect();
 				bracketed_area.pop();
-				let bracketed_area_parsed = parse_user_defined_function(name, type_restriction, bracketed_area)?;
-				parse_tree_elements.insert(index, bracketed_area_parsed);
+				let bracketed_area_parsed = parse_function_expressions(bracketed_area)?;
+				let new_parse_tree_element = ParseTreeElement::UserDefinedFunction(name, type_restriction, bracketed_area_parsed);
+				parse_tree_elements.insert(index, new_parse_tree_element);
 			}
 			_ => continue,
 		}
@@ -167,6 +178,42 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 		let new_parse_tree_element = ParseTreeElement::UnaryOperator(operator, Box::new(operand));
 		parse_tree_elements[index] = new_parse_tree_element;
 	}
+	// Parse binary operators
+	for operators in Operator::get_precedence_priority() {
+		let operators = *operators;
+		let mut index = 0;
+		loop {
+			let parse_tree_element = match parse_tree_elements.get(index) {
+				Some(element) => element,
+				None => break,
+			}.clone();
+			let operator = match parse_tree_element {
+				ParseTreeElement::UnparsedToken(Token::Operator(operator)) => operator,
+				_ => {
+					index += 1;
+					continue;
+				}
+			};
+			if !operators.contains(&operator) {
+				index += 1;
+				continue;
+			}
+			if index == 0 {
+				return Err(BasicError::OperatorUsedOnNothing);
+			}
+			let left_operand = &parse_tree_elements.remove(index - 1);
+			if !left_operand.is_expression() {
+				return Err(BasicError::OperatorUsedOnNothing);
+			}
+			parse_tree_elements.remove(index - 1);
+			if index > parse_tree_elements.len() {
+				return Err(BasicError::OperatorUsedOnNothing);
+			}
+			let right_operand = &parse_tree_elements.remove(index - 1);
+			let new_parse_tree_element = ParseTreeElement::BinaryOperator(operator, Box::new(left_operand.clone()), Box::new(right_operand.clone()));
+			parse_tree_elements.insert(index - 1, new_parse_tree_element);
+		}
+	}
 	// Return the first element of the parse tree elements
 	if parse_tree_elements.len() != 1 {
 		return Err(BasicError::TooManyExpressions);
@@ -174,10 +221,6 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 	Ok(parse_tree_elements.pop().unwrap())
 }
 
-fn parse_function(function_type: BuiltInFunction, type_restriction: TypeRestriction, tokens: Vec<ParseTreeElement>) -> Result<ParseTreeElement, BasicError> {
-	todo!()
-}
-
-fn parse_user_defined_function(name: String, type_restriction: TypeRestriction, tokens: Vec<ParseTreeElement>) -> Result<ParseTreeElement, BasicError> {
+fn parse_function_expressions(tokens: Vec<ParseTreeElement>) -> Result<Vec<ParseTreeElement>, BasicError> {
 	todo!()
 }
