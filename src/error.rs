@@ -26,6 +26,8 @@ pub enum BasicError {
 	InvalidNumericalLiteral(String),
 	InvalidExpressionStartSeparator(ExpressionStartSeparator),
 	InvalidSeparator(Separator),
+	NoOpeningBracketAfterFunction,
+	TooManyExpressions,
 }
 
 impl Display for BasicError {
@@ -51,6 +53,8 @@ impl Display for BasicError {
 			Self::InvalidNumericalLiteral(string) => write!(formatter, "Invalid numerical literal: {string}."),
 			Self::InvalidExpressionStartSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_name()),
 			Self::InvalidSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_symbol_char()),
+			Self::NoOpeningBracketAfterFunction => write!(formatter, "No opening bracket immediately after function name and type."),
+			Self::TooManyExpressions => write!(formatter, "Too many expressions."),
 		}
 	}
 }
