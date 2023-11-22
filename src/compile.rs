@@ -18,7 +18,7 @@ impl ExpressionStartSeparator {
 	}
 }
 
-pub fn compile_parse_tree_elements_to_bytecode(mut tokens: Vec<ParseTreeElement>) -> Result<Vec<u8>, BasicError> {
+pub fn compile_parse_tree_elements_to_bytecode(mut tokens: &[ParseTreeElement]) -> Result<Vec<u8>, BasicError> {
 	let mut compiled_bytecode = Vec::new();
 	todo!();
 	/*

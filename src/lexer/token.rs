@@ -96,11 +96,11 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 			}
 		}
 		// A type restruction should end a token
-		if parsing_type == ParsingType::IdentifierKeyword {
+		/*if parsing_type == ParsingType::IdentifierKeyword {
 			if TypeRestriction::from_suffix_char(main_struct, this_char).is_some() {
 				end_token = true;
 			}
-		}
+		}*/
 		// Check if we should end the token here
 		let next_char = chars.get(index + 1).copied();
 		match next_char {
@@ -163,27 +163,15 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 					current_token_string = String::new();
 					break 'end_parse_other;
 				}
-				let last_char = current_token_string.chars().last().unwrap();
-				let type_restriction = TypeRestriction::from_suffix_char(main_struct, last_char);
-				let name_without_type_restriction = match type_restriction {
-					Some(_) => {
-						let mut name_without_type_restriction = current_token_string.clone();
-						name_without_type_restriction.pop();
-						name_without_type_restriction
-					}
-					None => current_token_string.clone(),
-				};
-				let type_restriction = match type_restriction {
-					Some(type_restriction) => type_restriction,
-					None => TypeRestriction::Any,
-				};
+				let (name_without_type_restriction, type_restriction) = TypeRestriction::from_string_with_suffix(main_struct, &current_token_string)?;
 				let as_built_in_function = BuiltInFunction::from_str(main_struct, &name_without_type_restriction);
 				if let Some(built_in_function) = as_built_in_function {
 					out.push(Token::BuiltInFunction(built_in_function, type_restriction));
 					current_token_string = String::new();
 					break 'end_parse_other;
 				}
-				out.push(Token::Identifier(mem::take(&mut current_token_string), type_restriction));
+				out.push(Token::Identifier(name_without_type_restriction.to_string(), type_restriction));
+				current_token_string = String::new();
 			}
 			ParsingType::None => {},
 		}

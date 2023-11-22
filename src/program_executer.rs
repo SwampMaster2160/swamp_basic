@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use num_traits::FromPrimitive;
 
-use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, scalar_value::ScalarValue, lexer::type_restriction::TypeRestriction};
+use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
 pub struct ProgramExecuter {
 	program_counter: usize,
@@ -127,12 +127,12 @@ impl ProgramExecuter {
 				let string = self.get_program_string(main_struct)?;
 				let number = string.parse()
 					.map_err(|_| BasicError::InvalidNumericalLiteral(string.to_string()))?;
-				ScalarValue::BigInteger(Rc::new(number))
+				ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(number)))
 			},
 			ExpressionOpcode::StringLiteral => {
 				let string = self.get_program_string(main_struct)?
 					.to_string();
-				ScalarValue::String(Rc::new(string))
+				ScalarValue::String(BasicString::String(Rc::new(string)))
 			}
 		};
 		Ok(out)

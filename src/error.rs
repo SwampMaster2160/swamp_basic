@@ -2,14 +2,14 @@ use std::{error::Error, fmt::Display};
 
 use num::BigInt;
 
-use crate::{scalar_value::ScalarValue, lexer::{type_restriction::TypeRestriction, separator::Separator}, compile::ExpressionStartSeparator};
+use crate::{lexer::{type_restriction::TypeRestriction, separator::Separator}, compile::ExpressionStartSeparator, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger}};
 
 #[derive(Debug, Clone)]
 pub enum BasicError {
 	CharEscapeInvalidChar(char),
 	CharEscapeAtLineEnd,
 	InvalidNonAlphabeticOperator(String),
-	IndexOutOfBounds(ScalarValue, usize),
+	IndexOutOfBounds(BasicInteger, usize),
 	TypeMismatch(ScalarValue, TypeRestriction),
 	UnableToCast(ScalarValue, TypeRestriction),
 	LineNotFound(BigInt),
@@ -29,6 +29,7 @@ pub enum BasicError {
 	NoOpeningBracketAfterFunction,
 	TooManyExpressions,
 	OperatorUsedOnNothing,
+	InvalidTypeRestriction(String),
 }
 
 impl Display for BasicError {
@@ -57,6 +58,7 @@ impl Display for BasicError {
 			Self::NoOpeningBracketAfterFunction => write!(formatter, "No opening bracket immediately after function name and type."),
 			Self::TooManyExpressions => write!(formatter, "Too many expressions."),
 			Self::OperatorUsedOnNothing => write!(formatter, "Operator used on nothing."),
+			Self::InvalidTypeRestriction(name) => write!(formatter, "Invalid type restriction: {name}."),
 		}
 	}
 }

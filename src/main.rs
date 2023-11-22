@@ -122,7 +122,7 @@ fn interpret_line(main_struct: &mut Main, program_executer: &mut ProgramExecuter
 		return false;
 	}
 	// Compile tokens to bytecode
-	let bytecode = match compile_parse_tree_elements_to_bytecode(parse_tree_elements) {
+	let bytecode = match compile_parse_tree_elements_to_bytecode(&parse_tree_elements) {
 		Ok(result) => result,
 		Err(error) => {
 			println!("Compile error: {error}");
@@ -159,7 +159,7 @@ pub struct Main {
 	string_to_command_mapping: HashMap<&'static str, Command>,
 	string_to_built_in_function_mapping: HashMap<&'static str, BuiltInFunction>,
 	string_to_operator_mapping: HashMap<&'static str, Operator>,
-	char_to_type_restriction_mapping: HashMap<char, TypeRestriction>,
+	string_to_type_restriction_mapping: HashMap<&'static str, TypeRestriction>,
 	char_to_separator_mapping: HashMap<char, Separator>,
 	operator_character_set: HashSet<char>,
 	
@@ -172,7 +172,7 @@ impl Main {
 		Self {
 			string_to_command_mapping: Command::get_string_to_command_mapping(),
 			string_to_built_in_function_mapping: BuiltInFunction::get_string_to_built_in_function_mapping(),
-			char_to_type_restriction_mapping: TypeRestriction::get_char_to_type_restruction_mapping(),
+			string_to_type_restriction_mapping: TypeRestriction::get_string_to_type_restruction_mapping(),
 			char_to_separator_mapping: Separator::get_char_to_separator_mapping(),
 			string_to_operator_mapping: Operator::get_string_to_operator_mapping(),
 			operator_character_set: Operator::get_character_set(),
