@@ -1,14 +1,14 @@
-use crate::{lexer::{token::Token, separator::Separator, command::Command}, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, parser::ParseTreeElement};
+use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, parser::ParseTreeElement, lexer::command::Command};
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+/*#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum ExpressionStartSeparator {
 	None,
 	Coma,
 	SemiColon,
-}
+}*/
 
-impl ExpressionStartSeparator {
+/*impl ExpressionStartSeparator {
 	pub const fn get_name(self) -> &'static str {
 		match self {
 			Self::None => "<none>",
@@ -16,12 +16,11 @@ impl ExpressionStartSeparator {
 			Self::SemiColon => ";",
 		}
 	}
-}
+}*/
 
-pub fn compile_parse_tree_elements_to_bytecode(mut tokens: &[ParseTreeElement]) -> Result<Vec<u8>, BasicError> {
+/*pub fn compile_parse_tree_elements_to_bytecode(mut tokens: &[ParseTreeElement]) -> Result<Vec<u8>, BasicError> {
 	let mut compiled_bytecode = Vec::new();
 	todo!();
-	/*
 	// Separate comment
 	if let Some(Token::Comment(_)) = tokens.last() {
 		match tokens.pop() {
@@ -51,12 +50,83 @@ pub fn compile_parse_tree_elements_to_bytecode(mut tokens: &[ParseTreeElement]) 
 			compiled_bytecode.extend(compile_statement_to_bytecode(&statement_tokens[..end])?);
 			statement_tokens = &statement_tokens[end..];
 		}
-	}*/
+	}
+	// Return
+	Ok(compiled_bytecode)
+}*/
+
+/// Compiles a list of parse tree elements to bytecode
+pub fn compile_parse_tree_elements_to_bytecode(parse_tree_elements: &[ParseTreeElement]) -> Result<Vec<u8>, BasicError> {
+	let mut compiled_bytecode = Vec::new();
+	// Compile each statement
+	for parse_tree_element in parse_tree_elements {
+		compiled_bytecode.extend(compile_statement(parse_tree_element)?);
+	}
 	// Return
 	Ok(compiled_bytecode)
 }
 
-/// Compiles a statement (does not produce a value) to bytecode.
+/// Compiles a single parse tree element that is a statement to bytecode
+fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, BasicError> {
+	assert!(parse_tree_element.is_statement());
+	let mut out = Vec::new();
+	match parse_tree_element {
+		ParseTreeElement::Command(command, sub_elements) => match command {
+			Command::End => out.push(StatementOpcode::End as u8),
+			Command::Print => {
+				out.push(StatementOpcode::Print as u8);
+				for element in sub_elements {
+					match element {
+						ParseTreeElement::ExpressionSeparator(..) => return Err(BasicError::FeatureNotYetSupported),
+						_ => out.extend(compile_expression(element)?),
+					}
+				}
+				out.push(StatementOpcode::End as u8);
+			}
+			Command::Goto | Command::Run => {
+				out.push(match command {
+					Command::Goto => StatementOpcode::Goto,
+					Command::Run => StatementOpcode::Run,
+					_ => unreachable!(),
+				} as u8);
+				match sub_elements.len() {
+					0 => {},
+					1 => match &sub_elements[0] {
+						ParseTreeElement::ExpressionSeparator(separator) => return Err(BasicError::InvalidSeparator(*separator)),
+						_ => out.extend(compile_expression(&sub_elements[0])?),
+					}
+					_ => return Err(BasicError::TooManyExpressions),
+				}
+				out.push(StatementOpcode::End as u8);
+			}
+			_ => return Err(BasicError::FeatureNotYetSupported),
+		}
+		_ => return Err(BasicError::FeatureNotYetSupported),
+	}
+	Ok(out)
+}
+
+/// Compiles a single parse tree element that is an expression to bytecode
+fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, BasicError> {
+	assert!(parse_tree_element.is_expression());
+	let mut out = Vec::new();
+	match parse_tree_element {
+		ParseTreeElement::NumericalLiteral(number) => {
+			out.push(ExpressionOpcode::NumericalLiteral as u8);
+			out.extend(number.as_bytes());
+			out.push(0);
+		}
+		ParseTreeElement::StringLiteral(number) => {
+			out.push(ExpressionOpcode::StringLiteral as u8);
+			out.extend(number.as_bytes());
+			out.push(0);
+		}
+		_ => return Err(BasicError::FeatureNotYetSupported),
+	}
+	Ok(out)
+}
+
+/*/// Compiles a statement (does not produce a value) to bytecode.
 pub fn compile_statement_to_bytecode(tokens: &[Token]) -> Result<Vec<u8>, BasicError> {
 	return match &tokens[0] {
 		Token::Command(command) => compile_command_to_bytecode(command, &tokens[1..]),
@@ -187,4 +257,4 @@ fn get_expression_length(tokens: &[Token]) -> Result<usize, BasicError> {
 		0 => Ok(tokens.len()),
 		_ => Err(BasicError::TooManyOpeningBrackets),
 	}
-}
+}*/

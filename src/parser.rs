@@ -21,7 +21,7 @@ impl ParseTreeElement {
 		Self::UnparsedToken(token)
 	}
 
-	/*const fn is_statement(&self) -> bool {
+	pub const fn is_statement(&self) -> bool {
 		match self {
 			Self::UnparsedToken(_) => false,
 			Self::NumericalLiteral(_) => false,
@@ -34,9 +34,9 @@ impl ParseTreeElement {
 			Self::Command(_, _) => true,
 			Self::ExpressionSeparator(_) => false,
 		}
-	}*/
+	}
 
-	const fn is_expression(&self) -> bool {
+	pub const fn is_expression(&self) -> bool {
 		match self {
 			Self::UnparsedToken(_) => false,
 			Self::NumericalLiteral(_) => true,
@@ -110,6 +110,10 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 			// Parse expression
 			let expressions_parsed = parse_expressions(&mut statements_tokens)?;
 			ParseTreeElement::Command(command, expressions_parsed)
+		}
+		Command::Then | Command::Else => {
+			let statement = parse_statement(tokens)?;
+			ParseTreeElement::Command(command, vec![statement])
 		}
 		_ => return Err(BasicError::FeatureNotYetSupported),
 	})
