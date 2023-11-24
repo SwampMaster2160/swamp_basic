@@ -68,6 +68,7 @@ pub fn compile_parse_tree_elements_to_bytecode(parse_tree_elements: &[ParseTreeE
 
 /// Compiles a single parse tree element that is a statement to bytecode
 fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, BasicError> {
+	#[cfg(debug_assertions)]
 	assert!(parse_tree_element.is_statement());
 	let mut out = Vec::new();
 	match parse_tree_element {
@@ -108,6 +109,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 
 /// Compiles a single parse tree element that is an expression to bytecode
 fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, BasicError> {
+	#[cfg(debug_assertions)]
 	assert!(parse_tree_element.is_expression());
 	let mut out = Vec::new();
 	match parse_tree_element {

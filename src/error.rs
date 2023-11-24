@@ -2,7 +2,7 @@ use std::{error::Error, fmt::Display};
 
 use num::BigInt;
 
-use crate::{lexer::{type_restriction::TypeRestriction, separator::Separator}, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger}};
+use crate::{lexer::{type_restriction::TypeRestriction, separator::Separator, command::Command}, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger}};
 
 #[derive(Debug, Clone)]
 pub enum BasicError {
@@ -24,12 +24,14 @@ pub enum BasicError {
 	InvalidFunctionOpcode(u8),
 	ExpectedFunctionOpcodeButEnd,
 	InvalidNumericalLiteral(String),
-	//InvalidExpressionStartSeparator(ExpressionStartSeparator),
 	InvalidSeparator(Separator),
 	NoOpeningBracketAfterFunction,
 	TooManyExpressions,
 	OperatorUsedOnNothing,
 	InvalidTypeRestriction(String),
+	InvalidMultiCommand(Vec<Command>),
+	ExpectedCommand,
+	InvalidSingleCommand(Command),
 }
 
 impl Display for BasicError {
@@ -53,13 +55,18 @@ impl Display for BasicError {
 			Self::InvalidFunctionOpcode(opcode) => write!(formatter, "Invalid function opcode: {:#04X}.", opcode),
 			Self::ExpectedFunctionOpcodeButEnd => write!(formatter, "Expected function opcode but bytecode ended."),
 			Self::InvalidNumericalLiteral(string) => write!(formatter, "Invalid numerical literal: {string}."),
-			//Self::InvalidExpressionStartSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_name()),
 			Self::InvalidSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_symbol_char()),
 			Self::NoOpeningBracketAfterFunction => write!(formatter, "No opening bracket immediately after function name and type."),
 			Self::TooManyExpressions => write!(formatter, "Too many expressions."),
 			Self::OperatorUsedOnNothing => write!(formatter, "Operator used on nothing."),
 			Self::InvalidTypeRestriction(name) => write!(formatter, "Invalid type restriction: {name}."),
+			Self::InvalidMultiCommand(commands) => {
+				write!(formatter, "Invalid multi-command: {:?}", commands)
+			}
+			Self::ExpectedCommand => write!(formatter, "Expected command."),
+			Self::InvalidSingleCommand(command) => write!(formatter, "Invalid single command: {:?}.", command),
 		}
 	}
 }
+
 impl Error for BasicError {}

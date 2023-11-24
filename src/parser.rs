@@ -3,6 +3,7 @@ use std::mem;
 use crate::{lexer::{token::Token, separator::Separator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, operator::Operator, command::Command}, error::BasicError};
 
 #[derive(Debug, Clone)]
+/// Parsing a line's tokens will result in a tree of parse tree elements for each statement.
 pub enum ParseTreeElement {
 	UnparsedToken(Token),
 	NumericalLiteral(String),
@@ -17,10 +18,12 @@ pub enum ParseTreeElement {
 }
 
 impl ParseTreeElement {
+	/// Creates a unparsed new parse tree element from a token.
 	const fn from_token(token: Token) -> Self {
 		Self::UnparsedToken(token)
 	}
 
+	/// Is the tree element a statement.
 	pub const fn is_statement(&self) -> bool {
 		match self {
 			Self::UnparsedToken(_) => false,
@@ -36,6 +39,7 @@ impl ParseTreeElement {
 		}
 	}
 
+	/// Is the tree element an expression.
 	pub const fn is_expression(&self) -> bool {
 		match self {
 			Self::UnparsedToken(_) => false,
@@ -52,7 +56,7 @@ impl ParseTreeElement {
 	}
 }
 
-/// Parse a BASIC line into trees of parse tree elements
+/// Parse a BASIC line into trees of parse tree elements and extracts the line comment.
 pub fn parse_line(mut tokens: Vec<Token>) -> Result<(Vec<ParseTreeElement>, Option<String>), BasicError> {
 	// Separate comment
 	let mut comment = None;
@@ -67,30 +71,27 @@ pub fn parse_line(mut tokens: Vec<Token>) -> Result<(Vec<ParseTreeElement>, Opti
 	}
 	// There should be no more remarks or comments
 	#[cfg(debug_assertions)]
-	if tokens.contains(&Token::Command(Command::Remark)) {
-		panic!();
-	}
-	#[cfg(debug_assertions)]
 	for token in tokens.iter() {
-		if matches!(token, Token::Comment(_)) {
-			panic!();
-		}
+		assert!(!matches!(token, Token::Comment(_) | Token::Command(Command::Remark)))
 	}
 	// Parse each semicolon separated section
-	let mut out = Vec::new();
+	let mut trees_out = Vec::new();
 	for mut statements_tokens in tokens.split(|token| *token == Token::Separator(Separator::Colon)) {
+		// Parse each statement in the semicolon separated section
 		while !statements_tokens.is_empty() {
-			out.push(parse_statement(&mut statements_tokens)?);
+			trees_out.push(parse_statement(&mut statements_tokens)?);
 		}
 	}
-	//
-	Ok((out, comment))
+	// Return
+	Ok((trees_out, comment))
 }
 
 /// Parses and removes a single statement from `tokens`.
 fn parse_statement(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
+	// Extract the first token
 	let first_token = tokens.get(0).ok_or(BasicError::ExpectedStatement)?;
 	*tokens = &mut &tokens[1..];
+	// Parse the statement
 	match first_token {
 		Token::Identifier(_, _) => return Err(BasicError::FeatureNotYetSupported),
 		Token::Command(command) => parse_command(*command, tokens),
@@ -98,35 +99,61 @@ fn parse_statement(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError
 	}
 }
 
+
+/// Parses and removes a single command or double commands "go to" and "go sub" from `tokens`.
 fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
 	Ok(match command {
+		// Commands that have a list of statements and separators as sub-trees
 		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::List | Command::On | Command::Return | Command::Stop => {
-			// Get the length of the expression
+			// Get the length of the expressions (up to the next command token)
 			let command_index = tokens.iter()
 				.position(|token| matches!(token, Token::Command(_)))
 				.unwrap_or_else(|| tokens.len());
 			let mut statements_tokens;
 			(statements_tokens, *tokens) = tokens.split_at(command_index);
-			// Parse expression
+			// Parse expressions
 			let expressions_parsed = parse_expressions(&mut statements_tokens)?;
 			ParseTreeElement::Command(command, expressions_parsed)
 		}
+		// Commands that have another statement as a sub-tree
 		Command::Then | Command::Else => {
 			let statement = parse_statement(tokens)?;
 			ParseTreeElement::Command(command, vec![statement])
 		}
+		// Merge "go" with "to" or "sub" to create one tree
+		Command::Go => {
+			// Extract the second command
+			let next_token = tokens.get(0).ok_or(BasicError::ExpectedCommand)?;
+			let next_command = match next_token {
+				Token::Command(command) => *command,
+				_ => return Err(BasicError::ExpectedCommand),
+			};
+			*tokens = &mut &tokens[1..];
+			// Merge it with the "to" or "sub" command.
+			let merged_commands = match next_command {
+				Command::To => Command::Goto,
+				Command::Subroutine => Command::GoSubroutine,
+				_ => return Err(BasicError::InvalidMultiCommand(vec![command, next_command])),
+			};
+			// Parse the merged command
+			parse_command(merged_commands, tokens)?
+		}
+		// "to" on it's own is invalid since it should be preceded by a "go" command
+		Command::To => return Err(BasicError::InvalidSingleCommand(command)),
+
 		_ => return Err(BasicError::FeatureNotYetSupported),
 	})
 }
 
 /// Parse a list of expressions, commas and semicolons
 fn parse_expressions(tokens: &mut &[Token]) -> Result<Vec<ParseTreeElement>, BasicError> {
-	let mut out = Vec::new();
+	let mut parsed_trees_out = Vec::new();
+	// Parse each expression untill there are none left
 	while !tokens.is_empty() {
 		// If we have a comma or semicolon then add that to the result
 		match &tokens[0] {
 			Token::Separator(separator) if matches!(separator, Separator::Comma | Separator::Semicolon) => {
-				out.push(ParseTreeElement::ExpressionSeparator(*separator));
+				parsed_trees_out.push(ParseTreeElement::ExpressionSeparator(*separator));
 				*tokens = &tokens[1..];
 				continue;
 			}
@@ -137,6 +164,7 @@ fn parse_expressions(tokens: &mut &[Token]) -> Result<Vec<ParseTreeElement>, Bas
 		let mut expression_length = tokens.len();
 		for (index, token) in tokens.iter().enumerate() {
 			match token {
+				// If we have two expressions sitting next to one another without a separator
 				Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::BuiltInFunction(..) | Token::Separator(Separator::OpeningBracket)
 					if bracket_depth == 0 && index != 0 &&
 					matches!(tokens[index - 1], Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::Separator(Separator::ClosingBracket)) &&
@@ -145,13 +173,16 @@ fn parse_expressions(tokens: &mut &[Token]) -> Result<Vec<ParseTreeElement>, Bas
 					expression_length = index;
 					break;
 				}
+				// Brackets increase and decrease the bracket depth
 				Token::Separator(Separator::OpeningBracket) => bracket_depth += 1,
 				Token::Separator(Separator::ClosingBracket) => bracket_depth = bracket_depth.checked_sub(1)
 					.ok_or(BasicError::TooManyClosingBrackets)?,
+				// The expression stops at a comma or semicolon if the bracket depth is 0
 				Token::Separator(Separator::Comma | Separator::Semicolon) if bracket_depth == 0 => {
 					expression_length = index;
 					break;
 				}
+				// Ignore other tokens
 				_ => {}
 			}
 		}
@@ -161,9 +192,10 @@ fn parse_expressions(tokens: &mut &[Token]) -> Result<Vec<ParseTreeElement>, Bas
 		let expression_parse_tree_elements: Vec<ParseTreeElement> = expression_tokens.into_iter()
 			.map(|token| ParseTreeElement::from_token(token.clone()))
 			.collect();
-		out.push(parse_expression(expression_parse_tree_elements)?);
+		parsed_trees_out.push(parse_expression(expression_parse_tree_elements)?);
 	}
-	Ok(out)
+	// Return
+	Ok(parsed_trees_out)
 }
 
 /// Takes a slice of parse tree elements and returns the length of the section from the opening bracket to it's matching closing bracket.
@@ -195,9 +227,9 @@ fn find_bracket_pair_end(tokens: &[ParseTreeElement]) -> Result<usize, BasicErro
 	Err(BasicError::TooManyOpeningBrackets)
 }
 
-/// Parse an expression
+/// Parse a single expression and returned the parsed tree
 fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<ParseTreeElement, BasicError> {
-	// Parse bracketed pairs and functions
+	// Parse code in brackets and parse functions
 	for index in 0.. {
 		// Get each unparsed token
 		let parse_tree_element = match parse_tree_elements.get_mut(index) {
@@ -210,22 +242,25 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 		};
 		// Evaluate bracketed pairs and functions
 		match token {
-			// An opening bracket
+			// If we find an opening bracket, find the matching closing bracket and parse the bracketed area
 			Token::Separator(Separator::OpeningBracket) => {
+				// Extract bracketed area and discard the brackets arround said area
 				let bracketed_area_length = find_bracket_pair_end(&parse_tree_elements[index..])?;
 				let mut bracketed_area: Vec<ParseTreeElement> = parse_tree_elements.drain(index..index + bracketed_area_length)
 					.skip(1)
 					.collect();
 				bracketed_area.pop();
+				// Parse the bracketed area
 				let bracketed_area_parsed = parse_expression(bracketed_area)?;
 				parse_tree_elements.insert(index, bracketed_area_parsed);
 			}
 			// Other separators are invalid
 			Token::Separator(seaprator) => return Err(BasicError::InvalidSeparator(*seaprator)),
-			// A function
+			// Parse built-in functions
 			Token::BuiltInFunction(function, type_restriction) => {
 				let function = *function;
 				let type_restriction = *type_restriction;
+				// There should be an opening bracket after the function
 				let next_token = match parse_tree_elements.get(index + 1) {
 					None => return Err(BasicError::NoOpeningBracketAfterFunction),
 					Some(token) => token,
@@ -233,40 +268,50 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 				if !matches!(next_token, ParseTreeElement::UnparsedToken(Token::Separator(Separator::OpeningBracket))) {
 					return Err(BasicError::NoOpeningBracketAfterFunction)
 				}
+				// Get the length of the functions bracketed area
 				let bracketed_area_length = find_bracket_pair_end(&parse_tree_elements[index + 1..])?;
+				// Get the bracketed area without the brackets and function name
 				let mut bracketed_area: Vec<ParseTreeElement> = parse_tree_elements.drain(index..index + 1 + bracketed_area_length)
 					.skip(2)
 					.collect();
 				bracketed_area.pop();
+				// Parse the bracketed area
 				let bracketed_area_parsed = parse_function_expressions(bracketed_area)?;
 				let new_parse_tree_element = ParseTreeElement::BuiltInFunction(function, type_restriction, bracketed_area_parsed);
 				parse_tree_elements.insert(index, new_parse_tree_element);
 			}
-			// User defined functions
+			// Parse user defined functions
 			Token::Identifier(name, type_restriction) => {
-				let type_restriction = *type_restriction;
 				let name = name.clone();
+				let type_restriction = *type_restriction;
+				// If there is not an opening bracket after the function name then this is not a function
 				if !matches!(parse_tree_elements.get(index + 1), Some(ParseTreeElement::UnparsedToken(Token::Separator(Separator::OpeningBracket)))) {
 					continue;
 				}
+				// Get the length of the functions bracketed area
 				let bracketed_area_length = find_bracket_pair_end(&parse_tree_elements[index + 1..])?;
+				// Get the bracketed area without the brackets and function name
 				let mut bracketed_area: Vec<ParseTreeElement> = parse_tree_elements.drain(index..index + 1 + bracketed_area_length)
 					.skip(2)
 					.collect();
 				bracketed_area.pop();
+				// Parse the bracketed area
 				let bracketed_area_parsed = parse_function_expressions(bracketed_area)?;
 				let new_parse_tree_element = ParseTreeElement::UserDefinedFunction(name, type_restriction, bracketed_area_parsed);
 				parse_tree_elements.insert(index, new_parse_tree_element);
 			}
-			_ => continue,
+			// Ignore other tokens
+			_ => {},
 		}
 	}
 	// Parse single tokens that do not depend on other tokens
 	for parse_tree_element in parse_tree_elements.iter_mut() {
+		// Skip parsed tokens
 		let token = match parse_tree_element {
 			ParseTreeElement::UnparsedToken(token) => token,
 			_ => continue,
 		};
+		// Parse
 		match token {
 			Token::NumericalLiteral(literal) => *parse_tree_element = ParseTreeElement::NumericalLiteral(mem::take(literal)),
 			Token::StringLiteral(literal) => *parse_tree_element = ParseTreeElement::StringLiteral(mem::take(literal)),
@@ -275,65 +320,80 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 		}
 	}
 	// Parse unary operators
+	// Go over all tokens from right to left
 	for index in (0..parse_tree_elements.len()).rev() {
+		// Get operator, skip non-operators
 		let parse_tree_element = &parse_tree_elements[index];
 		let operator = match parse_tree_element {
 			ParseTreeElement::UnparsedToken(Token::Operator(operator)) => *operator,
 			_ => continue,
 		};
+		// Skip if the element to the left is an expression (parse as a binary operator later)
 		if index > 0 && parse_tree_elements[index - 1].is_expression() {
 			continue;
 		}
+		// Extract the operand (to the right)
 		if parse_tree_elements.len() <= index + 1 {
 			return Err(BasicError::OperatorUsedOnNothing);
 		}
 		let operand = parse_tree_elements.remove(index + 1);
+		// Parse the operator
 		let new_parse_tree_element = ParseTreeElement::UnaryOperator(operator, Box::new(operand));
 		parse_tree_elements[index] = new_parse_tree_element;
 	}
 	// Parse binary operators
+	// For each priority of operators
 	for operators in Operator::get_precedence_priority() {
 		let operators = *operators;
+		// Go over each element
 		let mut index = 0;
 		loop {
+			// Get the element as an operator, skip non-operators
 			let parse_tree_element = match parse_tree_elements.get(index) {
 				Some(element) => element,
 				None => break,
-			}.clone();
-			let operator = match parse_tree_element {
+			};
+			let operator = *match parse_tree_element {
 				ParseTreeElement::UnparsedToken(Token::Operator(operator)) => operator,
 				_ => {
 					index += 1;
 					continue;
 				}
 			};
+			// Skip if the operator is not in this priority
 			if !operators.contains(&operator) {
 				index += 1;
 				continue;
 			}
+			// It is an error to have the operator at the start of an expression
 			if index == 0 {
 				return Err(BasicError::OperatorUsedOnNothing);
 			}
-			let left_operand = &parse_tree_elements.remove(index - 1);
+			// Extract left operand
+			let left_operand = parse_tree_elements.remove(index - 1);
 			if !left_operand.is_expression() {
 				return Err(BasicError::OperatorUsedOnNothing);
 			}
 			parse_tree_elements.remove(index - 1);
+			// It is an error to have the operator at the end of an expression
 			if index > parse_tree_elements.len() {
 				return Err(BasicError::OperatorUsedOnNothing);
 			}
-			let right_operand = &parse_tree_elements.remove(index - 1);
-			let new_parse_tree_element = ParseTreeElement::BinaryOperator(operator, Box::new(left_operand.clone()), Box::new(right_operand.clone()));
+			// Extract right operand
+			let right_operand = parse_tree_elements.remove(index - 1);
+			// Parse operator
+			let new_parse_tree_element = ParseTreeElement::BinaryOperator(operator, Box::new(left_operand), Box::new(right_operand));
 			parse_tree_elements.insert(index - 1, new_parse_tree_element);
 		}
 	}
-	// Return the first element of the parse tree elements
+	// There should only be one element now so return it
 	if parse_tree_elements.len() != 1 {
 		return Err(BasicError::TooManyExpressions);
 	}
 	Ok(parse_tree_elements.pop().unwrap())
 }
 
+// Parse a comma separated list of expressions for a function
 fn parse_function_expressions(_tokens: Vec<ParseTreeElement>) -> Result<Vec<ParseTreeElement>, BasicError> {
 	return Err(BasicError::FeatureNotYetSupported);
 }
