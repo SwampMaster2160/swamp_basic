@@ -9,9 +9,9 @@ pub mod parser;
 
 use std::{io::stdin, collections::{HashMap, HashSet}};
 
-use lexer::{token::tokenize_line, command::Command, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator};
+use lexer::{command::Command, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator, tokenize::tokenize_line};
 use num::BigInt;
-use parser::parse_line;
+use parser::parse_tokens_to_parse_tree_elements;
 use program::Program;
 use program_executer::ProgramExecuter;
 
@@ -43,6 +43,7 @@ fn main() {
 /// Interpret a line that is a string slice.
 /// Should not contain any newline chars.
 /// Returns weather to exit the interpreter.
+#[inline(always)]
 fn interpret_line(main_struct: &mut Main, program_executer: &mut ProgramExecuter, line: &str) -> bool {
 	// Remove starting whitespaces
 	let line = line.trim_start();
@@ -107,7 +108,7 @@ fn interpret_line(main_struct: &mut Main, program_executer: &mut ProgramExecuter
 		return false;
 	}
 	// Parse tokens
-	let (parse_tree_elements, _comment) = match parse_line(tokens) {
+	let (parse_tree_elements, _comment) = match parse_tokens_to_parse_tree_elements(tokens) {
 		Ok(parse_tree_elements) => parse_tree_elements,
 		Err(error) => {
 			println!("Parse error: {error}");
@@ -121,7 +122,7 @@ fn interpret_line(main_struct: &mut Main, program_executer: &mut ProgramExecuter
 		}
 		return false;
 	}
-	// Compile tokens to bytecode
+	// Compile tree elements to bytecode
 	let bytecode = match compile_parse_tree_elements_to_bytecode(&parse_tree_elements) {
 		Ok(result) => result,
 		Err(error) => {

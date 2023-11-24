@@ -31,6 +31,7 @@ impl ProgramExecuter {
 	}
 
 	/// Gets a mutable reference to the current program counter (main or line).
+	#[inline(always)]
 	fn get_program_counter(&mut self) -> &mut usize {
 		match self.is_executing_line_program {
 			true => &mut self.line_program_counter,
@@ -139,14 +140,15 @@ impl ProgramExecuter {
 	}
 
 	/// Executes the program untill it stops.
+	#[inline(always)]
 	fn execute(&mut self, main_struct: &mut Main) {
 		// Execute instructions
 		loop {
 			let instruction_result = self.execute_statement(main_struct);
 			match instruction_result {
 				Err(error) if !self.is_executing_line_program => {
-					// TODO: Print the line number the error occured on
-					println!("Runtime error: {error}");
+					let line = main_struct.program.get_line_number_bytecode_is_in(self.program_counter);
+					println!("Runtime error on line {line}: {error}");
 					break;
 				}
 				Err(error) => {
@@ -167,6 +169,7 @@ impl ProgramExecuter {
 	}
 
 	/// Executes the line program and jumps to the main program if a run, goto, ... is entered.
+	#[inline(always)]
 	pub fn execute_line(&mut self, main_struct: &mut Main) {
 		self.is_executing_line_program = true;
 		self.line_program_counter = 0;

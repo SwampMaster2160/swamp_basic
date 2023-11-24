@@ -19,6 +19,7 @@ pub enum ParseTreeElement {
 
 impl ParseTreeElement {
 	/// Creates a unparsed new parse tree element from a token.
+	#[inline(always)]
 	const fn from_token(token: Token) -> Self {
 		Self::UnparsedToken(token)
 	}
@@ -57,7 +58,8 @@ impl ParseTreeElement {
 }
 
 /// Parse a BASIC line into trees of parse tree elements and extracts the line comment.
-pub fn parse_line(mut tokens: Vec<Token>) -> Result<(Vec<ParseTreeElement>, Option<String>), BasicError> {
+#[inline(always)]
+pub fn parse_tokens_to_parse_tree_elements(mut tokens: Vec<Token>) -> Result<(Vec<ParseTreeElement>, Option<String>), BasicError> {
 	// Separate comment
 	let mut comment = None;
 	if let Some(Token::Comment(_)) = tokens.last() {
@@ -98,7 +100,6 @@ fn parse_statement(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError
 		_ => return Err(BasicError::ExpectedStatement),
 	}
 }
-
 
 /// Parses and removes a single command or double commands "go to" and "go sub" from `tokens`.
 fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {

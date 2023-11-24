@@ -108,6 +108,15 @@ impl Program {
 		}
 	}
 
+	/// Returns the line that the bytecode at the index is on.
+	pub fn get_line_number_bytecode_is_in(&self, bytecode_index: usize) -> &BigInt {
+		let line_number_index = match self.line_numbers.binary_search_by(|(_, index)| index.cmp(&bytecode_index)) {
+			Ok(line_number_index) => line_number_index,
+			Err(line_number_index) => line_number_index - 1,
+		};
+		&self.line_numbers[line_number_index].0
+	}
+
 	/// Returns the next byte from the program then increments the program counter. Returns None if the end of the program has been reached.
 	pub fn get_byte(&self, is_line_program: bool, program_counter: &mut usize) -> Option<u8> {
 		let byte = self.get_bytecode(is_line_program)
@@ -123,13 +132,18 @@ impl Program {
 	///
 	/// The program counter is incremented to point to the byte after the string's null byte.
 	pub fn get_string(&self, is_line_program: bool, program_counter: &mut usize) -> Result<&str, BasicError> {
+		// Get bytecode
 		let bytecode = self.get_bytecode(is_line_program);
+		// Get null byte index or return an error if none exist
 		let null_byte_index = bytecode.iter()
 			.skip(*program_counter)
 			.position(|byte| *byte == 0)
 			.ok_or(BasicError::UnterminatedString)?;
+		// Get the byte slice that contains the string without the null byte
 		let utf_8_byte_slice = &bytecode[*program_counter..*program_counter + null_byte_index];
+		// Repoint program counter to point to the byte after the null byte
 		*program_counter += null_byte_index + 1;
+		// Return string slice or an error if is not a valid utf-8 string
 		from_utf8(utf_8_byte_slice)
 			.map_err(|_| BasicError::InvalidUtf8String)
 	}
