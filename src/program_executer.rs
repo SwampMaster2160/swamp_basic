@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use num::BigInt;
 use num_traits::FromPrimitive;
 
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
@@ -80,7 +81,7 @@ impl ProgramExecuter {
 					None => 0,
 					Some(opcode) => {
 						let result = self.execute_expression(main_struct, opcode, TypeRestriction::Integer)?;
-						let line_number = result.as_big_int()?;
+						let line_number: Rc<BigInt> = result.try_into()?;
 						main_struct.program.get_bytecode_index_from_line_number(&line_number)?
 					}
 				};
@@ -93,7 +94,7 @@ impl ProgramExecuter {
 					None => 0,
 					Some(opcode) => {
 						let result = self.execute_expression(main_struct, opcode, TypeRestriction::Integer)?;
-						let line_number = result.as_big_int()?;
+						let line_number: Rc<BigInt> = result.try_into()?;
 						main_struct.program.get_bytecode_index_from_line_number(&line_number)?
 					}
 				};
@@ -135,6 +136,7 @@ impl ProgramExecuter {
 					.to_string();
 				ScalarValue::String(BasicString::String(Rc::new(string)))
 			}
+			_ => return Err(BasicError::FeatureNotYetSupported),
 		};
 		Ok(out)
 	}

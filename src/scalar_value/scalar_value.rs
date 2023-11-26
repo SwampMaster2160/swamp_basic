@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, rc::Rc};
 
 use num::{BigInt, Complex};
 
@@ -131,13 +131,25 @@ impl ScalarValue {
 		}
 	}*/
 
-	pub fn as_big_int(self) -> Result<BigInt, BasicError> {
+	/*pub fn as_big_int(self) -> Result<BigInt, BasicError> {
 		let out: BigInt = match self {
 			Self::Integer(value) => value.as_big_int()?,
 			Self::GaussianInteger(value) if value.im.is_zero() => value.re.as_big_int()?,
 			_ => return Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
 		};
 		Ok(out)
+	}*/
+}
+
+impl TryInto<Rc<BigInt>> for ScalarValue {
+	type Error = BasicError;
+
+	fn try_into(self) -> Result<Rc<BigInt>, Self::Error> {
+		match self {
+			Self::Integer(value) => value.try_into(),
+			Self::GaussianInteger(value) if value.im.is_zero() => value.re.try_into(),
+			_ => return Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
+		}
 	}
 }
 

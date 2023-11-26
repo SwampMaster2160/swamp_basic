@@ -1,4 +1,4 @@
-use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, parser::ParseTreeElement, lexer::command::Command};
+use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, parser::ParseTreeElement, lexer::{command::Command, operator::Operator}};
 
 /// Compiles a list of parse tree elements to bytecode
 #[inline(always)]
@@ -72,6 +72,48 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 			out.push(ExpressionOpcode::StringLiteral as u8);
 			out.extend(number.as_bytes());
 			out.push(0);
+		}
+		ParseTreeElement::BinaryOperator(operator, left_operand, right_operand) => {
+			match *operator {
+				Operator::AddConcatenate | Operator::And | Operator::Divide | Operator::ExclusiveOr | Operator::Exponent | Operator::MinusNegate | Operator::Modulus | Operator::Multiply |
+				Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo | Operator::EqualToAssign => {
+					out.push(match operator {
+						Operator::AddConcatenate => ExpressionOpcode::SumConcatenate,
+						Operator::And => ExpressionOpcode::And,
+						Operator::Divide => ExpressionOpcode::Divide,
+						Operator::ExclusiveOr => ExpressionOpcode::ExclusiveOr,
+						Operator::Exponent => ExpressionOpcode::Exponent,
+						Operator::MinusNegate => ExpressionOpcode::Subtract,
+						Operator::Modulus => ExpressionOpcode::Modulus,
+						Operator::Multiply => ExpressionOpcode::Product,
+						Operator::EqualTo => ExpressionOpcode::EqualTo,
+						Operator::GreaterThan => ExpressionOpcode::GreaterThan,
+						Operator::GreaterThanOrEqualTo => ExpressionOpcode::GreaterThanOrEqualTo,
+						Operator::LessThan => ExpressionOpcode::LessThan,
+						Operator::LessThanOrEqualTo => ExpressionOpcode::LessThanOrEqualTo,
+						Operator::NotEqualTo => ExpressionOpcode::NotEqualTo,
+						Operator::EqualToAssign => ExpressionOpcode::EqualToAssign,
+						_ => unreachable!(),
+					} as u8);
+					out.extend(compile_expression(left_operand)?);
+					out.extend(compile_expression(right_operand)?);
+					out.push(0);
+				}
+				other => return Err(BasicError::InvalidBinaryOperatorSymbol(other)),
+			}
+		}
+		ParseTreeElement::UnaryOperator(operator, operand) => {
+			match *operator {
+				Operator::MinusNegate | Operator::Not => {
+					out.push(match operator {
+						Operator::MinusNegate => ExpressionOpcode::Negate,
+						Operator::Not => ExpressionOpcode::Not,
+						_ => unreachable!(),
+					} as u8);
+					out.extend(compile_expression(operand)?);
+				}
+				other => return Err(BasicError::InvalidUnaryOperatorSymbol(other)),
+			}
 		}
 		_ => return Err(BasicError::FeatureNotYetSupported),
 	}

@@ -2,7 +2,7 @@ use std::{error::Error, fmt::Display};
 
 use num::BigInt;
 
-use crate::{lexer::{type_restriction::TypeRestriction, separator::Separator, command::Command}, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger}};
+use crate::{lexer::{type_restriction::TypeRestriction, separator::Separator, command::Command, operator::Operator}, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger}};
 
 #[derive(Debug, Clone)]
 pub enum BasicError {
@@ -32,6 +32,8 @@ pub enum BasicError {
 	InvalidMultiCommand(Vec<Command>),
 	ExpectedCommand,
 	InvalidSingleCommand(Command),
+	InvalidBinaryOperatorSymbol(Operator),
+	InvalidUnaryOperatorSymbol(Operator),
 }
 
 impl Display for BasicError {
@@ -65,6 +67,8 @@ impl Display for BasicError {
 			}
 			Self::ExpectedCommand => write!(formatter, "Expected command."),
 			Self::InvalidSingleCommand(command) => write!(formatter, "Invalid single command: {:?}.", command),
+			Self::InvalidBinaryOperatorSymbol(operator) => write!(formatter, "{:?} can only be used as a unary operator.", operator),
+			Self::InvalidUnaryOperatorSymbol(operator) => write!(formatter, "{:?} can only be used as a binary operator.", operator),
 		}
 	}
 }

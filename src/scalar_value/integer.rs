@@ -1,6 +1,6 @@
-use std::{rc::Rc, fmt::Display};
+use std::{rc::Rc, fmt::Display, ops::Add};
 
-use num::{BigInt, bigint::Sign};
+use num::{BigInt, bigint::{Sign, ToBigInt}};
 use num_traits::{Zero, ToPrimitive};
 
 use crate::error::BasicError;
@@ -10,22 +10,19 @@ use crate::error::BasicError;
 pub enum BasicInteger {
 	/// Zero
 	Zero,
-	/// An integer of any magnitude
-	BigInteger(Rc<BigInt>),
+	/// A 64-bit signed integer
+	SmallInteger(i64),
 	/// A size or index
 	Size(usize),
-	/// An unsigned byte
-	Byte(u8),
-	/// An unsigned 32-bit integer
-	U32(u32),
+	/// An integer of any magnitude
+	BigInteger(Rc<BigInt>),
 }
 
 impl BasicInteger {
 	pub fn is_zero(&self) -> bool {
 		match self {
 			Self::BigInteger(value) => value.is_zero(),
-			Self::Byte(value) => value.is_zero(),
-			Self::U32(value) => value.is_zero(),
+			Self::SmallInteger(value) => value.is_zero(),
 			Self::Zero => true,
 			Self::Size(value) => value.is_zero(),
 		}
@@ -41,15 +38,7 @@ impl BasicInteger {
 					false => Err(BasicError::IndexOutOfBounds(self.clone(), container_length)),
 				}
 			}
-			Self::Byte(index) => {
-				// A usize is at least 16 bits wide
-				let index = *index as usize;
-				match index < container_length {
-					true => Ok(index),
-					false => Err(BasicError::IndexOutOfBounds(self.clone(), container_length)),
-				}
-			}
-			Self::U32(index) => {
+			Self::SmallInteger(index) => {
 				let index = match (*index).try_into() {
 					Ok(index) => index,
 					Err(_) => return Err(BasicError::IndexOutOfBounds(self.clone(), container_length)),
@@ -85,7 +74,7 @@ impl BasicInteger {
 		}
 	}
 
-	pub fn as_big_int(self) -> Result<BigInt, BasicError> {
+	/*pub fn as_big_int(self) -> Result<BigInt, BasicError> {
 		let out: BigInt = match self {
 			Self::BigInteger(value) => match Rc::try_unwrap(value) {
 				Ok(only_value) => only_value,
@@ -97,6 +86,19 @@ impl BasicInteger {
 			Self::Zero => BigInt::zero(),
 		};
 		Ok(out)
+	}*/
+}
+
+impl TryInto<Rc<BigInt>> for BasicInteger {
+	type Error = BasicError;
+
+	fn try_into(self) -> Result<Rc<BigInt>, Self::Error> {
+		Ok(match self {
+			Self::BigInteger(value) => value.clone(),
+			Self::SmallInteger(value) => Rc::new(value.into()),
+			Self::Size(value) => Rc::new(value.into()),
+			Self::Zero => Rc::new(BigInt::zero()),
+		})
 	}
 }
 
@@ -105,9 +107,33 @@ impl Display for BasicInteger {
 		match self {
 			Self::BigInteger(value) => write!(formatter, "{value}"),
 			Self::Size(value) => write!(formatter, "{value}"),
-			Self::Byte(value) => write!(formatter, "{value}"),
-			Self::U32(value) => write!(formatter, "{value}"),
+			Self::SmallInteger(value) => write!(formatter, "{value}"),
 			Self::Zero => write!(formatter, "0"),
+		}
+	}
+}
+
+impl Add for BasicInteger {
+	type Output = Self;
+
+	fn add(self, rhs: Self) -> Self::Output {
+		match (self, rhs) {
+			(Self::Zero, other) | (other, Self::Zero) => other,
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => match left_value.checked_add(left_value) {
+				Some(result) => Self::SmallInteger(result),
+				None => Self::BigInteger(Rc::new((left_value as i128 + right_value as i128).to_bigint().unwrap())),
+			}
+			(Self::Size(left_value), Self::Size(right_value)) => match left_value.checked_add(left_value) {
+				Some(result) => {
+					Self::Size(result)
+				},
+				None => match usize::BITS < 63 {
+					true => Self::SmallInteger(left_value as i64 + right_value as i64),
+					false => Self::BigInteger(Rc::new(left_value.to_bigint().unwrap() + right_value.to_bigint().unwrap())),
+				}
+			}
+			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Self::BigInteger(Rc::new(left_value.as_ref() + right_value.as_ref())),
+			_ => todo!(),
 		}
 	}
 }

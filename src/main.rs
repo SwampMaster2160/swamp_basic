@@ -7,7 +7,7 @@ pub mod compile;
 pub mod program_executer;
 pub mod parser;
 
-use std::{io::stdin, collections::{HashMap, HashSet}};
+use std::{io::stdin, collections::{HashMap, HashSet}, rc::Rc};
 
 use lexer::{command::Command, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator, tokenize::tokenize_line};
 use num::BigInt;
@@ -179,5 +179,12 @@ impl Main {
 			operator_character_set: Operator::get_character_set(),
 			program: Program::new(),
 		}
+	}
+}
+
+pub fn get_rc_only_or_clone<T: Clone>(value: Rc<T>) -> T {
+	match Rc::try_unwrap(value) {
+		Ok(unwrapped) => unwrapped,
+		Err(wrapped) => wrapped.as_ref().clone(),
 	}
 }
