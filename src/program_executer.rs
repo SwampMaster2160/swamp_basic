@@ -129,7 +129,7 @@ impl ProgramExecuter {
 				let string = self.get_program_string(main_struct)?;
 				let number = string.parse()
 					.map_err(|_| BasicError::InvalidNumericalLiteral(string.to_string()))?;
-				ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(number)))
+				ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(number)).compact())
 			},
 			ExpressionOpcode::StringLiteral => {
 				let string = self.get_program_string(main_struct)?

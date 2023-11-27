@@ -1,19 +1,20 @@
 use std::{fmt::Display, rc::Rc};
 
-use num::{BigInt, Complex};
+use num::{BigInt, Complex, complex::Complex64};
+use num_traits::Zero;
 
 use crate::{lexer::type_restriction::TypeRestriction, error::BasicError};
 
-use super::{integer::BasicInteger, float::BasicFloat, string::BasicString};
+use super::{integer::BasicInteger, string::BasicString};
 
 #[derive(Debug, Clone, PartialEq)]
 #[repr(u8)]
 pub enum ScalarValue {
 	Integer(BasicInteger),
-	Float(BasicFloat),
+	Float(f64),
 	Bool(bool),
 	String(BasicString),
-	ComplexFloat(Complex<BasicFloat>),
+	ComplexFloat(Complex64),
 	GaussianInteger(Complex<BasicInteger>),
 }
 
@@ -55,6 +56,12 @@ impl ScalarValue {
 			TypeRestriction::ComplexFloat => self.is_complex_float(),
 			TypeRestriction::ComplexNumber => self.is_complex_float() || self.is_gaussian_integer(),
 		}
+	}
+
+	/// Makes a value compact.
+	pub fn compact(self) -> Self {
+		// TODO
+		self
 	}
 
 	/*/// Casts a the value to conform to the given type restriction.
@@ -131,14 +138,31 @@ impl ScalarValue {
 		}
 	}*/
 
-	/*pub fn as_big_int(self) -> Result<BigInt, BasicError> {
-		let out: BigInt = match self {
-			Self::Integer(value) => value.as_big_int()?,
-			Self::GaussianInteger(value) if value.im.is_zero() => value.re.as_big_int()?,
-			_ => return Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
-		};
-		Ok(out)
-	}*/
+	pub fn add_concatenate(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(match (self.clone(), rhs) {
+			(Self::ComplexFloat(complex_float_value), other) | (other, Self::ComplexFloat(complex_float_value)) => {
+				let converted: Complex64 = other.try_into()?;
+				Self::ComplexFloat(complex_float_value + converted)
+			}
+			(Self::GaussianInteger(left_value), Self::GaussianInteger(right_value)) =>
+				Self::GaussianInteger(Complex::new(left_value.re + right_value.re, left_value.im + right_value.im)),
+			(Self::GaussianInteger(gaussian_integer_value), Self::Integer(integer_value)) |
+			(Self::Integer(integer_value), Self::GaussianInteger(gaussian_integer_value)) =>
+				Self::GaussianInteger(Complex::new(gaussian_integer_value.re + integer_value, gaussian_integer_value.im)),
+			(Self::GaussianInteger(gaussian_integer_value), Self::Float(float_value)) |
+			(Self::Float(float_value), Self::GaussianInteger(gaussian_integer_value)) => {
+				let gaussian_real: f64 = gaussian_integer_value.re.into();
+				Self::ComplexFloat(Complex64::new(gaussian_real + float_value, gaussian_integer_value.im.into()))
+			}
+			(Self::Float(float_value), other) | (other, Self::Float(float_value)) => {
+				let converted: f64 = other.try_into()?;
+				Self::Float(float_value + converted)
+			}
+			(Self::Integer(left_value), Self::Integer(right_value)) => Self::Integer(left_value + right_value),
+			(Self::String(left_value), Self::String(right_value)) => todo!(),
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::ComplexNumber)),
+		})
+	}
 }
 
 impl TryInto<Rc<BigInt>> for ScalarValue {
@@ -150,6 +174,34 @@ impl TryInto<Rc<BigInt>> for ScalarValue {
 			Self::GaussianInteger(value) if value.im.is_zero() => value.re.try_into(),
 			_ => return Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
 		}
+	}
+}
+
+impl TryInto<f64> for ScalarValue {
+	type Error = BasicError;
+
+	fn try_into(self) -> Result<f64, Self::Error> {
+		Ok(match self {
+			Self::Float(value) => value,
+			Self::Integer(value) => value.into(),
+			Self::ComplexFloat(value) if value.im.is_zero() => value.re,
+			Self::GaussianInteger(value) if value.im.is_zero() => value.re.into(),
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::Float)),
+		})
+	}
+}
+
+impl TryInto<Complex64> for ScalarValue {
+	type Error = BasicError;
+
+	fn try_into(self) -> Result<Complex64, Self::Error> {
+		Ok(match self {
+			Self::Float(value) => value.into(),
+			Self::Integer(value) => Complex64::new(value.into(), 0.0),
+			Self::ComplexFloat(value) => value,
+			Self::GaussianInteger(value) => Complex::new(value.re.into(), value.im.into()),
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::Float)),
+		})
 	}
 }
 
