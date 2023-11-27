@@ -1,4 +1,4 @@
-use std::{rc::Rc, fmt::Display, ops::Add};
+use std::{rc::Rc, fmt::Display, ops::Add, result};
 
 use num::{BigInt, bigint::{Sign, ToBigInt}};
 use num_traits::{Zero, ToPrimitive};
@@ -113,6 +113,9 @@ impl Display for BasicInteger {
 	}
 }
 
+/// Can the sum of two usize numbers always fit in a i64.
+const CAN_USIZE_SUM_FIT_IN_I64: bool = usize::BITS < 63;
+
 impl Add for BasicInteger {
 	type Output = Self;
 
@@ -127,13 +130,23 @@ impl Add for BasicInteger {
 				Some(result) => {
 					Self::Size(result)
 				},
-				None => match usize::BITS < 63 {
+				None => match CAN_USIZE_SUM_FIT_IN_I64 {
 					true => Self::SmallInteger(left_value as i64 + right_value as i64),
 					false => Self::BigInteger(Rc::new(left_value.to_bigint().unwrap() + right_value.to_bigint().unwrap())),
 				}
 			}
 			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Self::BigInteger(Rc::new(left_value.as_ref() + right_value.as_ref())),
-			_ => todo!(),
+			(Self::BigInteger(big_value), Self::SmallInteger(small_value)) | (Self::SmallInteger(small_value), Self::BigInteger(big_value))
+			=> Self::BigInteger(Rc::new(big_value.as_ref() + small_value.to_bigint().unwrap())),
+			(Self::BigInteger(big_value), Self::Size(small_value)) | (Self::Size(small_value), Self::BigInteger(big_value))
+			=> Self::BigInteger(Rc::new(big_value.as_ref() + small_value.to_bigint().unwrap())),
+			(Self::Size(size_value), Self::SmallInteger(small_value)) | (Self::SmallInteger(small_value), Self::Size(size_value)) => match small_value.try_into() {
+				Ok(converted) => match size_value.checked_add_signed(converted) {
+					Some(result) => Self::Size(result),
+					None => Self::BigInteger(Rc::new((size_value.to_bigint().unwrap() + converted.to_bigint().unwrap()).to_bigint().unwrap())),
+				}
+				Err(..) => Self::BigInteger(Rc::new(size_value.to_bigint().unwrap() + small_value.to_bigint().unwrap()))
+			}
 		}
 	}
 }
