@@ -12,7 +12,7 @@ use super::{integer::BasicInteger, string::BasicString};
 pub enum ScalarValue {
 	Integer(BasicInteger),
 	Float(f64),
-	Bool(bool),
+	Boolean(bool),
 	String(BasicString),
 	ComplexFloat(Complex64),
 	GaussianInteger(Complex<BasicInteger>),
@@ -51,7 +51,7 @@ impl ScalarValue {
 			TypeRestriction::Float => self.is_float(),
 			TypeRestriction::RealNumber => self.is_integer() || self.is_float(),
 			TypeRestriction::String => matches!(self, Self::String(_)),
-			TypeRestriction::Boolean => matches!(self, Self::Bool(_)),
+			TypeRestriction::Boolean => matches!(self, Self::Boolean(_)),
 			TypeRestriction::GaussianInteger => self.is_gaussian_integer(),
 			TypeRestriction::ComplexFloat => self.is_complex_float(),
 			TypeRestriction::ComplexNumber => self.is_complex_float() || self.is_gaussian_integer(),
@@ -159,7 +159,7 @@ impl ScalarValue {
 				Self::Float(float_value + converted)
 			}
 			(Self::Integer(left_value), Self::Integer(right_value)) => Self::Integer(left_value + right_value),
-			(Self::String(left_value), Self::String(right_value)) => todo!(),
+			(Self::String(left_value), Self::String(right_value)) => Self::String(left_value.concatenate(right_value)),
 			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::ComplexNumber)),
 		})
 	}
@@ -209,7 +209,7 @@ impl Display for ScalarValue {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Integer(value) => write!(formatter, "{value}"),
-			Self::Bool(value) => write!(formatter, "{value}"),
+			Self::Boolean(value) => write!(formatter, "{value}"),
 			Self::Float(value) => write!(formatter, "{value}"),
 			Self::String(value) => write!(formatter, "{value}"),
 			Self::ComplexFloat(value) if value.im.is_zero() => write!(formatter, "{}", value.re),

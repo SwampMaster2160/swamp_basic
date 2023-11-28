@@ -121,7 +121,7 @@ impl ProgramExecuter {
 	}
 
 	/// Executes an expression.
-	fn execute_expression(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, _preferred_type: TypeRestriction) -> Result<ScalarValue, BasicError> {
+	fn execute_expression(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, preferred_type: TypeRestriction) -> Result<ScalarValue, BasicError> {
 		// Execute function
 		let out = match opcode {
 			ExpressionOpcode::NumericalLiteral => {
@@ -135,6 +135,24 @@ impl ProgramExecuter {
 				let string = self.get_program_string(main_struct)?
 					.to_string();
 				ScalarValue::String(BasicString::String(Rc::new(string)))
+			}
+			ExpressionOpcode::SumConcatenate => {
+				let mut sum_value: Option<ScalarValue> = None;
+				loop {
+					let expression_opcode = match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => expression_opcode,
+						None => break,
+					};
+					let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+					sum_value = Some(match sum_value {
+						Some(sum_value) => sum_value.add_concatenate(argument)?,
+						None => argument,
+					});
+				}
+				match sum_value {
+					Some(sum_value) => sum_value,
+					None => preferred_type.default_value(),
+				}
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		};

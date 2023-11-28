@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use strum_macros::EnumIter;
 
-use crate::{Main, error::BasicError};
+use crate::{Main, error::BasicError, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
 #[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(u8)]
@@ -21,6 +21,15 @@ pub enum TypeRestriction {
 
 impl TypeRestriction {
 	const SUFFIX_CHARS: [char; 5] = ['#', '%', '~', '$', '?'];
+
+	pub fn default_value(self) -> ScalarValue {
+		match self {
+			Self::Any | Self::ComplexNumber | Self::GaussianInteger | Self::RealNumber | Self::Integer => ScalarValue::Integer(BasicInteger::Zero),
+			Self::Float | Self::ComplexFloat => ScalarValue::Float(0.0),
+			Self::Boolean => ScalarValue::Boolean(false),
+			Self::String => ScalarValue::String(BasicString::EmptyString),
+		}
+	}
 
 	/// Takes a char and returns the type restriction that is associated with the char if it is a symbol for a type restriction.
 	#[inline(always)]
