@@ -78,10 +78,10 @@ impl Operator {
 			&[Self::Exponent],
 			&[Self::Multiply, Self::Divide, Self::Modulus],
 			&[Self::AddConcatenate, Self::MinusNegate],
+			&[Self::EqualTo, Self::EqualToAssign, Self::NotEqualTo, Self::LessThan, Self::LessThanOrEqualTo, Self::GreaterThan, Self::GreaterThanOrEqualTo],
 			&[Self::And],
 			&[Self::ExclusiveOr],
 			&[Self::Or],
-			&[Self::EqualTo, Self::EqualToAssign, Self::NotEqualTo, Self::LessThan, Self::LessThanOrEqualTo, Self::GreaterThan, Self::GreaterThanOrEqualTo],
 		]
 	}
 
