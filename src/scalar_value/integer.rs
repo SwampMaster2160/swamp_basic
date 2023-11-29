@@ -1,7 +1,7 @@
-use std::{rc::Rc, fmt::Display, ops::Add};
+use std::{rc::Rc, fmt::Display, ops::{Add, Sub}};
 
 use num::{BigInt, bigint::{Sign, ToBigInt}};
-use num_traits::{Zero, ToPrimitive};
+use num_traits::{Zero, ToPrimitive, Num};
 
 use crate::error::BasicError;
 
@@ -188,6 +188,28 @@ impl Add for BasicInteger {
 				Sign::Minus => Self::BigInteger(Rc::new(big_value.as_ref() + negative_value.to_bigint().unwrap())),
 			}
 			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Self::BigInteger(Rc::new(left_value.as_ref() + right_value.as_ref())),
+		}
+	}
+}
+
+const SIGNED_MIN_ABS: usize = isize::MIN.abs_diff(0);
+
+impl Sub for BasicInteger {
+	type Output = Self;
+
+	fn sub(self, rhs: Self) -> Self::Output {
+		match (self, rhs) {
+			// Zero - any
+			(Self::Zero, other) | (other, Self::Zero) => other,
+			// Positive - positive
+			(Self::PositiveSmallInteger(left_value), Self::PositiveSmallInteger(right_value)) if left_value == right_value => Self::Zero,
+			(Self::PositiveSmallInteger(left_value), Self::PositiveSmallInteger(right_value)) => match left_value.checked_sub(right_value) {
+				Some(result) => Self::PositiveSmallInteger(result),
+				None => match right_value - left_value < SIGNED_MIN_ABS {
+					true => Self::NegativeSmallInteger(left_value.wrapping_sub(right_value) as isize),
+					false => Self::BigInteger(Rc::new(left_value.to_bigint().unwrap() - right_value.to_bigint().unwrap())),
+				}
+			}
 		}
 	}
 }

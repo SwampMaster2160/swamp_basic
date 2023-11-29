@@ -57,7 +57,10 @@ fn interpret_line(main_struct: &mut Main, program_executer: &mut ProgramExecuter
 
 	// Get the line number if there is one, the main part of the line to be converted to tokens and weather to just print the tokens
 	// The line is numbered if it's first char is a digit or negative sign
-	let first_digit = first_word.chars().next().unwrap();
+	let first_digit = match first_word.chars().next() {
+		Some(first_digit) => first_digit,
+		None => return false,
+	};
 	let (line_number, line_body, print_tokens, print_bytecode, print_parse_tree_elements) = if first_digit.is_ascii_digit() || first_digit == '-' {
 		// Get the line number
 		let line_number = match first_word.parse::<BigInt>() {
