@@ -45,7 +45,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 						ParseTreeElement::ExpressionSeparator(separator) => return Err(BasicError::InvalidSeparator(*separator)),
 						_ => out.extend(compile_expression(&sub_elements[0])?),
 					}
-					_ => return Err(BasicError::WrongExpressionCount),
+					_ => return Err(BasicError::InvalidArgumentCount),
 				}
 				out.push(StatementOpcode::End as u8);
 			}
@@ -123,7 +123,7 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 				BuiltInFunction::AbsoluteValue | BuiltInFunction::Arctangent | BuiltInFunction::Cosine | BuiltInFunction::Exponential | BuiltInFunction::Integer |
 				BuiltInFunction::Logarithm | BuiltInFunction::Sign | BuiltInFunction::Sine | BuiltInFunction::SquareRoot | BuiltInFunction::Tangent => {
 					if argument_expressions.len() != 1 {
-						return Err(BasicError::TooManyArguments);
+						return Err(BasicError::InvalidArgumentCount);
 					}
 					out.push(match function {
 						BuiltInFunction::AbsoluteValue => ExpressionOpcode::AbsoluteValue,
@@ -140,7 +140,13 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 					} as u8);
 					out.extend(compile_expression(&argument_expressions[0])?);
 				}
-				_ => return Err(BasicError::FeatureNotYetSupported),
+				BuiltInFunction::Random => {
+					out.push(BuiltInFunction::Random as u8);
+					for argument_expression in argument_expressions {
+						out.extend(compile_expression(argument_expression)?);
+					}
+					out.push(0);
+				}
 			}
 		}
 		_ => return Err(BasicError::FeatureNotYetSupported),

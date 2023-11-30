@@ -26,7 +26,6 @@ pub enum BasicError {
 	InvalidNumericalLiteral(String),
 	InvalidSeparator(Separator),
 	NoOpeningBracketAfterFunction,
-	WrongExpressionCount,
 	OperatorUsedOnNothing,
 	InvalidTypeRestriction(String),
 	InvalidMultiCommand(Vec<Command>),
@@ -34,7 +33,7 @@ pub enum BasicError {
 	InvalidSingleCommand(Command),
 	InvalidBinaryOperatorSymbol(Operator),
 	InvalidUnaryOperatorSymbol(Operator),
-	TooManyArguments,
+	InvalidArgumentCount,
 }
 
 impl Display for BasicError {
@@ -60,7 +59,6 @@ impl Display for BasicError {
 			Self::InvalidNumericalLiteral(string) => write!(formatter, "Invalid numerical literal: {string}."),
 			Self::InvalidSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_symbol_char()),
 			Self::NoOpeningBracketAfterFunction => write!(formatter, "No opening bracket immediately after function name and type."),
-			Self::WrongExpressionCount => write!(formatter, "Wrong expression count."),
 			Self::OperatorUsedOnNothing => write!(formatter, "Operator used on nothing."),
 			Self::InvalidTypeRestriction(name) => write!(formatter, "Invalid type restriction: {name}."),
 			Self::InvalidMultiCommand(commands) => {
@@ -70,7 +68,7 @@ impl Display for BasicError {
 			Self::InvalidSingleCommand(command) => write!(formatter, "Invalid single command: {:?}.", command),
 			Self::InvalidBinaryOperatorSymbol(operator) => write!(formatter, "{:?} can only be used as a unary operator.", operator),
 			Self::InvalidUnaryOperatorSymbol(operator) => write!(formatter, "{:?} can only be used as a binary operator.", operator),
-			Self::TooManyArguments => write!(formatter, "Too many arguments."),
+			Self::InvalidArgumentCount => write!(formatter, "Invalid argument count."),
 		}
 	}
 }

@@ -62,7 +62,6 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 					'n' => '\n',
 					't' => '\t',
 					'r' => '\r',
-					'0' => '\0',
 					_ => return Err(BasicError::CharEscapeInvalidChar(this_char)),
 				};
 				current_token_string.push(char_replaced_with);

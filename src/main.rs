@@ -7,7 +7,7 @@ pub mod compile;
 pub mod program_executer;
 pub mod parser;
 
-use std::{io::stdin, collections::{HashMap, HashSet}, rc::Rc, env};
+use std::{io::{stdin, stdout, Write}, collections::{HashMap, HashSet}, rc::Rc};
 
 use lexer::{command::Command, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator, tokenize::tokenize_line};
 use num::BigInt;
@@ -18,7 +18,7 @@ use program_executer::ProgramExecuter;
 use crate::compile::compile_parse_tree_elements_to_bytecode;
 
 fn main() {
-	env::set_var("RUST_BACKTRACE", "1");
+	//env::set_var("RUST_BACKTRACE", "1");
 	// Create main struct
 	let mut main_struct = Main::new();
 	let mut program_executer = ProgramExecuter::new();
@@ -26,6 +26,8 @@ fn main() {
 	println!("--- Swamp BASIC {}, type \"exit\" to exit interpreter. ---", option_env!("CARGO_PKG_VERSION").unwrap());
 	// Main loop untill exit typed
 	'main_loop: loop {
+		print!(">");
+		stdout().flush().unwrap();
 		// Get lines
 		let mut input_text = String::new();
 		stdin().read_line(&mut input_text).unwrap();

@@ -166,8 +166,8 @@ fn parse_expressions(tokens: &mut &[Token]) -> Result<Vec<ParseTreeElement>, Bas
 				// If we have two expressions sitting next to one another without a separator
 				Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::BuiltInFunction(..) | Token::Separator(Separator::OpeningBracket)
 					if bracket_depth == 0 && index != 0 &&
-					matches!(tokens[index - 1], Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::Separator(Separator::ClosingBracket)) &&
-					!(matches!(token, Token::Separator(Separator::OpeningBracket)) && matches!(tokens[index - 1], Token::Identifier(..))) =>
+					matches!(tokens[index - 1], Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::Separator(Separator::ClosingBracket) | Token::BuiltInFunction(..)) &&
+					!(matches!(token, Token::Separator(Separator::OpeningBracket)) && matches!(tokens[index - 1], Token::Identifier(..) | Token::BuiltInFunction(..))) =>
 				{
 					expression_length = index;
 					break;
@@ -395,7 +395,7 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 	}
 	// There should only be one element now so return it
 	if parse_tree_elements.len() != 1 {
-		return Err(BasicError::WrongExpressionCount);
+		return Err(BasicError::InvalidArgumentCount);
 	}
 	Ok(parse_tree_elements.pop().unwrap())
 }
