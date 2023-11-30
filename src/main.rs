@@ -7,7 +7,7 @@ pub mod compile;
 pub mod program_executer;
 pub mod parser;
 
-use std::{io::stdin, collections::{HashMap, HashSet}, rc::Rc};
+use std::{io::stdin, collections::{HashMap, HashSet}, rc::Rc, env};
 
 use lexer::{command::Command, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator, operator::Operator, tokenize::tokenize_line};
 use num::BigInt;
@@ -18,6 +18,7 @@ use program_executer::ProgramExecuter;
 use crate::compile::compile_parse_tree_elements_to_bytecode;
 
 fn main() {
+	env::set_var("RUST_BACKTRACE", "1");
 	// Create main struct
 	let mut main_struct = Main::new();
 	let mut program_executer = ProgramExecuter::new();

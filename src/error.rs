@@ -26,7 +26,7 @@ pub enum BasicError {
 	InvalidNumericalLiteral(String),
 	InvalidSeparator(Separator),
 	NoOpeningBracketAfterFunction,
-	TooManyExpressions,
+	WrongExpressionCount,
 	OperatorUsedOnNothing,
 	InvalidTypeRestriction(String),
 	InvalidMultiCommand(Vec<Command>),
@@ -60,7 +60,7 @@ impl Display for BasicError {
 			Self::InvalidNumericalLiteral(string) => write!(formatter, "Invalid numerical literal: {string}."),
 			Self::InvalidSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_symbol_char()),
 			Self::NoOpeningBracketAfterFunction => write!(formatter, "No opening bracket immediately after function name and type."),
-			Self::TooManyExpressions => write!(formatter, "Too many expressions."),
+			Self::WrongExpressionCount => write!(formatter, "Wrong expression count."),
 			Self::OperatorUsedOnNothing => write!(formatter, "Operator used on nothing."),
 			Self::InvalidTypeRestriction(name) => write!(formatter, "Invalid type restriction: {name}."),
 			Self::InvalidMultiCommand(commands) => {

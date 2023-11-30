@@ -45,7 +45,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 						ParseTreeElement::ExpressionSeparator(separator) => return Err(BasicError::InvalidSeparator(*separator)),
 						_ => out.extend(compile_expression(&sub_elements[0])?),
 					}
-					_ => return Err(BasicError::TooManyExpressions),
+					_ => return Err(BasicError::WrongExpressionCount),
 				}
 				out.push(StatementOpcode::End as u8);
 			}

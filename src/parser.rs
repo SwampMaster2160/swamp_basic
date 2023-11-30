@@ -395,7 +395,7 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 	}
 	// There should only be one element now so return it
 	if parse_tree_elements.len() != 1 {
-		return Err(BasicError::TooManyExpressions);
+		return Err(BasicError::WrongExpressionCount);
 	}
 	Ok(parse_tree_elements.pop().unwrap())
 }
