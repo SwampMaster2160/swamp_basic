@@ -121,7 +121,7 @@ impl ProgramExecuter {
 	}
 
 	/// Executes an expression.
-	fn execute_expression(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, preferred_type: TypeRestriction) -> Result<ScalarValue, BasicError> {
+	fn execute_expression(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, return_type_restriction: TypeRestriction) -> Result<ScalarValue, BasicError> {
 		// Execute function
 		let out = match opcode {
 			ExpressionOpcode::NumericalLiteral => {
@@ -155,7 +155,7 @@ impl ProgramExecuter {
 				}
 				match result {
 					Some(sum_value) => sum_value,
-					None => preferred_type.default_value(),
+					None => return_type_restriction.default_value(),
 				}
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),

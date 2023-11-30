@@ -35,4 +35,12 @@ pub enum ExpressionOpcode {
 	Sine,
 	SquareRoot,
 	Tangent,
+	GetRealNumber,
+	GetInteger,
+	GetFloat,
+	GetString,
+	GetBoolean,
+	GetComplexFloat,
+	GetGaussianInteger,
+	GetComplexNumber,
 }
