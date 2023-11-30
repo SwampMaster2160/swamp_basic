@@ -259,13 +259,21 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 			Token::BuiltInFunction(function, type_restriction) => {
 				let function = *function;
 				let type_restriction = *type_restriction;
-				// There should be an opening bracket after the function
+				// If there is no opening bracket after the function name then the function has no arguments
 				let next_token = match parse_tree_elements.get(index + 1) {
-					None => return Err(BasicError::NoOpeningBracketAfterFunction),
+					None => {
+						let new_parse_tree_element = ParseTreeElement::BuiltInFunction(function, type_restriction, Vec::new());
+						parse_tree_elements.remove(index);
+						parse_tree_elements.insert(index, new_parse_tree_element);
+						continue;
+					}
 					Some(token) => token,
 				};
 				if !matches!(next_token, ParseTreeElement::UnparsedToken(Token::Separator(Separator::OpeningBracket))) {
-					return Err(BasicError::NoOpeningBracketAfterFunction)
+					let new_parse_tree_element = ParseTreeElement::BuiltInFunction(function, type_restriction, Vec::new());
+					parse_tree_elements.remove(index);
+					parse_tree_elements.insert(index, new_parse_tree_element);
+					continue;
 				}
 				// Get the length of the functions bracketed area
 				let bracketed_area_length = find_bracket_pair_length(&parse_tree_elements[index + 1..])?;
