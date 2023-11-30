@@ -1,9 +1,9 @@
 use std::{rc::Rc, fmt::Display, ops::{Add, Sub}};
 
 use num::{BigInt, bigint::{Sign, ToBigInt}};
-use num_traits::{Zero, ToPrimitive, Num};
+use num_traits::{Zero, ToPrimitive};
 
-use crate::error::BasicError;
+use crate::{error::BasicError, get_rc_only_or_clone};
 
 #[derive(Debug, Clone, PartialEq)]
 #[repr(u8)]
@@ -199,8 +199,15 @@ impl Sub for BasicInteger {
 
 	fn sub(self, rhs: Self) -> Self::Output {
 		match (self, rhs) {
-			// Zero - any
-			(Self::Zero, other) | (other, Self::Zero) => other,
+			// Any - zero
+			(other, Self::Zero) => other,
+			// Zero - positive
+			(Self::Zero, Self::PositiveSmallInteger(positive_value)) => match 0isize.checked_sub_unsigned(positive_value) {
+				Some(result) => Self::NegativeSmallInteger(result),
+				None => Self::BigInteger(Rc::new(BigInt::zero() - positive_value.to_bigint().unwrap())),
+			}
+			// Zero - negative
+			(Self::Zero, Self::NegativeSmallInteger(negative_value)) => Self::PositiveSmallInteger(0usize.wrapping_sub(negative_value as usize)),
 			// Positive - positive
 			(Self::PositiveSmallInteger(left_value), Self::PositiveSmallInteger(right_value)) if left_value == right_value => Self::Zero,
 			(Self::PositiveSmallInteger(left_value), Self::PositiveSmallInteger(right_value)) => match left_value.checked_sub(right_value) {
@@ -210,6 +217,34 @@ impl Sub for BasicInteger {
 					false => Self::BigInteger(Rc::new(left_value.to_bigint().unwrap() - right_value.to_bigint().unwrap())),
 				}
 			}
+			// Negative - negative
+			(Self::NegativeSmallInteger(left_value), Self::NegativeSmallInteger(right_value)) => match left_value.wrapping_sub(right_value) {
+				value if value < 0 => Self::NegativeSmallInteger(value as isize),
+				value if value == 0 => Self::Zero,
+				value => Self::PositiveSmallInteger(value as usize),
+			}
+			// Negative - positive
+			(Self::NegativeSmallInteger(negative_value), Self::PositiveSmallInteger(positive_value)) => match negative_value.checked_sub_unsigned(positive_value) {
+				Some(result) => Self::NegativeSmallInteger(result),
+				None => Self::BigInteger(Rc::new(negative_value.to_bigint().unwrap() - positive_value.to_bigint().unwrap())),
+			}
+			// Positive - negative
+			(Self::PositiveSmallInteger(positive_value), Self::NegativeSmallInteger(negative_value)) => match positive_value.checked_add(negative_value.abs_diff(0)) {
+				Some(result) => Self::PositiveSmallInteger(result),
+				None => Self::BigInteger(Rc::new(positive_value.to_bigint().unwrap() - negative_value.to_bigint().unwrap())),
+			},
+			// Big - positive
+			(Self::BigInteger(big_value), Self::PositiveSmallInteger(positive_value)) => Self::BigInteger(Rc::new(get_rc_only_or_clone(big_value) - positive_value.to_bigint().unwrap())),
+			// Big - negative
+			(Self::BigInteger(big_value), Self::NegativeSmallInteger(positive_value)) => Self::BigInteger(Rc::new(get_rc_only_or_clone(big_value) - positive_value.to_bigint().unwrap())),
+			// Zero - big
+			(Self::Zero, Self::BigInteger(big_value)) => Self::BigInteger(Rc::new(BigInt::zero() - get_rc_only_or_clone(big_value))),
+			// Positive - big
+			(Self::PositiveSmallInteger(positive_value), Self::BigInteger(big_value)) => Self::BigInteger(Rc::new(positive_value.to_bigint().unwrap() - get_rc_only_or_clone(big_value))),
+			// Negative - big
+			(Self::NegativeSmallInteger(negative_value), Self::BigInteger(big_value)) => Self::BigInteger(Rc::new(negative_value.to_bigint().unwrap() - get_rc_only_or_clone(big_value))),
+			// Big - big
+			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Self::BigInteger(Rc::new(get_rc_only_or_clone(left_value) - get_rc_only_or_clone(right_value))),
 		}
 	}
 }
