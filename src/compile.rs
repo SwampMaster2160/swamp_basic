@@ -1,4 +1,4 @@
-use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, parser::ParseTreeElement, lexer::{command::Command, operator::Operator}};
+use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, parser::ParseTreeElement, lexer::{command::Command, operator::Operator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction}};
 
 /// Compiles a list of parse tree elements to bytecode
 #[inline(always)]
@@ -113,6 +113,34 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 					out.extend(compile_expression(operand)?);
 				}
 				other => return Err(BasicError::InvalidUnaryOperatorSymbol(other)),
+			}
+		}
+		ParseTreeElement::BuiltInFunction(function, type_restriction, argument_expressions) => {
+			if *type_restriction != TypeRestriction::Any {
+				return Err(BasicError::FeatureNotYetSupported);
+			}
+			match function {
+				BuiltInFunction::AbsoluteValue | BuiltInFunction::Arctangent | BuiltInFunction::Cosine | BuiltInFunction::Exponential | BuiltInFunction::Integer |
+				BuiltInFunction::Logarithm | BuiltInFunction::Sign | BuiltInFunction::Sine | BuiltInFunction::SquareRoot | BuiltInFunction::Tangent => {
+					if argument_expressions.len() != 1 {
+						return Err(BasicError::TooManyArguments);
+					}
+					out.push(match function {
+						BuiltInFunction::AbsoluteValue => ExpressionOpcode::AbsoluteValue,
+						BuiltInFunction::Arctangent => ExpressionOpcode::Arctangent,
+						BuiltInFunction::Cosine => ExpressionOpcode::Cosine,
+						BuiltInFunction::Exponential => ExpressionOpcode::Exponential,
+						BuiltInFunction::Integer => ExpressionOpcode::Integer,
+						BuiltInFunction::Logarithm => ExpressionOpcode::Logarithm,
+						BuiltInFunction::Sign => ExpressionOpcode::Sign,
+						BuiltInFunction::Sine => ExpressionOpcode::Sine,
+						BuiltInFunction::SquareRoot => ExpressionOpcode::SquareRoot,
+						BuiltInFunction::Tangent => ExpressionOpcode::Tangent,
+						_ => unreachable!(),
+					} as u8);
+					out.extend(compile_expression(&argument_expressions[0])?);
+				}
+				_ => return Err(BasicError::FeatureNotYetSupported),
 			}
 		}
 		_ => return Err(BasicError::FeatureNotYetSupported),

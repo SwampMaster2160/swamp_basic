@@ -34,6 +34,7 @@ pub enum BasicError {
 	InvalidSingleCommand(Command),
 	InvalidBinaryOperatorSymbol(Operator),
 	InvalidUnaryOperatorSymbol(Operator),
+	TooManyArguments,
 }
 
 impl Display for BasicError {
@@ -69,6 +70,7 @@ impl Display for BasicError {
 			Self::InvalidSingleCommand(command) => write!(formatter, "Invalid single command: {:?}.", command),
 			Self::InvalidBinaryOperatorSymbol(operator) => write!(formatter, "{:?} can only be used as a unary operator.", operator),
 			Self::InvalidUnaryOperatorSymbol(operator) => write!(formatter, "{:?} can only be used as a binary operator.", operator),
+			Self::TooManyArguments => write!(formatter, "Too many arguments."),
 		}
 	}
 }
