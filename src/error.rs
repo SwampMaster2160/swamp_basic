@@ -20,8 +20,8 @@ pub enum BasicError {
 	TooManyOpeningBrackets,
 	UnterminatedString,
 	InvalidUtf8String,
-	InvalidCommandOpcode(u8),
-	InvalidFunctionOpcode(u8),
+	InvalidStatementOpcode(u8),
+	InvalidExpressionOpcode(u8),
 	ExpectedFunctionOpcodeButEnd,
 	InvalidNumericalLiteral(String),
 	InvalidSeparator(Separator),
@@ -35,6 +35,7 @@ pub enum BasicError {
 	InvalidUnaryOperatorSymbol(Operator),
 	InvalidArgumentCount,
 	InvalidSize(BasicInteger),
+	InvalidNullStatementOpcode
 }
 
 impl Display for BasicError {
@@ -54,8 +55,8 @@ impl Display for BasicError {
 			Self::TooManyOpeningBrackets => write!(formatter, "Too many opening brackets."),
 			Self::UnterminatedString => write!(formatter, "Unterminated string."),
 			Self::InvalidUtf8String => write!(formatter, "Invalid byte sequence for a UTF-8 string."),
-			Self::InvalidCommandOpcode(opcode) => write!(formatter, "Invalid command opcode: {:#04X}.", opcode),
-			Self::InvalidFunctionOpcode(opcode) => write!(formatter, "Invalid function opcode: {:#04X}.", opcode),
+			Self::InvalidStatementOpcode(opcode) => write!(formatter, "Invalid command opcode: {:#04X}.", opcode),
+			Self::InvalidExpressionOpcode(opcode) => write!(formatter, "Invalid function opcode: {:#04X}.", opcode),
 			Self::ExpectedFunctionOpcodeButEnd => write!(formatter, "Expected function opcode but bytecode ended."),
 			Self::InvalidNumericalLiteral(string) => write!(formatter, "Invalid numerical literal: {string}."),
 			Self::InvalidSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_symbol_char()),
@@ -71,6 +72,7 @@ impl Display for BasicError {
 			Self::InvalidUnaryOperatorSymbol(operator) => write!(formatter, "{:?} can only be used as a binary operator.", operator),
 			Self::InvalidArgumentCount => write!(formatter, "Invalid argument count."),
 			Self::InvalidSize(size) => write!(formatter, "Invalid size: {size}."),
+			Self::InvalidNullStatementOpcode => write!(formatter, "Invalid null statement opcode.")
 		}
 	}
 }

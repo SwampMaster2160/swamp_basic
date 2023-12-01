@@ -141,7 +141,7 @@ impl ScalarValue {
 		}
 	}*/
 
-	pub fn add_concatenate(self, rhs: Self) -> Result<Self, BasicError> {
+	pub fn add_concatenate(self, rhs: Self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		Ok(match (self.clone(), rhs) {
 			(Self::ComplexFloat(complex_float_value), other) | (other, Self::ComplexFloat(complex_float_value)) => {
 				let converted: Complex64 = other.try_into()?;
@@ -165,7 +165,7 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn sub(self, rhs: Self) -> Result<Self, BasicError> {
+	pub fn sub(self, rhs: Self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		Ok(match (self.clone(), rhs) {
 			(Self::ComplexFloat(complex_float_value), other) => {
 				let converted: Complex64 = other.try_into()?;
@@ -209,7 +209,7 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn mul(self, rhs: Self) -> Result<Self, BasicError> {
+	pub fn mul(self, rhs: Self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		Ok(match (self.clone(), rhs) {
 			(Self::Integer(integer_value), Self::String(_string_value)) => {
 				let _usize_value: usize = integer_value.try_into()?;
@@ -240,19 +240,67 @@ impl ScalarValue {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn pow(self, _rhs: Self) -> Result<Self, BasicError> {
+	pub fn pow(self, _rhs: Self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn and(self, _rhs: Self) -> Result<Self, BasicError> {
+	pub fn and(self, _rhs: Self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn xor(self, _rhs: Self) -> Result<Self, BasicError> {
+	pub fn xor(self, _rhs: Self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn or(self, _rhs: Self) -> Result<Self, BasicError> {
+	pub fn or(self, _rhs: Self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn abs(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn atan(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn cos(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn sin(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn tan(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn random(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn integer(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn log(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn neg(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn not(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn sqrt(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn sign(self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 }

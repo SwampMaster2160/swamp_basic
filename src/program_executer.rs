@@ -60,7 +60,7 @@ impl ProgramExecuter {
 			},
 		};
 		let opcode: StatementOpcode = FromPrimitive::from_u8(opcode_id)
-			.ok_or(BasicError::InvalidCommandOpcode(opcode_id))?;
+			.ok_or(BasicError::InvalidStatementOpcode(opcode_id))?;
 		// Execute statment instruction
 		match opcode {
 			StatementOpcode::End => return Ok(InstructionExecutionSuccessResult::ProgramStopped),
@@ -116,7 +116,7 @@ impl ProgramExecuter {
 			.ok_or(BasicError::ExpectedFunctionOpcodeButEnd)?;
 		Ok(match opcode_id {
 			0 => None,
-			_ => Some(FromPrimitive::from_u8(opcode_id).ok_or(BasicError::InvalidFunctionOpcode(opcode_id))?)
+			_ => Some(FromPrimitive::from_u8(opcode_id).ok_or(BasicError::InvalidExpressionOpcode(opcode_id))?)
 		})
 	}
 
@@ -147,14 +147,14 @@ impl ProgramExecuter {
 					let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
 					result = Some(match result {
 						Some(sum_value) => match opcode {
-							ExpressionOpcode::SumConcatenate => sum_value.add_concatenate(argument)?,
-							ExpressionOpcode::Subtract => sum_value.sub(argument)?,
-							ExpressionOpcode::Product => sum_value.mul(argument)?,
+							ExpressionOpcode::SumConcatenate => sum_value.add_concatenate(argument, return_type_restriction)?,
+							ExpressionOpcode::Subtract => sum_value.sub(argument, return_type_restriction)?,
+							ExpressionOpcode::Product => sum_value.mul(argument, return_type_restriction)?,
 							ExpressionOpcode::Divide => sum_value.div(argument, return_type_restriction)?,
-							ExpressionOpcode::Exponent => sum_value.pow(argument)?,
-							ExpressionOpcode::And => sum_value.and(argument)?,
-							ExpressionOpcode::ExclusiveOr => sum_value.xor(argument)?,
-							ExpressionOpcode::Or => sum_value.or(argument)?,
+							ExpressionOpcode::Exponent => sum_value.pow(argument, return_type_restriction)?,
+							ExpressionOpcode::And => sum_value.and(argument, return_type_restriction)?,
+							ExpressionOpcode::ExclusiveOr => sum_value.xor(argument, return_type_restriction)?,
+							ExpressionOpcode::Or => sum_value.or(argument, return_type_restriction)?,
 							_ => unreachable!(),
 						},
 						None => argument,
@@ -163,6 +163,29 @@ impl ProgramExecuter {
 				match result {
 					Some(sum_value) => sum_value,
 					None => return_type_restriction.default_value(),
+				}
+			}
+			ExpressionOpcode::AbsoluteValue | ExpressionOpcode::Arctangent | ExpressionOpcode::Cosine | ExpressionOpcode::Sine | ExpressionOpcode::Tangent | ExpressionOpcode::Random |
+			ExpressionOpcode::Integer | ExpressionOpcode::Logarithm | ExpressionOpcode::Negate | ExpressionOpcode::Not | ExpressionOpcode::SquareRoot | ExpressionOpcode::Sign => {
+				let expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => return Err(BasicError::InvalidNullStatementOpcode),
+				};
+				let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+				match opcode {
+					ExpressionOpcode::AbsoluteValue => argument.abs(return_type_restriction)?,
+					ExpressionOpcode::Arctangent => argument.atan(return_type_restriction)?,
+					ExpressionOpcode::Cosine => argument.cos(return_type_restriction)?,
+					ExpressionOpcode::Sine => argument.sin(return_type_restriction)?,
+					ExpressionOpcode::Tangent => argument.tan(return_type_restriction)?,
+					ExpressionOpcode::Random => argument.random(return_type_restriction)?,
+					ExpressionOpcode::Integer => argument.integer(return_type_restriction)?,
+					ExpressionOpcode::Logarithm => argument.log(return_type_restriction)?,
+					ExpressionOpcode::Negate => argument.neg(return_type_restriction)?,
+					ExpressionOpcode::Not => argument.not(return_type_restriction)?,
+					ExpressionOpcode::SquareRoot => argument.sqrt(return_type_restriction)?,
+					ExpressionOpcode::Sign => argument.sign(return_type_restriction)?,
+					_ => unreachable!(),
 				}
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
