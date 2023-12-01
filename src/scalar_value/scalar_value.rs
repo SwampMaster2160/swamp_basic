@@ -240,6 +240,10 @@ impl ScalarValue {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
+	pub fn modulus(self, _rhs: Self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
 	pub fn pow(self, _rhs: Self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}

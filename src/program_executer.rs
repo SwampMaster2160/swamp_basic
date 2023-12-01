@@ -155,6 +155,7 @@ impl ProgramExecuter {
 							ExpressionOpcode::And => sum_value.and(argument, return_type_restriction)?,
 							ExpressionOpcode::ExclusiveOr => sum_value.xor(argument, return_type_restriction)?,
 							ExpressionOpcode::Or => sum_value.or(argument, return_type_restriction)?,
+							ExpressionOpcode::Modulus => sum_value.modulus(argument, return_type_restriction)?,
 							_ => unreachable!(),
 						},
 						None => argument,
