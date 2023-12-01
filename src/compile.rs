@@ -75,8 +75,8 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 		}
 		ParseTreeElement::BinaryOperator(operator, left_operand, right_operand) => {
 			match *operator {
-				Operator::AddConcatenate | Operator::And | Operator::Divide | Operator::ExclusiveOr | Operator::Exponent | Operator::MinusNegate | Operator::Modulus | Operator::Multiply |
-				Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo | Operator::EqualToAssign => {
+				Operator::AddConcatenate | Operator::And | Operator::Divide | Operator::ExclusiveOr | Operator::Exponent | Operator::MinusNegate | Operator::Modulus | Operator::Multiply/* |*/
+				/*Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo | Operator::EqualToAssign*/ => {
 					out.push(match operator {
 						Operator::AddConcatenate => ExpressionOpcode::SumConcatenate,
 						Operator::And => ExpressionOpcode::And,
@@ -86,13 +86,13 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 						Operator::MinusNegate => ExpressionOpcode::Subtract,
 						Operator::Modulus => ExpressionOpcode::Modulus,
 						Operator::Multiply => ExpressionOpcode::Product,
-						Operator::EqualTo => ExpressionOpcode::EqualTo,
+						/*Operator::EqualTo => ExpressionOpcode::EqualTo,
 						Operator::GreaterThan => ExpressionOpcode::GreaterThan,
 						Operator::GreaterThanOrEqualTo => ExpressionOpcode::GreaterThanOrEqualTo,
 						Operator::LessThan => ExpressionOpcode::LessThan,
 						Operator::LessThanOrEqualTo => ExpressionOpcode::LessThanOrEqualTo,
 						Operator::NotEqualTo => ExpressionOpcode::NotEqualTo,
-						Operator::EqualToAssign => ExpressionOpcode::EqualToAssign,
+						Operator::EqualToAssign => ExpressionOpcode::EqualToAssign,*/
 						_ => unreachable!(),
 					} as u8);
 					out.extend(compile_expression(left_operand)?);

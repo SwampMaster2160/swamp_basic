@@ -60,8 +60,11 @@ impl ScalarValue {
 
 	/// Makes a value compact.
 	pub fn compact(self) -> Self {
-		// TODO
-		self
+		match self {
+			ScalarValue::ComplexFloat(value) if value.im.is_zero() => ScalarValue::Float(value.re),
+			ScalarValue::GaussianInteger(value) if value.im.is_zero() => ScalarValue::Integer(value.re),
+			_ => self,
+		}
 	}
 
 	/*/// Casts a the value to conform to the given type restriction.
@@ -142,17 +145,15 @@ impl ScalarValue {
 		Ok(match (self.clone(), rhs) {
 			(Self::ComplexFloat(complex_float_value), other) | (other, Self::ComplexFloat(complex_float_value)) => {
 				let converted: Complex64 = other.try_into()?;
-				Self::ComplexFloat(complex_float_value + converted)
+				Self::ComplexFloat(complex_float_value + converted).compact()
 			}
-			(Self::GaussianInteger(left_value), Self::GaussianInteger(right_value)) =>
-				Self::GaussianInteger(Complex::new(left_value.re + right_value.re, left_value.im + right_value.im)),
-			(Self::GaussianInteger(gaussian_integer_value), Self::Integer(integer_value)) |
-			(Self::Integer(integer_value), Self::GaussianInteger(gaussian_integer_value)) =>
-				Self::GaussianInteger(Complex::new(gaussian_integer_value.re + integer_value, gaussian_integer_value.im)),
-			(Self::GaussianInteger(gaussian_integer_value), Self::Float(float_value)) |
-			(Self::Float(float_value), Self::GaussianInteger(gaussian_integer_value)) => {
-				let gaussian_real: f64 = gaussian_integer_value.re.into();
-				Self::ComplexFloat(Complex64::new(gaussian_real + float_value, gaussian_integer_value.im.into()))
+			(Self::GaussianInteger(_), Self::Float(float_value)) | (Self::Float(float_value), Self::GaussianInteger(_)) => {
+				let converted: Complex64 = self.try_into()?;
+				Self::ComplexFloat(converted + Complex64::new(float_value, 0.))
+			}
+			(Self::GaussianInteger(gaussian_integer_value), other) | (other, Self::GaussianInteger(gaussian_integer_value)) => {
+				let converted: Complex<BasicInteger> = other.try_into()?;
+				Self::GaussianInteger(gaussian_integer_value + converted).compact()
 			}
 			(Self::Float(float_value), other) | (other, Self::Float(float_value)) => {
 				let converted: f64 = other.try_into()?;
@@ -166,27 +167,93 @@ impl ScalarValue {
 
 	pub fn sub(self, rhs: Self) -> Result<Self, BasicError> {
 		Ok(match (self.clone(), rhs) {
-			(Self::ComplexFloat(complex_float_value), other) | (other, Self::ComplexFloat(complex_float_value)) => {
+			(Self::ComplexFloat(complex_float_value), other) => {
 				let converted: Complex64 = other.try_into()?;
-				Self::ComplexFloat(complex_float_value - converted)
+				Self::ComplexFloat(complex_float_value - converted).compact()
 			}
-			(Self::GaussianInteger(left_value), Self::GaussianInteger(right_value)) =>
-				Self::GaussianInteger(Complex::new(left_value.re - right_value.re, left_value.im - right_value.im)),
-			(Self::GaussianInteger(gaussian_integer_value), Self::Integer(integer_value)) |
-			(Self::Integer(integer_value), Self::GaussianInteger(gaussian_integer_value)) =>
-				Self::GaussianInteger(Complex::new(gaussian_integer_value.re - integer_value, gaussian_integer_value.im)),
-			(Self::GaussianInteger(gaussian_integer_value), Self::Float(float_value)) |
-			(Self::Float(float_value), Self::GaussianInteger(gaussian_integer_value)) => {
-				let gaussian_real: f64 = gaussian_integer_value.re.into();
-				Self::ComplexFloat(Complex64::new(gaussian_real - float_value, gaussian_integer_value.im.into()))
+			(other, Self::ComplexFloat(complex_float_value)) => {
+				let converted: Complex64 = other.try_into()?;
+				Self::ComplexFloat(converted - complex_float_value).compact()
 			}
-			(Self::Float(float_value), other) | (other, Self::Float(float_value)) => {
+
+			(Self::GaussianInteger(_), Self::Float(float_value)) => {
+				let converted: Complex64 = self.try_into()?;
+				Self::ComplexFloat(converted - Complex64::new(float_value, 0.))
+			}
+			(Self::Float(float_value), Self::GaussianInteger(_)) => {
+				let converted: Complex64 = self.try_into()?;
+				Self::ComplexFloat(Complex64::new(float_value, 0.) - converted)
+			}
+
+			(Self::GaussianInteger(complex_float_value), other) => {
+				let converted: Complex<BasicInteger> = other.try_into()?;
+				Self::GaussianInteger(complex_float_value - converted).compact()
+			}
+			(other, Self::GaussianInteger(complex_float_value)) => {
+				let converted: Complex<BasicInteger> = other.try_into()?;
+				Self::GaussianInteger(converted - complex_float_value).compact()
+			}
+
+			(Self::Float(float_value), other) => {
 				let converted: f64 = other.try_into()?;
 				Self::Float(float_value - converted)
 			}
+			(other, Self::Float(float_value)) => {
+				let converted: f64 = other.try_into()?;
+				Self::Float(converted - float_value)
+			}
+
 			(Self::Integer(left_value), Self::Integer(right_value)) => Self::Integer(left_value - right_value),
+
 			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::ComplexNumber)),
 		})
+	}
+
+	pub fn mul(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(match (self.clone(), rhs) {
+			(Self::Integer(integer_value), Self::String(_string_value)) => {
+				let _usize_value: usize = integer_value.try_into()?;
+				return Err(BasicError::FeatureNotYetSupported)
+			},
+			(Self::ComplexFloat(complex_float_value), other) | (other, Self::ComplexFloat(complex_float_value)) => {
+				let converted: Complex64 = other.try_into()?;
+				Self::ComplexFloat(complex_float_value * converted).compact()
+			}
+			(Self::GaussianInteger(_), Self::Float(float_value)) | (Self::Float(float_value), Self::GaussianInteger(_)) => {
+				let converted: Complex64 = self.try_into()?;
+				Self::ComplexFloat(converted * Complex64::new(float_value, 0.))
+			}
+			(Self::GaussianInteger(gaussian_integer_value), other) | (other, Self::GaussianInteger(gaussian_integer_value)) => {
+				let converted: Complex<BasicInteger> = other.try_into()?;
+				Self::GaussianInteger(gaussian_integer_value * converted).compact()
+			}
+			(Self::Float(float_value), other) | (other, Self::Float(float_value)) => {
+				let converted: f64 = other.try_into()?;
+				Self::Float(float_value * converted)
+			}
+			(Self::Integer(left_value), Self::Integer(right_value)) => Self::Integer(left_value * right_value),
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::ComplexNumber)),
+		})
+	}
+
+	pub fn div(self, _rhs: Self, _return_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn pow(self, _rhs: Self) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn and(self, _rhs: Self) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn xor(self, _rhs: Self) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn or(self, _rhs: Self) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
 	}
 }
 
@@ -209,8 +276,6 @@ impl TryInto<f64> for ScalarValue {
 		Ok(match self {
 			Self::Float(value) => value,
 			Self::Integer(value) => value.into(),
-			Self::ComplexFloat(value) if value.im.is_zero() => value.re,
-			Self::GaussianInteger(value) if value.im.is_zero() => value.re.into(),
 			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::Float)),
 		})
 	}
@@ -225,7 +290,19 @@ impl TryInto<Complex64> for ScalarValue {
 			Self::Integer(value) => Complex64::new(value.into(), 0.0),
 			Self::ComplexFloat(value) => value,
 			Self::GaussianInteger(value) => Complex::new(value.re.into(), value.im.into()),
-			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::Float)),
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::ComplexFloat)),
+		})
+	}
+}
+
+impl TryInto<Complex<BasicInteger>> for ScalarValue {
+	type Error = BasicError;
+
+	fn try_into(self) -> Result<Complex<BasicInteger>, Self::Error> {
+		Ok(match self {
+			Self::Integer(value) => Complex::new(value, BasicInteger::Zero),
+			Self::GaussianInteger(value) => Complex::new(value.re.into(), value.im.into()),
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::GaussianInteger)),
 		})
 	}
 }

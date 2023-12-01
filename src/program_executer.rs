@@ -136,7 +136,8 @@ impl ProgramExecuter {
 					.to_string();
 				ScalarValue::String(BasicString::String(Rc::new(string)))
 			}
-			ExpressionOpcode::SumConcatenate | ExpressionOpcode::Subtract => {
+			ExpressionOpcode::SumConcatenate | ExpressionOpcode::Subtract | ExpressionOpcode::Product | ExpressionOpcode::Divide | ExpressionOpcode::Exponent | ExpressionOpcode::Modulus |
+			ExpressionOpcode::And | ExpressionOpcode::ExclusiveOr | ExpressionOpcode::Or => {
 				let mut result: Option<ScalarValue> = None;
 				loop {
 					let expression_opcode = match self.get_expression_opcode(main_struct)? {
@@ -148,6 +149,12 @@ impl ProgramExecuter {
 						Some(sum_value) => match opcode {
 							ExpressionOpcode::SumConcatenate => sum_value.add_concatenate(argument)?,
 							ExpressionOpcode::Subtract => sum_value.sub(argument)?,
+							ExpressionOpcode::Product => sum_value.mul(argument)?,
+							ExpressionOpcode::Divide => sum_value.div(argument, return_type_restriction)?,
+							ExpressionOpcode::Exponent => sum_value.pow(argument)?,
+							ExpressionOpcode::And => sum_value.and(argument)?,
+							ExpressionOpcode::ExclusiveOr => sum_value.xor(argument)?,
+							ExpressionOpcode::Or => sum_value.or(argument)?,
 							_ => unreachable!(),
 						},
 						None => argument,

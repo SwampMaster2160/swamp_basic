@@ -1,7 +1,7 @@
-use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div}, num::NonZeroUsize};
+use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem}, num::NonZeroUsize};
 
 use num::{BigInt, bigint::{Sign, ToBigInt}};
-use num_traits::{Zero, ToPrimitive, CheckedDiv};
+use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One};
 
 use crate::{error::BasicError, get_rc_only_or_clone};
 
@@ -17,16 +17,6 @@ pub enum BasicInteger {
 }
 
 impl BasicInteger {
-	/// Returns if the value is equal to zero
-	pub fn is_zero(&self) -> bool {
-		match self {
-			Self::BigInteger(value) => value.is_zero(),
-			Self::Zero => true,
-			//Self::SmallInteger(value) => value.is_zero(),
-			Self::SmallInteger(_) => false,
-		}
-	}
-
 	/// Makes a value compact.
 	pub fn compact(self) -> Self {
 		match self {
@@ -133,13 +123,13 @@ impl Into<f64> for BasicInteger {
 }
 
 impl TryInto<usize> for BasicInteger {
-	type Error = ();
+	type Error = BasicError;
 
 	fn try_into(self) -> Result<usize, Self::Error> {
 		match self {
 			Self::Zero => Ok(0),
 			Self::SmallInteger(value) => Ok(value.get()),
-			Self::BigInteger(..) => Err(()),
+			Self::BigInteger(..) => Err(BasicError::InvalidSize(self)),
 		}
 	}
 }
@@ -272,6 +262,30 @@ impl Neg for BasicInteger {
 	}
 }
 
+impl Rem for BasicInteger {
+	type Output = Self;
+
+	fn rem(self, _rhs: Self) -> Self::Output {
+		unimplemented!()
+	}
+}
+
+impl One for BasicInteger {
+	fn one() -> Self {
+		Self::SmallInteger(1.try_into().unwrap())
+	}
+}
+
+impl Zero for BasicInteger {
+	fn zero() -> Self {
+		Self::Zero
+	}
+
+	fn is_zero(&self) -> bool {
+		self == &Self::Zero
+	}
+}
+
 /*impl Pow<Self> for BasicInteger {
 	type Output = Self;
 
@@ -287,10 +301,10 @@ impl Neg for BasicInteger {
 	}
 }*/
 
-/*impl Num for BasicInteger {
-	type FromStrRadixErr;
+impl Num for BasicInteger {
+	type FromStrRadixErr = ();
 
-	fn from_str_radix(str: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
-		todo!()
+	fn from_str_radix(_str: &str, _radix: u32) -> Result<Self, Self::FromStrRadixErr> {
+		unimplemented!()
 	}
-}*/
+}
