@@ -35,7 +35,8 @@ pub enum BasicError {
 	InvalidUnaryOperatorSymbol(Operator),
 	InvalidArgumentCount,
 	InvalidSize(BasicInteger),
-	InvalidNullStatementOpcode
+	InvalidNullStatementOpcode,
+	DivisionByZero,
 }
 
 impl Display for BasicError {
@@ -72,7 +73,8 @@ impl Display for BasicError {
 			Self::InvalidUnaryOperatorSymbol(operator) => write!(formatter, "{:?} can only be used as a binary operator.", operator),
 			Self::InvalidArgumentCount => write!(formatter, "Invalid argument count."),
 			Self::InvalidSize(size) => write!(formatter, "Invalid size: {size}."),
-			Self::InvalidNullStatementOpcode => write!(formatter, "Invalid null statement opcode.")
+			Self::InvalidNullStatementOpcode => write!(formatter, "Invalid null statement opcode."),
+			Self::DivisionByZero => write!(formatter, "Division by zero."),
 		}
 	}
 }

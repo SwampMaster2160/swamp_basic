@@ -53,6 +53,18 @@ impl BasicString {
 			}
 		}
 	}
+
+	pub fn repeat(self, times: usize) -> Self {
+		match times {
+			0 => Self::EmptyString,
+			1 => self,
+			_ => match self {
+				Self::String(value) => Self::String(Rc::new(value.repeat(times))),
+				Self::Char(value) => Self::String(Rc::new(value.to_string().repeat(times))),
+				Self::EmptyString => Self::EmptyString,
+			}
+		}
+	}
 }
 
 impl Display for BasicString {
