@@ -352,7 +352,7 @@ impl TryInto<Complex<BasicInteger>> for ScalarValue {
 
 	fn try_into(self) -> Result<Complex<BasicInteger>, Self::Error> {
 		Ok(match self {
-			Self::Integer(value) => Complex::new(value, BasicInteger::Zero),
+			Self::Integer(value) => Complex::new(value, BasicInteger::zero()),
 			Self::GaussianInteger(value) => Complex::new(value.re.into(), value.im.into()),
 			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::GaussianInteger)),
 		})

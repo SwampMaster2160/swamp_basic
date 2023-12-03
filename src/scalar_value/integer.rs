@@ -1,4 +1,4 @@
-use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem}, num::NonZeroUsize};
+use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem}};
 
 use num::{BigInt, bigint::{Sign, ToBigInt}};
 use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One};
@@ -9,9 +9,9 @@ use crate::{error::BasicError, get_rc_only_or_clone};
 #[repr(u8)]
 pub enum BasicInteger {
 	/// Zero
-	Zero,
+	//Zero,
 	/// Should be 1 or greater
-	SmallInteger(NonZeroUsize),
+	SmallInteger(usize),//
 	/// A big integer, should be greater than usize::MAX or less than 0
 	BigInteger(Rc<BigInt>),
 }
@@ -27,10 +27,10 @@ impl BasicInteger {
 			}*/
 			Self::BigInteger(value) => {
 				match value.to_usize() {
-					Some(value) => match NonZeroUsize::try_from(value) {
+					Some(value) => /*match NonZeroUsize::try_from(value) {
 						Ok(value) => Self::SmallInteger(value),
 						Err(_) => Self::Zero,
-					},
+					}*/Self::SmallInteger(value),
 					None => Self::BigInteger(value),
 				}
 			}
@@ -42,7 +42,7 @@ impl BasicInteger {
 	pub fn as_index(&self, container_length: usize) -> Result<usize, BasicError> {
 		match self {
 			Self::SmallInteger(index) => {
-				let index = index.get();
+				let index = *index;
 				// The index is invalid if it is not less than the container length
 				match index < container_length {
 					true => Ok(index),
@@ -66,27 +66,27 @@ impl BasicInteger {
 					false => Err(BasicError::IndexOutOfBounds(self.clone(), container_length)),
 				}
 			}
-			Self::Zero => {
+			/*Self::Zero => {
 				match container_length {
 					0 => Err(BasicError::IndexOutOfBounds(self.clone(), container_length)),
 					_ => Ok(0),
 				}
-			}
+			}*/
 		}
 	}
 
 	pub fn is_multiple_of(self, other: Self) -> Option<bool> {
 		match (self, other) {
 			// Any, Zero
-			(_, Self::Zero) => None,
+			/*(_, Self::Zero) => None,
 			// Zero, any
-			(Self::Zero, _) => Some(true),
+			(Self::Zero, _) => Some(true),*/
 			// Small, small
-			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => Some(left_value.get() % right_value.get() == 0),
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => Some(left_value % right_value == 0),
 			// Big, small
-			(Self::BigInteger(left_value), Self::SmallInteger(right_value)) => Some(left_value.as_ref() % right_value.get().to_bigint().unwrap() == BigInt::zero()),
+			(Self::BigInteger(left_value), Self::SmallInteger(right_value)) => Some(left_value.as_ref() % right_value.to_bigint().unwrap() == BigInt::zero()),
 			// Small, big
-			(Self::SmallInteger(left_value), Self::BigInteger(right_value)) => Some(left_value.get().to_bigint().unwrap() % right_value.as_ref() == BigInt::zero()),
+			(Self::SmallInteger(left_value), Self::BigInteger(right_value)) => Some(left_value.to_bigint().unwrap() % right_value.as_ref() == BigInt::zero()),
 			// Big, big
 			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Some(left_value.as_ref() % right_value.as_ref() == BigInt::zero())
 		}
@@ -99,8 +99,8 @@ impl TryInto<Rc<BigInt>> for BasicInteger {
 	fn try_into(self) -> Result<Rc<BigInt>, Self::Error> {
 		Ok(match self {
 			Self::BigInteger(value) => value.clone(),
-			Self::SmallInteger(value) => Rc::new(value.get().into()),
-			Self::Zero => Rc::new(BigInt::zero()),
+			Self::SmallInteger(value) => Rc::new(value.into()),
+			//Self::Zero => Rc::new(BigInt::zero()),
 		})
 	}
 }
@@ -108,8 +108,8 @@ impl TryInto<Rc<BigInt>> for BasicInteger {
 impl Into<f64> for BasicInteger {
 	fn into(self) -> f64 {
 		match self {
-			Self::Zero => 0.0,
-			Self::SmallInteger(value) => value.get() as f64,
+			//Self::Zero => 0.0,
+			Self::SmallInteger(value) => value as f64,
 			Self::BigInteger(value) => match value.to_f64() {
 				Some(value) => value,
 				None => match value.sign() {
@@ -127,8 +127,8 @@ impl TryInto<usize> for BasicInteger {
 
 	fn try_into(self) -> Result<usize, Self::Error> {
 		match self {
-			Self::Zero => Ok(0),
-			Self::SmallInteger(value) => Ok(value.get()),
+			//Self::Zero => Ok(0),
+			Self::SmallInteger(value) => Ok(value),
 			Self::BigInteger(..) => Err(BasicError::InvalidSize(self)),
 		}
 	}
@@ -139,7 +139,7 @@ impl Display for BasicInteger {
 		match self {
 			Self::BigInteger(value) => write!(formatter, "{value}"),
 			Self::SmallInteger(value) => write!(formatter, "{value}"),
-			Self::Zero => write!(formatter, "0"),
+			//Self::Zero => write!(formatter, "0"),
 		}
 	}
 }
@@ -150,15 +150,15 @@ impl Add for BasicInteger {
 	fn add(self, rhs: Self) -> Self::Output {
 		match (self, rhs) {
 			// Zero + any
-			(Self::Zero, other) | (other, Self::Zero) => other,
+			//(Self::Zero, other) | (other, Self::Zero) => other,
 			// Small + small
-			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => match left_value.checked_add(right_value.get()) {
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => match left_value.checked_add(right_value) {
 				Some(result) => Self::SmallInteger(result),
-				None => Self::BigInteger(Rc::new(left_value.get().to_bigint().unwrap() + right_value.get().to_bigint().unwrap())),
+				None => Self::BigInteger(Rc::new(left_value.to_bigint().unwrap() + right_value.to_bigint().unwrap())),
 			}
 			// Small + big integer
 			(Self::SmallInteger(small_value), Self::BigInteger(big_value)) |
-			(Self::BigInteger(big_value), Self::SmallInteger(small_value)) => Self::BigInteger(Rc::new(big_value.as_ref() + small_value.get().to_bigint().unwrap())).compact(),
+			(Self::BigInteger(big_value), Self::SmallInteger(small_value)) => Self::BigInteger(Rc::new(big_value.as_ref() + small_value.to_bigint().unwrap())).compact(),
 			// Big integer + big integer
 			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Self::BigInteger(Rc::new(left_value.as_ref() + right_value.as_ref())).compact(),
 		}
@@ -171,24 +171,24 @@ impl Sub for BasicInteger {
 	fn sub(self, rhs: Self) -> Self::Output {
 		match (self, rhs) {
 			// Any - zero
-			(other, Self::Zero) => other,
+			//(other, Self::Zero) => other,
 			// Zero - small
-			(Self::Zero, Self::SmallInteger(small_value)) => Self::BigInteger(Rc::new(BigInt::zero() - small_value.get().to_bigint().unwrap())),
+			//(Self::Zero, Self::SmallInteger(small_value)) => Self::BigInteger(Rc::new(BigInt::zero() - small_value.get().to_bigint().unwrap())),
 			// Small - small
-			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) if left_value == right_value => Self::Zero,
-			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => match left_value.get().checked_sub(right_value.get()) {
-				Some(result) => match NonZeroUsize::try_from(result) {
+			//(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) if left_value == right_value => Self::Zero,
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => match left_value.checked_sub(right_value) {
+				Some(result) => Self::SmallInteger(result),/*match NonZeroUsize::try_from(result) {
 					Ok(result) => Self::SmallInteger(result),
 					Err(..) => Self::Zero,
-				}
-				None => Self::BigInteger(Rc::new(left_value.get().to_bigint().unwrap() - right_value.get().to_bigint().unwrap())),
+				}*/
+				None => Self::BigInteger(Rc::new(left_value.to_bigint().unwrap() - right_value.to_bigint().unwrap())),
 			}
 			// Big - small
-			(Self::BigInteger(small_value), Self::SmallInteger(positive_value)) => Self::BigInteger(Rc::new(get_rc_only_or_clone(small_value) - positive_value.get().to_bigint().unwrap())).compact(),
+			(Self::BigInteger(small_value), Self::SmallInteger(positive_value)) => Self::BigInteger(Rc::new(get_rc_only_or_clone(small_value) - positive_value.to_bigint().unwrap())).compact(),
 			// Zero - big
-			(Self::Zero, Self::BigInteger(big_value)) => Self::BigInteger(Rc::new(BigInt::zero() - get_rc_only_or_clone(big_value))).compact(),
+			//(Self::Zero, Self::BigInteger(big_value)) => Self::BigInteger(Rc::new(BigInt::zero() - get_rc_only_or_clone(big_value))).compact(),
 			// Small - big
-			(Self::SmallInteger(small_value), Self::BigInteger(big_value)) => Self::BigInteger(Rc::new(small_value.get().to_bigint().unwrap() - get_rc_only_or_clone(big_value))).compact(),
+			(Self::SmallInteger(small_value), Self::BigInteger(big_value)) => Self::BigInteger(Rc::new(small_value.to_bigint().unwrap() - get_rc_only_or_clone(big_value))).compact(),
 			// Big - big
 			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Self::BigInteger(Rc::new(get_rc_only_or_clone(left_value) - get_rc_only_or_clone(right_value))).compact(),
 		}
@@ -201,15 +201,15 @@ impl Mul for BasicInteger {
 	fn mul(self, rhs: Self) -> Self::Output {
 		match (self, rhs) {
 			// Zero * any
-			(Self::Zero, _) | (_, Self::Zero) => Self::Zero,
+			//(Self::Zero, _) | (_, Self::Zero) => Self::Zero,
 			// Small * small
 			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => match left_value.checked_mul(right_value) {
 				Some(result) => Self::SmallInteger(result),
-				None => Self::BigInteger(Rc::new(left_value.get().to_bigint().unwrap() * right_value.get().to_bigint().unwrap())),
+				None => Self::BigInteger(Rc::new(left_value.to_bigint().unwrap() * right_value.to_bigint().unwrap())),
 			}
 			// Small * big integer
 			(Self::SmallInteger(small_value), Self::BigInteger(big_value)) |
-			(Self::BigInteger(big_value), Self::SmallInteger(small_value)) => Self::BigInteger(Rc::new(big_value.as_ref() * small_value.get().to_bigint().unwrap())),
+			(Self::BigInteger(big_value), Self::SmallInteger(small_value)) => Self::BigInteger(Rc::new(big_value.as_ref() * small_value.to_bigint().unwrap())).compact(),
 			// Big integer * big integer
 			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Self::BigInteger(Rc::new(left_value.as_ref() * right_value.as_ref())).compact(),
 		}
@@ -228,24 +228,24 @@ impl CheckedDiv for BasicInteger {
 	fn checked_div(&self, rhs: &Self) -> Option<Self> {
 		match (self, rhs) {
 			// Any / zero
-			(_, Self::Zero) => None,
+			(_, Self::SmallInteger(0)) => None,
 			// Zero / any
-			(Self::Zero, _) => Some(Self::Zero),
+			//(Self::Zero, _) => Some(Self::Zero),
 			// Small / small
-			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => Some(match NonZeroUsize::try_from(left_value.get() / right_value.get()) {
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => Some(Self::SmallInteger(left_value / right_value))/*Some(match NonZeroUsize::try_from(left_value / right_value) {
 				Ok(result) => Self::SmallInteger(result),
 				Err(..) => Self::Zero,
-			}),
+			})*/,
 			// Small / big integer
 			(Self::SmallInteger(small_value), Self::BigInteger(big_value)) => Some(match big_value.sign() {
 				Sign::NoSign => panic!(),
-				Sign::Plus => Self::Zero,
-				Sign::Minus => Self::BigInteger(Rc::new(small_value.get().to_bigint().unwrap() / big_value.as_ref())),
+				Sign::Plus => Self::zero(),
+				Sign::Minus => Self::BigInteger(Rc::new(small_value.to_bigint().unwrap() / big_value.as_ref())),
 			}),
 			// Big integer / big integer
 			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Some(Self::BigInteger(Rc::new(left_value.as_ref() / right_value.as_ref())).compact()),
 			// Big integer / small
-			(Self::BigInteger(big_value), Self::SmallInteger(small_value)) => Some(Self::BigInteger(Rc::new(big_value.as_ref() / small_value.get().to_bigint().unwrap())).compact()),
+			(Self::BigInteger(big_value), Self::SmallInteger(small_value)) => Some(Self::BigInteger(Rc::new(big_value.as_ref() / small_value.to_bigint().unwrap())).compact()),
 		}
 	}
 }
@@ -255,8 +255,8 @@ impl Neg for BasicInteger {
 
 	fn neg(self) -> Self::Output {
 		match self {
-			Self::Zero => Self::Zero,
-			Self::SmallInteger(value) => Self::BigInteger(Rc::new(-(value.get().to_bigint().unwrap()))),
+			Self::SmallInteger(0) => self,
+			Self::SmallInteger(value) => Self::BigInteger(Rc::new(-(value.to_bigint().unwrap()))),
 			BasicInteger::BigInteger(value) => Self::BigInteger(Rc::new(-get_rc_only_or_clone(value))).compact(),
 		}
 	}
@@ -278,11 +278,11 @@ impl One for BasicInteger {
 
 impl Zero for BasicInteger {
 	fn zero() -> Self {
-		Self::Zero
+		Self::SmallInteger(0)
 	}
 
 	fn is_zero(&self) -> bool {
-		self == &Self::Zero
+		self == &Self::SmallInteger(0)
 	}
 }
 

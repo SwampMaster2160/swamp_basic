@@ -1,3 +1,4 @@
+use num_traits::Zero;
 use strum::IntoEnumIterator;
 use std::{collections::HashMap, fmt::Display};
 
@@ -24,7 +25,7 @@ impl TypeRestriction {
 
 	pub fn default_value(self) -> ScalarValue {
 		match self {
-			Self::Any | Self::ComplexNumber | Self::GaussianInteger | Self::RealNumber | Self::Integer => ScalarValue::Integer(BasicInteger::Zero),
+			Self::Any | Self::ComplexNumber | Self::GaussianInteger | Self::RealNumber | Self::Integer => ScalarValue::Integer(BasicInteger::zero()),
 			Self::Float | Self::ComplexFloat => ScalarValue::Float(0.0),
 			Self::Boolean => ScalarValue::Boolean(false),
 			Self::String => ScalarValue::String(BasicString::EmptyString),
