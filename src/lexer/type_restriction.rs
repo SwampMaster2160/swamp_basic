@@ -16,8 +16,8 @@ pub enum TypeRestriction {
 	String,
 	Boolean,
 	ComplexFloat,
-	GaussianInteger,
-	ComplexNumber,
+	//GaussianInteger,
+	Number,
 }
 
 impl TypeRestriction {
@@ -25,7 +25,7 @@ impl TypeRestriction {
 
 	pub fn default_value(self) -> ScalarValue {
 		match self {
-			Self::Any | Self::ComplexNumber | Self::GaussianInteger | Self::RealNumber | Self::Integer => ScalarValue::Integer(BasicInteger::zero()),
+			Self::Any | Self::Number | /*Self::GaussianInteger |*/ Self::RealNumber | Self::Integer => ScalarValue::Integer(BasicInteger::zero()),
 			Self::Float | Self::ComplexFloat => ScalarValue::Float(0.0),
 			Self::Boolean => ScalarValue::Boolean(false),
 			Self::String => ScalarValue::String(BasicString::EmptyString),
@@ -55,9 +55,9 @@ impl TypeRestriction {
 			Self::Float => Some("~"),
 			Self::String => Some("$"),
 			Self::Boolean => Some("?"),
-			Self::ComplexNumber => Some("##"),
+			Self::Number => Some("##"),
 			Self::ComplexFloat => Some("~~"),
-			Self::GaussianInteger => Some("%%"),
+			//Self::GaussianInteger => Some("%%"),
 		}
 	}
 
@@ -86,8 +86,8 @@ impl Display for TypeRestriction {
 			TypeRestriction::String => write!(formatter, "string"),
 			TypeRestriction::Boolean => write!(formatter, "boolean"),
 			TypeRestriction::ComplexFloat => write!(formatter, "complex floating-point number"),
-			TypeRestriction::GaussianInteger => write!(formatter, "gaussian integer"),
-			TypeRestriction::ComplexNumber => write!(formatter, "complex number"),
+			//TypeRestriction::GaussianInteger => write!(formatter, "gaussian integer"),
+			TypeRestriction::Number => write!(formatter, "number"),
 		}
 	}
 }
