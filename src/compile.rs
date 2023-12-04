@@ -77,8 +77,7 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 		ParseTreeElement::BinaryOperator(operator, left_operand, right_operand) => {
 			match *operator {
 				Operator::AddConcatenate | Operator::And | Operator::Divide | Operator::FlooredDivide | Operator::ExclusiveOr | Operator::Exponent |
-				Operator::MinusNegate | Operator::Modulus | Operator::Multiply/* |*/
-				/*Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo | Operator::EqualToAssign*/ => {
+				Operator::MinusNegate | Operator::Modulus | Operator::Multiply => {
 					out.push(match operator {
 						Operator::AddConcatenate => ExpressionOpcode::SumConcatenate,
 						Operator::And => ExpressionOpcode::And,
@@ -89,18 +88,25 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 						Operator::Modulus => ExpressionOpcode::Modulus,
 						Operator::Multiply => ExpressionOpcode::Product,
 						Operator::FlooredDivide => ExpressionOpcode::FlooredDivide,
-						/*Operator::EqualTo => ExpressionOpcode::EqualTo,
-						Operator::GreaterThan => ExpressionOpcode::GreaterThan,
-						Operator::GreaterThanOrEqualTo => ExpressionOpcode::GreaterThanOrEqualTo,
-						Operator::LessThan => ExpressionOpcode::LessThan,
-						Operator::LessThanOrEqualTo => ExpressionOpcode::LessThanOrEqualTo,
-						Operator::NotEqualTo => ExpressionOpcode::NotEqualTo,
-						Operator::EqualToAssign => ExpressionOpcode::EqualToAssign,*/
 						_ => unreachable!(),
 					} as u8);
 					out.extend(compile_expression(left_operand)?);
 					out.extend(compile_expression(right_operand)?);
 					out.push(0);
+				}
+				Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo | Operator::EqualToAssign => {
+					out.push(match operator {
+						Operator::EqualTo => ExpressionOpcode::EqualTo,
+						Operator::GreaterThan => ExpressionOpcode::GreaterThan,
+						Operator::GreaterThanOrEqualTo => ExpressionOpcode::GreaterThanOrEqualTo,
+						Operator::LessThan => ExpressionOpcode::LessThan,
+						Operator::LessThanOrEqualTo => ExpressionOpcode::LessThanOrEqualTo,
+						Operator::NotEqualTo => ExpressionOpcode::NotEqualTo,
+						Operator::EqualToAssign => ExpressionOpcode::EqualTo,
+						_ => unreachable!(),
+					} as u8);
+					out.extend(compile_expression(left_operand)?);
+					out.extend(compile_expression(right_operand)?);
 				}
 				other => return Err(BasicError::InvalidBinaryOperatorSymbol(other)),
 			}

@@ -18,7 +18,6 @@ pub enum ExpressionOpcode {
 	ExclusiveOr,
 	Negate,
 	Not,
-	EqualToAssign,
 	EqualTo,
 	NotEqualTo,
 	LessThan,

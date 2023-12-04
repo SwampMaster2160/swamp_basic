@@ -1,7 +1,7 @@
 use std::{fmt::Display, rc::Rc, f64::consts::{PI, E}};
 
 use num::{BigInt, complex::Complex64};
-use num_traits::{Zero, CheckedDiv};
+use num_traits::{Zero, CheckedDiv, CheckedRem};
 
 use crate::{lexer::type_restriction::TypeRestriction, error::BasicError};
 
@@ -56,7 +56,7 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn sub(self, rhs: Self) -> Result<Self, BasicError> {
+	pub fn subtract(self, rhs: Self) -> Result<Self, BasicError> {
 		Ok(match (self.clone(), rhs) {
 			(Self::ComplexFloat(complex_float_value), other) => Self::ComplexFloat(complex_float_value - other.to_complex64()?).compact(),
 			(other, Self::ComplexFloat(complex_float_value)) => Self::ComplexFloat(other.to_complex64()? - complex_float_value).compact(),
@@ -70,7 +70,7 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn mul(self, rhs: Self) -> Result<Self, BasicError> {
+	pub fn multiply(self, rhs: Self) -> Result<Self, BasicError> {
 		Ok(match (self.clone(), rhs) {
 			(Self::Integer(integer_value), Self::String(string_value)) | (Self::String(string_value), Self::Integer(integer_value)) => {
 				let usize_value: usize = integer_value.try_into()?;
@@ -84,7 +84,7 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn div(self, rhs: Self) -> Result<Self, BasicError> {
+	pub fn divide(self, rhs: Self) -> Result<Self, BasicError> {
 		Ok(match (self.clone(), rhs) {
 			(Self::ComplexFloat(complex_float_value), other) => Self::ComplexFloat(complex_float_value / other.to_complex64()?).compact(),
 			(other, Self::ComplexFloat(complex_float_value)) => Self::ComplexFloat(other.to_complex64()? / complex_float_value).compact(),
@@ -101,7 +101,7 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn floored_div(self, rhs: Self) -> Result<Self, BasicError> {
+	pub fn floored_divide(self, rhs: Self) -> Result<Self, BasicError> {
 		Ok(match (self.clone(), rhs) {
 			(Self::Integer(left_value), Self::Integer(right_value)) => Self::Integer(left_value.checked_div(&right_value)
 				.ok_or(BasicError::DivisionByZero)?),
@@ -110,11 +110,22 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn modulus(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn modulus(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(match (self.clone(), rhs) {
+			(Self::ComplexFloat(complex_float_value), other) => Self::ComplexFloat(complex_float_value % other.to_complex64()?).compact(),
+			(other, Self::ComplexFloat(complex_float_value)) => Self::ComplexFloat(other.to_complex64()? % complex_float_value).compact(),
+
+			(Self::Float(float_value), other) => Self::Float(float_value % other.to_f64()?),
+			(other, Self::Float(float_value)) => Self::Float(other.to_f64()? % float_value),
+
+			(Self::Integer(left_value), Self::Integer(right_value)) => Self::Integer(left_value.checked_rem(&right_value)
+				.ok_or(BasicError::DivisionByZero)?),
+
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::Number)),
+		})
 	}
 
-	pub fn pow(self, _rhs: Self) -> Result<Self, BasicError> {
+	pub fn power(self, _rhs: Self) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
@@ -130,23 +141,47 @@ impl ScalarValue {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn abs(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+	pub fn equal_to(self, _rhs: Self) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn atan(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+	pub fn not_equal_to(self, _rhs: Self) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn cos(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+	pub fn less_than(self, _rhs: Self) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn sin(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+	pub fn less_than_or_equal_to(self, _rhs: Self) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn tan(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+	pub fn greater_than(self, _rhs: Self) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn greater_than_or_equal_to(self, _rhs: Self) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn absolute_value(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn arctangent(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn cosine(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn sine(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		return Err(BasicError::FeatureNotYetSupported)
+	}
+
+	pub fn tangent(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
@@ -158,19 +193,24 @@ impl ScalarValue {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn log(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+	pub fn natural_logarithm(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn neg(self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn negate(self) -> Result<Self, BasicError> {
+		match self {
+			Self::Integer(value) => Ok(Self::Integer(-value)),
+			Self::Float(value) => Ok(Self::Float(-value)),
+			Self::ComplexFloat(value) => Ok(Self::ComplexFloat(-value)),
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::Number)),
+		}
 	}
 
 	pub fn not(self) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn sqrt(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+	pub fn square_root(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 

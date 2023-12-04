@@ -148,11 +148,11 @@ impl ProgramExecuter {
 					result = Some(match result {
 						Some(sum_value) => match opcode {
 							ExpressionOpcode::SumConcatenate => sum_value.add_concatenate(argument)?,
-							ExpressionOpcode::Subtract => sum_value.sub(argument)?,
-							ExpressionOpcode::Product => sum_value.mul(argument)?,
-							ExpressionOpcode::Divide => sum_value.div(argument)?,
-							ExpressionOpcode::FlooredDivide => sum_value.floored_div(argument)?,
-							ExpressionOpcode::Exponent => sum_value.pow(argument)?,
+							ExpressionOpcode::Subtract => sum_value.subtract(argument)?,
+							ExpressionOpcode::Product => sum_value.multiply(argument)?,
+							ExpressionOpcode::Divide => sum_value.divide(argument)?,
+							ExpressionOpcode::FlooredDivide => sum_value.floored_divide(argument)?,
+							ExpressionOpcode::Exponent => sum_value.power(argument)?,
 							ExpressionOpcode::And => sum_value.and(argument)?,
 							ExpressionOpcode::ExclusiveOr => sum_value.xor(argument)?,
 							ExpressionOpcode::Or => sum_value.or(argument)?,
@@ -167,6 +167,27 @@ impl ProgramExecuter {
 					None => return_type_restriction.default_value(),
 				}
 			}
+			ExpressionOpcode::EqualTo | ExpressionOpcode::LessThan | ExpressionOpcode::LessThanOrEqualTo | ExpressionOpcode::GreaterThan | ExpressionOpcode::GreaterThanOrEqualTo | ExpressionOpcode::NotEqualTo => {
+				let left_expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => return Err(BasicError::InvalidNullStatementOpcode),
+				};
+				let left_argument = self.execute_expression(main_struct, left_expression_opcode, TypeRestriction::Any)?;
+				let right_expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => return Err(BasicError::InvalidNullStatementOpcode),
+				};
+				let right_argument = self.execute_expression(main_struct, right_expression_opcode, TypeRestriction::Any)?;
+				match opcode {
+					ExpressionOpcode::EqualTo => left_argument.equal_to(right_argument)?,
+					ExpressionOpcode::NotEqualTo => left_argument.not_equal_to(right_argument)?,
+					ExpressionOpcode::LessThan => left_argument.less_than(right_argument)?,
+					ExpressionOpcode::LessThanOrEqualTo => left_argument.less_than_or_equal_to(right_argument)?,
+					ExpressionOpcode::GreaterThan => left_argument.greater_than(right_argument)?,
+					ExpressionOpcode::GreaterThanOrEqualTo => left_argument.greater_than_or_equal_to(right_argument)?,
+					_ => unreachable!(),
+				}
+			}
 			ExpressionOpcode::AbsoluteValue | ExpressionOpcode::Arctangent | ExpressionOpcode::Cosine | ExpressionOpcode::Sine | ExpressionOpcode::Tangent |
 			ExpressionOpcode::Integer | ExpressionOpcode::Logarithm | ExpressionOpcode::Negate | ExpressionOpcode::Not | ExpressionOpcode::SquareRoot | ExpressionOpcode::Sign => {
 				let expression_opcode = match self.get_expression_opcode(main_struct)? {
@@ -175,16 +196,16 @@ impl ProgramExecuter {
 				};
 				let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
 				match opcode {
-					ExpressionOpcode::AbsoluteValue => argument.abs(return_type_restriction)?,
-					ExpressionOpcode::Arctangent => argument.atan(return_type_restriction)?,
-					ExpressionOpcode::Cosine => argument.cos(return_type_restriction)?,
-					ExpressionOpcode::Sine => argument.sin(return_type_restriction)?,
-					ExpressionOpcode::Tangent => argument.tan(return_type_restriction)?,
+					ExpressionOpcode::AbsoluteValue => argument.absolute_value(return_type_restriction)?,
+					ExpressionOpcode::Arctangent => argument.arctangent(return_type_restriction)?,
+					ExpressionOpcode::Cosine => argument.cosine(return_type_restriction)?,
+					ExpressionOpcode::Sine => argument.sine(return_type_restriction)?,
+					ExpressionOpcode::Tangent => argument.tangent(return_type_restriction)?,
 					ExpressionOpcode::Integer => argument.integer(return_type_restriction)?,
-					ExpressionOpcode::Logarithm => argument.log(return_type_restriction)?,
-					ExpressionOpcode::Negate => argument.neg()?,
+					ExpressionOpcode::Logarithm => argument.natural_logarithm(return_type_restriction)?,
+					ExpressionOpcode::Negate => argument.negate()?,
 					ExpressionOpcode::Not => argument.not()?,
-					ExpressionOpcode::SquareRoot => argument.sqrt(return_type_restriction)?,
+					ExpressionOpcode::SquareRoot => argument.square_root(return_type_restriction)?,
 					ExpressionOpcode::Sign => argument.sign(return_type_restriction)?,
 					_ => unreachable!(),
 				}

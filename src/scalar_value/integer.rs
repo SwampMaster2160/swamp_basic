@@ -1,7 +1,7 @@
 use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem}};
 
 use num::{BigInt, bigint::{Sign, ToBigInt}};
-use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One};
+use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One, CheckedRem};
 
 use crate::{error::BasicError, get_rc_only_or_clone};
 
@@ -211,6 +211,23 @@ impl Neg for BasicInteger {
 			Self::SmallInteger(0) => self,
 			Self::SmallInteger(value) => Self::BigInteger(Rc::new(-(value.to_bigint().unwrap()))),
 			Self::BigInteger(value) => Self::BigInteger(Rc::new(-value.as_ref())).compact(),
+		}
+	}
+}
+
+impl CheckedRem for BasicInteger {
+	fn checked_rem(&self, rhs: &Self) -> Option<Self> {
+		match (self, rhs) {
+			// Any / zero
+			(_, Self::SmallInteger(0)) => None,
+			// Small / small
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => Some(Self::SmallInteger(left_value % right_value)),
+			// Small / big integer
+			(Self::SmallInteger(small_value), Self::BigInteger(big_value)) => Some(Self::BigInteger(Rc::new(small_value.to_bigint().unwrap() % big_value.as_ref())).compact()),
+			// Big integer / big integer
+			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Some(Self::BigInteger(Rc::new(left_value.as_ref() % right_value.as_ref())).compact()),
+			// Big integer / small
+			(Self::BigInteger(big_value), Self::SmallInteger(small_value)) => Some(Self::BigInteger(Rc::new(big_value.as_ref() % small_value.to_bigint().unwrap())).compact()),
 		}
 	}
 }
