@@ -53,7 +53,7 @@ impl Operator {
 			Self::GreaterThan => (">", &[]),
 			Self::LessThanOrEqualTo => ("<=", &["=<"]),
 			Self::GreaterThanOrEqualTo => (">=", &["=>"]),
-			Self::Modulus => ("mod", &["modulus"]),
+			Self::Modulus => ("%", &["mod", "modulus"]),
 			Self::And => ("&", &["and"]),
 			Self::Or => ("|", &["or", "inclusiveor"]),
 			Self::ExclusiveOr => ("xor", &["eor", "exclusiveor"]),
