@@ -1,4 +1,4 @@
-use std::{fmt::Display, rc::Rc};
+use std::{fmt::Display, rc::Rc, f64::consts::{PI, E}};
 
 use num::{BigInt, complex::Complex64};
 use num_traits::{Zero, CheckedDiv};
@@ -206,6 +206,26 @@ impl ScalarValue {
 			Self::ComplexFloat(value) => value,
 			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::ComplexFloat)),
 		})
+	}
+
+	pub fn true_value() -> Self {
+		Self::Boolean(true)
+	}
+
+	pub fn false_value() -> Self {
+		Self::Boolean(false)
+	}
+
+	pub fn pi() -> Self {
+		Self::Float(PI)
+	}
+
+	pub fn eulers_number() -> Self {
+		Self::Float(E)
+	}
+
+	pub fn imaginary_unit() -> Self {
+		Self::ComplexFloat(Complex64::new(0.0, 1.0))
 	}
 }
 

@@ -147,6 +147,19 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 					}
 					out.push(0);
 				}
+				BuiltInFunction::True | BuiltInFunction::False | BuiltInFunction::Pi | BuiltInFunction::EulersNumber | BuiltInFunction::ImaginaryUnit => {
+					if argument_expressions.len() != 0 {
+						return Err(BasicError::InvalidArgumentCount);
+					}
+					out.push(match function {
+						BuiltInFunction::True => ExpressionOpcode::True,
+						BuiltInFunction::False => ExpressionOpcode::False,
+						BuiltInFunction::Pi => ExpressionOpcode::Pi,
+						BuiltInFunction::EulersNumber => ExpressionOpcode::EulersNumber,
+						BuiltInFunction::ImaginaryUnit => ExpressionOpcode::ImaginaryUnit,
+						_ => unreachable!(),
+					} as u8);
+				}
 			}
 		}
 		_ => return Err(BasicError::FeatureNotYetSupported),

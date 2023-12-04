@@ -19,6 +19,11 @@ pub enum BuiltInFunction {
 	Sine,
 	SquareRoot,
 	Tangent,
+	True,
+	False,
+	Pi,
+	EulersNumber,
+	ImaginaryUnit,
 }
 
 impl BuiltInFunction {
@@ -43,6 +48,11 @@ impl BuiltInFunction {
 			Self::Sine => ("sin", &["sine"]),
 			Self::SquareRoot => ("sqr", &["sqrt", "squareroot"]),
 			Self::Tangent => ("tan", &["tangent"]),
+			Self::True => ("true", &[]),
+			Self::False => ("false", &[]),
+			Self::Pi => ("pi", &[]),
+			Self::EulersNumber => ("e", &["eulersnumber"]),
+			Self::ImaginaryUnit => ("i", &["imaginaryunit", "imaginary"]),
 		}
 	}
 

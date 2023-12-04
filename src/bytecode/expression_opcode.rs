@@ -43,4 +43,9 @@ pub enum ExpressionOpcode {
 	GetComplexFloat,
 	GetGaussianInteger,
 	GetComplexNumber,
+	True,
+	False,
+	Pi,
+	EulersNumber,
+	ImaginaryUnit,
 }

@@ -189,6 +189,20 @@ impl ProgramExecuter {
 					_ => unreachable!(),
 				}
 			}
+			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber | ExpressionOpcode::ImaginaryUnit => {
+				let out = match opcode {
+					ExpressionOpcode::False => ScalarValue::false_value(),
+					ExpressionOpcode::True => ScalarValue::true_value(),
+					ExpressionOpcode::Pi => ScalarValue::pi(),
+					ExpressionOpcode::EulersNumber => ScalarValue::eulers_number(),
+					ExpressionOpcode::ImaginaryUnit => ScalarValue::imaginary_unit(),
+					_ => unreachable!(),
+				};
+				if !out.conforms_to_type_restriction(return_type_restriction) {
+					return Err(BasicError::TypeMismatch(out, return_type_restriction));
+				}
+				out
+			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		};
 		Ok(out)
