@@ -12,6 +12,7 @@ pub enum Operator {
 	MinusNegate,
 	Multiply,
 	Divide,
+	FlooredDivide,
 	Exponent,
 	EqualToAssign,
 	EqualTo,
@@ -43,6 +44,7 @@ impl Operator {
 			Self::MinusNegate => ("-", &[]),
 			Self::Multiply => ("*", &[]),
 			Self::Divide => ("/", &[]),
+			Self::FlooredDivide => ("//", &[]),
 			Self::Exponent => ("^", &["pow"]),
 			Self::EqualToAssign => ("=", &[]),
 			Self::EqualTo => ("==", &[]),
@@ -76,7 +78,7 @@ impl Operator {
 	pub const fn get_precedence_priority() -> &'static[&'static[Self]] {
 		&[
 			&[Self::Exponent],
-			&[Self::Multiply, Self::Divide, Self::Modulus],
+			&[Self::Multiply, Self::Divide, Self::FlooredDivide, Self::Modulus],
 			&[Self::AddConcatenate, Self::MinusNegate],
 			&[Self::EqualTo, Self::EqualToAssign, Self::NotEqualTo, Self::LessThan, Self::LessThanOrEqualTo, Self::GreaterThan, Self::GreaterThanOrEqualTo],
 			&[Self::And],

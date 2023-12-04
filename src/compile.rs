@@ -1,4 +1,5 @@
-use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, parser::ParseTreeElement, lexer::{command::Command, operator::Operator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction}};
+use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode},
+parser::ParseTreeElement, lexer::{command::Command, operator::Operator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction}};
 
 /// Compiles a list of parse tree elements to bytecode
 #[inline(always)]
@@ -75,7 +76,8 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 		}
 		ParseTreeElement::BinaryOperator(operator, left_operand, right_operand) => {
 			match *operator {
-				Operator::AddConcatenate | Operator::And | Operator::Divide | Operator::ExclusiveOr | Operator::Exponent | Operator::MinusNegate | Operator::Modulus | Operator::Multiply/* |*/
+				Operator::AddConcatenate | Operator::And | Operator::Divide | Operator::FlooredDivide | Operator::ExclusiveOr | Operator::Exponent |
+				Operator::MinusNegate | Operator::Modulus | Operator::Multiply/* |*/
 				/*Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo | Operator::EqualToAssign*/ => {
 					out.push(match operator {
 						Operator::AddConcatenate => ExpressionOpcode::SumConcatenate,
@@ -86,6 +88,7 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 						Operator::MinusNegate => ExpressionOpcode::Subtract,
 						Operator::Modulus => ExpressionOpcode::Modulus,
 						Operator::Multiply => ExpressionOpcode::Product,
+						Operator::FlooredDivide => ExpressionOpcode::FlooredDivide,
 						/*Operator::EqualTo => ExpressionOpcode::EqualTo,
 						Operator::GreaterThan => ExpressionOpcode::GreaterThan,
 						Operator::GreaterThanOrEqualTo => ExpressionOpcode::GreaterThanOrEqualTo,

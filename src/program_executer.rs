@@ -137,7 +137,7 @@ impl ProgramExecuter {
 				ScalarValue::String(BasicString::String(Rc::new(string)))
 			}
 			ExpressionOpcode::SumConcatenate | ExpressionOpcode::Subtract | ExpressionOpcode::Product | ExpressionOpcode::Divide | ExpressionOpcode::Exponent | ExpressionOpcode::Modulus |
-			ExpressionOpcode::And | ExpressionOpcode::ExclusiveOr | ExpressionOpcode::Or => {
+			ExpressionOpcode::And | ExpressionOpcode::ExclusiveOr | ExpressionOpcode::Or | ExpressionOpcode::FlooredDivide => {
 				let mut result: Option<ScalarValue> = None;
 				loop {
 					let expression_opcode = match self.get_expression_opcode(main_struct)? {
@@ -147,15 +147,16 @@ impl ProgramExecuter {
 					let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
 					result = Some(match result {
 						Some(sum_value) => match opcode {
-							ExpressionOpcode::SumConcatenate => sum_value.add_concatenate(argument, return_type_restriction)?,
-							ExpressionOpcode::Subtract => sum_value.sub(argument, return_type_restriction)?,
-							ExpressionOpcode::Product => sum_value.mul(argument, return_type_restriction)?,
-							ExpressionOpcode::Divide => sum_value.div(argument, return_type_restriction)?,
-							ExpressionOpcode::Exponent => sum_value.pow(argument, return_type_restriction)?,
-							ExpressionOpcode::And => sum_value.and(argument, return_type_restriction)?,
-							ExpressionOpcode::ExclusiveOr => sum_value.xor(argument, return_type_restriction)?,
-							ExpressionOpcode::Or => sum_value.or(argument, return_type_restriction)?,
-							ExpressionOpcode::Modulus => sum_value.modulus(argument, return_type_restriction)?,
+							ExpressionOpcode::SumConcatenate => sum_value.add_concatenate(argument)?,
+							ExpressionOpcode::Subtract => sum_value.sub(argument)?,
+							ExpressionOpcode::Product => sum_value.mul(argument)?,
+							ExpressionOpcode::Divide => sum_value.div(argument)?,
+							ExpressionOpcode::FlooredDivide => sum_value.floored_div(argument)?,
+							ExpressionOpcode::Exponent => sum_value.pow(argument)?,
+							ExpressionOpcode::And => sum_value.and(argument)?,
+							ExpressionOpcode::ExclusiveOr => sum_value.xor(argument)?,
+							ExpressionOpcode::Or => sum_value.or(argument)?,
+							ExpressionOpcode::Modulus => sum_value.modulus(argument)?,
 							_ => unreachable!(),
 						},
 						None => argument,
@@ -166,7 +167,7 @@ impl ProgramExecuter {
 					None => return_type_restriction.default_value(),
 				}
 			}
-			ExpressionOpcode::AbsoluteValue | ExpressionOpcode::Arctangent | ExpressionOpcode::Cosine | ExpressionOpcode::Sine | ExpressionOpcode::Tangent | ExpressionOpcode::Random |
+			ExpressionOpcode::AbsoluteValue | ExpressionOpcode::Arctangent | ExpressionOpcode::Cosine | ExpressionOpcode::Sine | ExpressionOpcode::Tangent |
 			ExpressionOpcode::Integer | ExpressionOpcode::Logarithm | ExpressionOpcode::Negate | ExpressionOpcode::Not | ExpressionOpcode::SquareRoot | ExpressionOpcode::Sign => {
 				let expression_opcode = match self.get_expression_opcode(main_struct)? {
 					Some(expression_opcode) => expression_opcode,
@@ -179,14 +180,26 @@ impl ProgramExecuter {
 					ExpressionOpcode::Cosine => argument.cos(return_type_restriction)?,
 					ExpressionOpcode::Sine => argument.sin(return_type_restriction)?,
 					ExpressionOpcode::Tangent => argument.tan(return_type_restriction)?,
-					ExpressionOpcode::Random => argument.random(return_type_restriction)?,
 					ExpressionOpcode::Integer => argument.integer(return_type_restriction)?,
 					ExpressionOpcode::Logarithm => argument.log(return_type_restriction)?,
-					ExpressionOpcode::Negate => argument.neg(return_type_restriction)?,
-					ExpressionOpcode::Not => argument.not(return_type_restriction)?,
+					ExpressionOpcode::Negate => argument.neg()?,
+					ExpressionOpcode::Not => argument.not()?,
 					ExpressionOpcode::SquareRoot => argument.sqrt(return_type_restriction)?,
 					ExpressionOpcode::Sign => argument.sign(return_type_restriction)?,
 					_ => unreachable!(),
+				}
+			}
+			ExpressionOpcode::Random => {
+				let first_expression_opcode = self.get_expression_opcode(main_struct)?;
+				match first_expression_opcode {
+					Some(first_expression_opcode) => {
+						let argument = self.execute_expression(main_struct, first_expression_opcode, TypeRestriction::Any)?;
+						if self.get_expression_opcode(main_struct)? != None {
+							return Err(BasicError::InvalidArgumentCount);
+						}
+						argument.random_1_argument(return_type_restriction)?
+					}
+					None => ScalarValue::get_random_no_arguments(return_type_restriction)?,
 				}
 			}
 			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber | ExpressionOpcode::ImaginaryUnit => {

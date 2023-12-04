@@ -1,6 +1,6 @@
 use num_derive::FromPrimitive;
 
-#[derive(FromPrimitive, Clone, Copy)]
+#[derive(FromPrimitive, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ExpressionOpcode {
 	//End = 0,
@@ -10,6 +10,7 @@ pub enum ExpressionOpcode {
 	Product,
 	Subtract,
 	Divide,
+	FlooredDivide,
 	Modulus,
 	Exponent,
 	And,
