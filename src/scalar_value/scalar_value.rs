@@ -1,7 +1,7 @@
 use std::{fmt::Display, rc::Rc, f64::consts::{PI, E}};
 
 use num::{BigInt, complex::Complex64};
-use num_traits::{Zero, CheckedDiv, CheckedRem};
+use num_traits::{Zero, CheckedDiv, CheckedRem, Pow};
 
 use crate::{lexer::type_restriction::TypeRestriction, error::BasicError};
 
@@ -125,8 +125,21 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn power(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn power(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(match (self.clone(), rhs) {
+			(Self::ComplexFloat(complex_float_value), other) => Self::ComplexFloat(complex_float_value.powc(other.to_complex64()?)).compact(),
+			(other, Self::ComplexFloat(complex_float_value)) => Self::ComplexFloat(other.to_complex64()?.powc(complex_float_value)).compact(),
+
+			(Self::Float(float_value), other) => Self::Float(float_value.powf(other.to_f64()?)),
+			(other, Self::Float(float_value)) => Self::Float(other.to_f64()?.powf(float_value)),
+
+			(Self::Integer(left_value), Self::Integer(right_value)) => match left_value.clone().pow(right_value.clone()) {
+				Some(result) => Self::Integer(result),
+				None => Self::Float(left_value.to_f64().powf(right_value.to_f64())),
+			}
+
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::Number)),
+		})
 	}
 
 	pub fn and(self, _rhs: Self) -> Result<Self, BasicError> {

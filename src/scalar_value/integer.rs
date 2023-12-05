@@ -1,7 +1,7 @@
 use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem}};
 
-use num::{BigInt, bigint::{Sign, ToBigInt}};
-use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One, CheckedRem};
+use num::{BigInt, bigint::{Sign, ToBigInt}, BigUint};
+use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One, CheckedRem, Pow, pow, checked_pow};
 
 use crate::{error::BasicError, get_rc_only_or_clone};
 
@@ -256,20 +256,73 @@ impl Zero for BasicInteger {
 	}
 }
 
-/*impl Pow<Self> for BasicInteger {
-	type Output = Self;
+impl Pow<Self> for BasicInteger {
+	type Output = Option<Self>;
 
 	fn pow(self, rhs: Self) -> Self::Output {
 		match (self, rhs) {
-			// Any ^ 0
-			(_, Self::Zero) => Self::ONE,
-			// 0 ^ any
-			(Self::Zero, _) => Self::Zero,
+			// 1 ^ any
+			(Self::SmallInteger(1), _) => Some(Self::SmallInteger(1)),
+			// Small ^ small
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => Some(match checked_pow(left_value, right_value) {
+				Some(result) => Self::SmallInteger(result),
+				None => Self::BigInteger(Rc::new(pow(left_value.to_bigint().unwrap(), right_value))),
+			}),
+			// Big ^ small
+			(Self::BigInteger(big_value), Self::SmallInteger(small_value)) => Some(Self::BigInteger(Rc::new(pow(get_rc_only_or_clone(big_value), small_value)))),
 			// Big ^ big
-			(Self::BigInteger(big_value), Self::BigInteger(big_exponent)) => Self::BigInteger(Rc::new(big_value.as_ref().pow(*big_exponent.as_ref()))).compact(),
+			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => match right_value.to_biguint() {
+				Some(mut exp) => {
+					let mut base = get_rc_only_or_clone(left_value);
+				
+					while (&exp & BigUint::one()).is_zero() {
+						base *= base.clone();
+						exp >>= 1;
+					}
+					if exp.is_one() {
+						return Some(Self::BigInteger(Rc::new(base)).compact());
+					}
+				
+					let mut acc = base.clone();
+					while exp > BigUint::one() {
+						exp >>= 1;
+						base *= base.clone();
+						if (&exp & BigUint::one()).is_one() {
+							acc *= base.clone();
+						}
+					}
+					return Some(Self::BigInteger(Rc::new(acc)).compact());
+				}
+				None => None,
+			}
+			// Small ^ big
+			(Self::SmallInteger(small_value), Self::BigInteger(big_value)) => match big_value.to_biguint() {
+				Some(mut exp) => {
+					let mut base = small_value.to_bigint().unwrap();
+				
+					while (&exp & BigUint::one()).is_zero() {
+						base *= base.clone();
+						exp >>= 1;
+					}
+					if exp.is_one() {
+						return Some(Self::BigInteger(Rc::new(base)).compact());
+					}
+				
+					let mut acc = base.clone();
+					while exp > BigUint::one() {
+						exp >>= 1;
+						base *= base.clone();
+						if (&exp & BigUint::one()).is_one() {
+							acc *= base.clone();
+						}
+					}
+					return Some(Self::BigInteger(Rc::new(acc)).compact());
+				}
+				None => None,
+			}
 		}
 	}
-}*/
+}
 
 impl Num for BasicInteger {
 	type FromStrRadixErr = ();
