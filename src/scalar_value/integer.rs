@@ -1,4 +1,4 @@
-use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem}};
+use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem, BitAnd, BitOr, BitXor, Not}};
 
 use num::{BigInt, bigint::{Sign, ToBigInt}, BigUint};
 use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One, CheckedRem, Pow, pow, checked_pow};
@@ -237,6 +237,65 @@ impl Rem for BasicInteger {
 
 	fn rem(self, _rhs: Self) -> Self::Output {
 		unimplemented!()
+	}
+}
+
+impl BitAnd for BasicInteger {
+	type Output = Self;
+
+	fn bitand(self, rhs: Self) -> Self::Output {
+		match (self, rhs) {
+			// Small & small
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => Self::SmallInteger(left_value & right_value),
+			// Small & big
+			(Self::SmallInteger(small_value), Self::BigInteger(big_value)) | (Self::BigInteger(big_value), Self::SmallInteger(small_value)) =>
+				Self::BigInteger(Rc::new(get_rc_only_or_clone(big_value) & small_value.to_bigint().unwrap())).compact(),
+			// Big & big
+			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Self::BigInteger(Rc::new(left_value.as_ref() & right_value.as_ref())).compact(),
+		}
+	}
+}
+
+impl BitOr for BasicInteger {
+	type Output = Self;
+
+	fn bitor(self, rhs: Self) -> Self::Output {
+		match (self, rhs) {
+			// Small & small
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => Self::SmallInteger(left_value | right_value),
+			// Small & big
+			(Self::SmallInteger(small_value), Self::BigInteger(big_value)) | (Self::BigInteger(big_value), Self::SmallInteger(small_value)) =>
+				Self::BigInteger(Rc::new(get_rc_only_or_clone(big_value) | small_value.to_bigint().unwrap())).compact(),
+			// Big & big
+			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Self::BigInteger(Rc::new(left_value.as_ref() | right_value.as_ref())).compact(),
+		}
+	}
+}
+
+impl BitXor for BasicInteger {
+	type Output = Self;
+
+	fn bitxor(self, rhs: Self) -> Self::Output {
+		match (self, rhs) {
+			// Small & small
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => Self::SmallInteger(left_value ^ right_value),
+			// Small & big
+			(Self::SmallInteger(small_value), Self::BigInteger(big_value)) | (Self::BigInteger(big_value), Self::SmallInteger(small_value)) =>
+				Self::BigInteger(Rc::new(get_rc_only_or_clone(big_value) ^ small_value.to_bigint().unwrap())).compact(),
+			// Big & big
+			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Self::BigInteger(Rc::new(left_value.as_ref() ^ right_value.as_ref())).compact(),
+		}
+	}
+}
+
+impl Not for BasicInteger {
+	type Output = Self;
+
+	fn not(self) -> Self::Output {
+		match self {
+			Self::BigInteger(value) => Self::BigInteger(Rc::new(!value.as_ref())).compact(),
+			Self::SmallInteger(value) => Self::BigInteger(Rc::new(!value.to_bigint().unwrap())),
+		}
 	}
 }
 

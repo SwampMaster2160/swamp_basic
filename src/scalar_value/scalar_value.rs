@@ -142,16 +142,28 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn and(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn and(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(match (self, rhs) {
+			(Self::Integer(left_value), Self::Integer(right_value)) => Self::Integer(left_value & right_value),
+			(Self::Boolean(left_value), Self::Boolean(right_value)) => Self::Boolean(left_value && right_value),
+			(left, _) => return Err(BasicError::TypeMismatch(left, TypeRestriction::Integer)),
+		})
 	}
 
-	pub fn xor(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn xor(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(match (self, rhs) {
+			(Self::Integer(left_value), Self::Integer(right_value)) => Self::Integer(left_value ^ right_value),
+			(Self::Boolean(left_value), Self::Boolean(right_value)) => Self::Boolean(left_value != right_value),
+			(left, _) => return Err(BasicError::TypeMismatch(left, TypeRestriction::Integer)),
+		})
 	}
 
-	pub fn or(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn or(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(match (self, rhs) {
+			(Self::Integer(left_value), Self::Integer(right_value)) => Self::Integer(left_value | right_value),
+			(Self::Boolean(left_value), Self::Boolean(right_value)) => Self::Boolean(left_value || right_value),
+			(left, _) => return Err(BasicError::TypeMismatch(left, TypeRestriction::Integer)),
+		})
 	}
 
 	pub fn equal_to(self, _rhs: Self) -> Result<Self, BasicError> {
@@ -220,7 +232,11 @@ impl ScalarValue {
 	}
 
 	pub fn not(self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+		match self {
+			Self::Integer(value) => Ok(Self::Integer(!value)),
+			Self::Boolean(value) => Ok(Self::Boolean(!value)),
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::Integer)),
+		}
 	}
 
 	pub fn square_root(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
