@@ -136,8 +136,8 @@ impl ProgramExecuter {
 					.to_string();
 				ScalarValue::String(BasicString::String(Rc::new(string)))
 			}
-			ExpressionOpcode::SumConcatenate | ExpressionOpcode::Subtract | ExpressionOpcode::Product | ExpressionOpcode::Divide | ExpressionOpcode::Exponent | ExpressionOpcode::Modulus |
-			ExpressionOpcode::And | ExpressionOpcode::ExclusiveOr | ExpressionOpcode::Or | ExpressionOpcode::FlooredDivide => {
+			// Expressions that take in a null terminated list of values such as the sum and product instructions
+			ExpressionOpcode::SumConcatenate | ExpressionOpcode::Product => {
 				let mut result: Option<ScalarValue> = None;
 				loop {
 					let expression_opcode = match self.get_expression_opcode(main_struct)? {
@@ -146,17 +146,9 @@ impl ProgramExecuter {
 					};
 					let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
 					result = Some(match result {
-						Some(sum_value) => match opcode {
-							ExpressionOpcode::SumConcatenate => sum_value.add_concatenate(argument)?,
-							ExpressionOpcode::Subtract => sum_value.subtract(argument)?,
-							ExpressionOpcode::Product => sum_value.multiply(argument)?,
-							ExpressionOpcode::Divide => sum_value.divide(argument)?,
-							ExpressionOpcode::FlooredDivide => sum_value.floored_divide(argument)?,
-							ExpressionOpcode::Exponent => sum_value.power(argument)?,
-							ExpressionOpcode::And => sum_value.and(argument)?,
-							ExpressionOpcode::ExclusiveOr => sum_value.xor(argument)?,
-							ExpressionOpcode::Or => sum_value.or(argument)?,
-							ExpressionOpcode::Modulus => sum_value.modulus(argument)?,
+						Some(some_value) => match opcode {
+							ExpressionOpcode::SumConcatenate => some_value.add_concatenate(argument)?,
+							ExpressionOpcode::Product => some_value.multiply(argument)?,
 							_ => unreachable!(),
 						},
 						None => argument,
@@ -167,7 +159,10 @@ impl ProgramExecuter {
 					None => return_type_restriction.default_value(),
 				}
 			}
-			ExpressionOpcode::EqualTo | ExpressionOpcode::LessThan | ExpressionOpcode::LessThanOrEqualTo | ExpressionOpcode::GreaterThan | ExpressionOpcode::GreaterThanOrEqualTo | ExpressionOpcode::NotEqualTo => {
+			// Expressions that take in 2 arguments
+			ExpressionOpcode::EqualTo | ExpressionOpcode::LessThan | ExpressionOpcode::LessThanOrEqualTo | ExpressionOpcode::GreaterThan | ExpressionOpcode::GreaterThanOrEqualTo |
+			ExpressionOpcode::NotEqualTo | ExpressionOpcode::Subtract | ExpressionOpcode::Divide | ExpressionOpcode::Exponent | ExpressionOpcode::Modulus | ExpressionOpcode::And |
+			ExpressionOpcode::ExclusiveOr | ExpressionOpcode::Or | ExpressionOpcode::FlooredDivide => {
 				let left_expression_opcode = match self.get_expression_opcode(main_struct)? {
 					Some(expression_opcode) => expression_opcode,
 					None => return Err(BasicError::InvalidNullStatementOpcode),
@@ -179,15 +174,24 @@ impl ProgramExecuter {
 				};
 				let right_argument = self.execute_expression(main_struct, right_expression_opcode, TypeRestriction::Any)?;
 				match opcode {
+					ExpressionOpcode::Subtract => left_argument.subtract(right_argument)?,
 					ExpressionOpcode::EqualTo => left_argument.equal_to(right_argument)?,
 					ExpressionOpcode::NotEqualTo => left_argument.not_equal_to(right_argument)?,
 					ExpressionOpcode::LessThan => left_argument.less_than(right_argument)?,
 					ExpressionOpcode::LessThanOrEqualTo => left_argument.less_than_or_equal_to(right_argument)?,
 					ExpressionOpcode::GreaterThan => left_argument.greater_than(right_argument)?,
 					ExpressionOpcode::GreaterThanOrEqualTo => left_argument.greater_than_or_equal_to(right_argument)?,
+					ExpressionOpcode::Divide => left_argument.divide(right_argument)?,
+					ExpressionOpcode::FlooredDivide => left_argument.floored_divide(right_argument)?,
+					ExpressionOpcode::Exponent => left_argument.power(right_argument)?,
+					ExpressionOpcode::And => left_argument.and(right_argument)?,
+					ExpressionOpcode::ExclusiveOr => left_argument.xor(right_argument)?,
+					ExpressionOpcode::Or => left_argument.or(right_argument)?,
+					ExpressionOpcode::Modulus => left_argument.modulus(right_argument)?,
 					_ => unreachable!(),
 				}
 			}
+			// Expressions that take in 1 argument
 			ExpressionOpcode::AbsoluteValue | ExpressionOpcode::Arctangent | ExpressionOpcode::Cosine | ExpressionOpcode::Sine | ExpressionOpcode::Tangent |
 			ExpressionOpcode::Integer | ExpressionOpcode::Logarithm | ExpressionOpcode::Negate | ExpressionOpcode::Not | ExpressionOpcode::SquareRoot | ExpressionOpcode::Sign => {
 				let expression_opcode = match self.get_expression_opcode(main_struct)? {
@@ -223,6 +227,7 @@ impl ProgramExecuter {
 					None => ScalarValue::get_random_no_arguments(return_type_restriction)?,
 				}
 			}
+			// Constants
 			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber | ExpressionOpcode::ImaginaryUnit => {
 				let out = match opcode {
 					ExpressionOpcode::False => ScalarValue::false_value(),
@@ -236,6 +241,28 @@ impl ProgramExecuter {
 					return Err(BasicError::TypeMismatch(out, return_type_restriction));
 				}
 				out
+			}
+			// Type restrictions
+			ExpressionOpcode::GetBoolean | ExpressionOpcode::GetComplexFloat | ExpressionOpcode::GetFloat | ExpressionOpcode::GetInteger |
+			ExpressionOpcode::GetNumber | ExpressionOpcode::GetRealNumber | ExpressionOpcode::GetString => {
+				// Get type restriction
+				let type_restriction_for_argument = match opcode {
+					ExpressionOpcode::GetBoolean => TypeRestriction::Boolean,
+					ExpressionOpcode::GetComplexFloat => TypeRestriction::ComplexFloat,
+					ExpressionOpcode::GetFloat => TypeRestriction::Float,
+					ExpressionOpcode::GetInteger => TypeRestriction::Integer,
+					ExpressionOpcode::GetNumber => TypeRestriction::Number,
+					ExpressionOpcode::GetRealNumber => TypeRestriction::RealNumber,
+					ExpressionOpcode::GetString => TypeRestriction::String,
+					_ => unreachable!(),
+				};
+				// Get opcode for the expression the type restriction is for
+				let expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => return Err(BasicError::InvalidNullStatementOpcode),
+				};
+				// Execute the expression with the type restriction
+				self.execute_expression(main_struct, expression_opcode, type_restriction_for_argument)?
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		};

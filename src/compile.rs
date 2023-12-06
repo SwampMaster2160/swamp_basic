@@ -40,6 +40,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 					_ => unreachable!(),
 				} as u8);
 				// Can only have 0 or 1 arguments
+				// TODO: Many arguments for on statements
 				match sub_elements.len() {
 					0 => {},
 					1 => match &sub_elements[0] {
@@ -48,6 +49,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 					}
 					_ => return Err(BasicError::InvalidArgumentCount),
 				}
+				// Null terminate
 				out.push(StatementOpcode::End as u8);
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
@@ -76,25 +78,24 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 		}
 		ParseTreeElement::BinaryOperator(operator, left_operand, right_operand) => {
 			match *operator {
-				Operator::AddConcatenate | Operator::And | Operator::Divide | Operator::FlooredDivide | Operator::ExclusiveOr | Operator::Exponent |
-				Operator::MinusNegate | Operator::Modulus | Operator::Multiply => {
+				// Operators that end with a null byte
+				Operator::AddConcatenate | Operator::Multiply => {
+					// Push operator opcode
 					out.push(match operator {
 						Operator::AddConcatenate => ExpressionOpcode::SumConcatenate,
-						Operator::And => ExpressionOpcode::And,
-						Operator::Divide => ExpressionOpcode::Divide,
-						Operator::ExclusiveOr => ExpressionOpcode::ExclusiveOr,
-						Operator::Exponent => ExpressionOpcode::Exponent,
-						Operator::MinusNegate => ExpressionOpcode::Subtract,
-						Operator::Modulus => ExpressionOpcode::Modulus,
 						Operator::Multiply => ExpressionOpcode::Product,
-						Operator::FlooredDivide => ExpressionOpcode::FlooredDivide,
 						_ => unreachable!(),
 					} as u8);
+					// Push bytecode for sub-expressions
 					out.extend(compile_expression(left_operand)?);
 					out.extend(compile_expression(right_operand)?);
+					// Null terminate
 					out.push(0);
 				}
-				Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo | Operator::EqualToAssign => {
+				// Operators that don't end in a null byte
+				Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo | Operator::EqualToAssign |
+				Operator::Divide | Operator::FlooredDivide | Operator::ExclusiveOr | Operator::Exponent | Operator::MinusNegate | Operator::Modulus | Operator::And => {
+					// Push operator opcode
 					out.push(match operator {
 						Operator::EqualTo => ExpressionOpcode::EqualTo,
 						Operator::GreaterThan => ExpressionOpcode::GreaterThan,
@@ -103,8 +104,16 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 						Operator::LessThanOrEqualTo => ExpressionOpcode::LessThanOrEqualTo,
 						Operator::NotEqualTo => ExpressionOpcode::NotEqualTo,
 						Operator::EqualToAssign => ExpressionOpcode::EqualTo,
+						Operator::And => ExpressionOpcode::And,
+						Operator::Divide => ExpressionOpcode::Divide,
+						Operator::ExclusiveOr => ExpressionOpcode::ExclusiveOr,
+						Operator::Exponent => ExpressionOpcode::Exponent,
+						Operator::MinusNegate => ExpressionOpcode::Subtract,
+						Operator::Modulus => ExpressionOpcode::Modulus,
+						Operator::FlooredDivide => ExpressionOpcode::FlooredDivide,
 						_ => unreachable!(),
 					} as u8);
+					// Push bytecode for sub-expressions
 					out.extend(compile_expression(left_operand)?);
 					out.extend(compile_expression(right_operand)?);
 				}
@@ -114,48 +123,75 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 		ParseTreeElement::UnaryOperator(operator, operand) => {
 			match *operator {
 				Operator::MinusNegate | Operator::Not => {
+					// Push operator opcode
 					out.push(match operator {
 						Operator::MinusNegate => ExpressionOpcode::Negate,
 						Operator::Not => ExpressionOpcode::Not,
 						_ => unreachable!(),
 					} as u8);
+					// Push bytecode for sub-expression
 					out.extend(compile_expression(operand)?);
 				}
 				other => return Err(BasicError::InvalidUnaryOperatorSymbol(other)),
 			}
 		}
 		ParseTreeElement::BuiltInFunction(function, type_restriction, argument_expressions) => {
+			// Push type restriction if not any
 			if *type_restriction != TypeRestriction::Any {
-				return Err(BasicError::FeatureNotYetSupported);
+				out.push(match *type_restriction {
+					TypeRestriction::Boolean => ExpressionOpcode::GetBoolean,
+					TypeRestriction::Integer => ExpressionOpcode::GetInteger,
+					TypeRestriction::String => ExpressionOpcode::GetString,
+					TypeRestriction::ComplexFloat => ExpressionOpcode::GetComplexFloat,
+					TypeRestriction::Number => ExpressionOpcode::GetNumber,
+					TypeRestriction::RealNumber => ExpressionOpcode::GetRealNumber,
+					TypeRestriction::Float => ExpressionOpcode::GetFloat,
+					TypeRestriction::Any => unreachable!(),
+				} as u8);
 			}
+			// Function
 			match function {
+				// Single argument functions
 				BuiltInFunction::AbsoluteValue | BuiltInFunction::Arctangent | BuiltInFunction::Cosine | BuiltInFunction::Exponential | BuiltInFunction::Integer |
-				BuiltInFunction::Logarithm | BuiltInFunction::Sign | BuiltInFunction::Sine | BuiltInFunction::SquareRoot | BuiltInFunction::Tangent => {
+				BuiltInFunction::Sign | BuiltInFunction::Sine | BuiltInFunction::SquareRoot | BuiltInFunction::Tangent => {
+					// Should only have one argument
 					if argument_expressions.len() != 1 {
 						return Err(BasicError::InvalidArgumentCount);
 					}
+					// Push the function opcode
 					out.push(match function {
 						BuiltInFunction::AbsoluteValue => ExpressionOpcode::AbsoluteValue,
 						BuiltInFunction::Arctangent => ExpressionOpcode::Arctangent,
 						BuiltInFunction::Cosine => ExpressionOpcode::Cosine,
 						BuiltInFunction::Exponential => ExpressionOpcode::Exponential,
 						BuiltInFunction::Integer => ExpressionOpcode::Integer,
-						BuiltInFunction::Logarithm => ExpressionOpcode::Logarithm,
 						BuiltInFunction::Sign => ExpressionOpcode::Sign,
 						BuiltInFunction::Sine => ExpressionOpcode::Sine,
 						BuiltInFunction::SquareRoot => ExpressionOpcode::SquareRoot,
 						BuiltInFunction::Tangent => ExpressionOpcode::Tangent,
 						_ => unreachable!(),
 					} as u8);
+					// Push bytecode for sub-expression
 					out.extend(compile_expression(&argument_expressions[0])?);
 				}
-				BuiltInFunction::Random => {
-					out.push(BuiltInFunction::Random as u8);
+				// Functions with any number of arguments that are null terminated
+				BuiltInFunction::Random | BuiltInFunction::Logarithm | BuiltInFunction::Sum | BuiltInFunction::Product => {
+					// Push the function opcode
+					out.push(match function {
+						BuiltInFunction::Random => ExpressionOpcode::Random,
+						BuiltInFunction::Logarithm => ExpressionOpcode::Logarithm,
+						BuiltInFunction::Sum => ExpressionOpcode::SumConcatenate,
+						BuiltInFunction::Product => ExpressionOpcode::Product,
+						_ => unreachable!(),
+					} as u8);
+					// Push bytecode for sub-expressions
 					for argument_expression in argument_expressions {
 						out.extend(compile_expression(argument_expression)?);
 					}
+					// Null terminate
 					out.push(0);
 				}
+				// Constants
 				BuiltInFunction::True | BuiltInFunction::False | BuiltInFunction::Pi | BuiltInFunction::EulersNumber | BuiltInFunction::ImaginaryUnit => {
 					if argument_expressions.len() != 0 {
 						return Err(BasicError::InvalidArgumentCount);
