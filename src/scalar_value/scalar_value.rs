@@ -1,7 +1,7 @@
 use std::{fmt::Display, rc::Rc, f64::consts::{PI, E}};
 
-use num::{BigInt, complex::Complex64};
-use num_traits::{Zero, CheckedDiv, CheckedRem, Pow};
+use num::{BigInt, complex::Complex64, bigint::ToBigInt};
+use num_traits::{Zero, CheckedDiv, CheckedRem, Pow, One};
 
 use crate::{lexer::type_restriction::TypeRestriction, error::BasicError};
 
@@ -243,8 +243,21 @@ impl ScalarValue {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn sign(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn sign(self, type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		Ok(match (self, type_restriction) {
+			(Self::Integer(value), TypeRestriction::Any | TypeRestriction::Integer | TypeRestriction::Number | TypeRestriction::RealNumber) => Self::Integer(value.sign()),
+			(Self::Integer(value), TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.sign_f64()),
+			(Self::Integer(value), TypeRestriction::Boolean) => Self::Boolean(value.sign_bit()),
+
+			(Self::Float(value), TypeRestriction::Any | TypeRestriction::Number | TypeRestriction::RealNumber | TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.signum()),
+			(Self::Float(value), TypeRestriction::Integer) => Self::Integer(match value {
+				value if value == 0.0 => BasicInteger::zero(),
+				value if value < 0.0 => BasicInteger::BigInteger(Rc::new((-1).to_bigint().unwrap())),
+				_ => BasicInteger::one(),
+			}),
+			(Self::Float(value), TypeRestriction::Boolean) => Self::Boolean(value.is_sign_negative()),
+			(value, _) => return Err(BasicError::TypeMismatch(value, TypeRestriction::RealNumber)),
+		})
 	}
 
 	pub fn to_f64(self) -> Result<f64, BasicError> {

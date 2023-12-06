@@ -1,7 +1,7 @@
 use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem, BitAnd, BitOr, BitXor, Not}};
 
 use num::{BigInt, bigint::{Sign, ToBigInt}, BigUint};
-use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One, CheckedRem, Pow, pow, checked_pow};
+use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One, CheckedRem, Pow, pow, checked_pow, Signed};
 
 use crate::{error::BasicError, get_rc_only_or_clone};
 
@@ -83,6 +83,41 @@ impl BasicInteger {
 			(Self::SmallInteger(left_value), Self::BigInteger(right_value)) => Some(left_value.to_bigint().unwrap() % right_value.as_ref() == BigInt::zero()),
 			// Big, big
 			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => Some(left_value.as_ref() % right_value.as_ref() == BigInt::zero())
+		}
+	}
+
+	pub fn sign(self) -> Self {
+		match self {
+			Self::SmallInteger(value) => match value {
+				0 => Self::SmallInteger(0),
+				_ => Self::SmallInteger(1),
+			}
+			Self::BigInteger(value) => match value.sign() {
+				Sign::Minus => Self::BigInteger(Rc::new((-1).to_bigint().unwrap())),
+				Sign::NoSign => Self::SmallInteger(0),
+				Sign::Plus => Self::SmallInteger(1),
+			}
+		}
+	}
+
+	pub fn sign_f64(self) -> f64 {
+		match self {
+			Self::SmallInteger(value) => match value {
+				0 => 0.0,
+				_ => 1.0,
+			}
+			Self::BigInteger(value) => match value.sign() {
+				Sign::Minus => -1.0,
+				Sign::NoSign => 0.0,
+				Sign::Plus => 1.0,
+			}
+		}
+	}
+
+	pub fn sign_bit(self) -> bool {
+		match self {
+			Self::SmallInteger(_) => false,
+			Self::BigInteger(value) => value.is_negative(),
 		}
 	}
 }
