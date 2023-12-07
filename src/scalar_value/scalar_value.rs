@@ -218,7 +218,7 @@ impl ScalarValue {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn natural_logarithm(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+	pub fn logarithm(self, _base: Self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
