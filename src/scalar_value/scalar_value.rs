@@ -196,20 +196,48 @@ impl ScalarValue {
 		}))
 	}
 
-	pub fn less_than(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn less_than(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(Self::Boolean(match (self, rhs) {
+			(Self::Float(float_value), other) => float_value < other.to_f64()?,
+			(other, Self::Float(float_value)) => other.to_f64()? < float_value,
+
+			(Self::Integer(left_value), Self::Integer(right_value)) => left_value < right_value,
+
+			(left, _) => return Err(BasicError::TypeMismatch(left, TypeRestriction::RealNumber)),
+		}))
 	}
 
-	pub fn less_than_or_equal_to(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn less_than_or_equal_to(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(Self::Boolean(match (self, rhs) {
+			(Self::Float(float_value), other) => float_value <= other.to_f64()?,
+			(other, Self::Float(float_value)) => other.to_f64()? <= float_value,
+
+			(Self::Integer(left_value), Self::Integer(right_value)) => left_value <= right_value,
+
+			(left, _) => return Err(BasicError::TypeMismatch(left, TypeRestriction::RealNumber)),
+		}))
 	}
 
-	pub fn greater_than(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn greater_than(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(Self::Boolean(match (self, rhs) {
+			(Self::Float(float_value), other) => float_value > other.to_f64()?,
+			(other, Self::Float(float_value)) => other.to_f64()? > float_value,
+
+			(Self::Integer(left_value), Self::Integer(right_value)) => left_value > right_value,
+
+			(left, _) => return Err(BasicError::TypeMismatch(left, TypeRestriction::RealNumber)),
+		}))
 	}
 
-	pub fn greater_than_or_equal_to(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn greater_than_or_equal_to(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(Self::Boolean(match (self, rhs) {
+			(Self::Float(float_value), other) => float_value >= other.to_f64()?,
+			(other, Self::Float(float_value)) => other.to_f64()? >= float_value,
+
+			(Self::Integer(left_value), Self::Integer(right_value)) => left_value >= right_value,
+
+			(left, _) => return Err(BasicError::TypeMismatch(left, TypeRestriction::RealNumber)),
+		}))
 	}
 
 	pub fn absolute_value(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
