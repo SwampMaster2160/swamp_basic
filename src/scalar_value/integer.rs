@@ -1,11 +1,11 @@
-use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem, BitAnd, BitOr, BitXor, Not}};
+use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem, BitAnd, BitOr, BitXor, Not}, cmp::Ordering};
 
 use num::{BigInt, bigint::{Sign, ToBigInt}, BigUint};
 use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One, CheckedRem, Pow, pow, checked_pow, Signed};
 
 use crate::{error::BasicError, get_rc_only_or_clone};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord)]
 #[repr(u8)]
 pub enum BasicInteger {
 	/// Small integer
@@ -147,6 +147,29 @@ impl Display for BasicInteger {
 		match self {
 			Self::BigInteger(value) => write!(formatter, "{value}"),
 			Self::SmallInteger(value) => write!(formatter, "{value}"),
+		}
+	}
+}
+
+impl PartialOrd for BasicInteger {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		match (self, other) {
+			// Small < big
+			(Self::SmallInteger(..), Self::BigInteger(right_value)) => Some(match right_value.sign() {
+				Sign::NoSign => panic!(),
+				Sign::Plus => Ordering::Less,
+				Sign::Minus => Ordering::Greater,
+			}),
+			// Big < small
+			(Self::BigInteger(left_value), Self::SmallInteger(..)) => Some(match left_value.sign() {
+				Sign::NoSign => panic!(),
+				Sign::Plus => Ordering::Greater,
+				Sign::Minus => Ordering::Less,
+			}),
+			// Big < big
+			(Self::BigInteger(left_value), Self::BigInteger(right_value)) => left_value.as_ref().partial_cmp(right_value.as_ref()),
+			// Small < small
+			(Self::SmallInteger(left_value), Self::SmallInteger(right_value)) => left_value.partial_cmp(right_value),
 		}
 	}
 }

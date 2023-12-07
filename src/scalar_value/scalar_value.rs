@@ -166,12 +166,34 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn equal_to(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn equal_to(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(Self::Boolean(match (self, rhs) {
+			(Self::ComplexFloat(left_value), Self::ComplexFloat(right_value)) => left_value == right_value,
+			(Self::ComplexFloat(..), _) | (_, Self::ComplexFloat(..)) => false,
+			(Self::Float(float_value), other_value) | (other_value, Self::Float(float_value)) => match other_value.to_f64() {
+				Ok(converted_value) => float_value == converted_value,
+				Err(_) => false,
+			}
+			(Self::Integer(left_value), Self::Integer(right_value)) => left_value == right_value,
+			(Self::Boolean(left_value), Self::Boolean(right_value)) => left_value == right_value,
+			(Self::String(left_value), Self::String(right_value)) => left_value == right_value,
+			_ => false,
+		}))
 	}
 
-	pub fn not_equal_to(self, _rhs: Self) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn not_equal_to(self, rhs: Self) -> Result<Self, BasicError> {
+		Ok(Self::Boolean(match (self, rhs) {
+			(Self::ComplexFloat(left_value), Self::ComplexFloat(right_value)) => left_value != right_value,
+			(Self::ComplexFloat(..), _) | (_, Self::ComplexFloat(..)) => true,
+			(Self::Float(float_value), other_value) | (other_value, Self::Float(float_value)) => match other_value.to_f64() {
+				Ok(converted_value) => float_value != converted_value,
+				Err(_) => true,
+			}
+			(Self::Integer(left_value), Self::Integer(right_value)) => left_value != right_value,
+			(Self::Boolean(left_value), Self::Boolean(right_value)) => left_value != right_value,
+			(Self::String(left_value), Self::String(right_value)) => left_value != right_value,
+			_ => true,
+		}))
 	}
 
 	pub fn less_than(self, _rhs: Self) -> Result<Self, BasicError> {
