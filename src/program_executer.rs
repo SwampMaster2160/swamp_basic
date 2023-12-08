@@ -123,13 +123,23 @@ impl ProgramExecuter {
 	/// Executes an expression.
 	fn execute_expression(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, return_type_restriction: TypeRestriction) -> Result<ScalarValue, BasicError> {
 		// Execute function
-		let out = match opcode {
+		Ok(match opcode {
 			ExpressionOpcode::NumericalLiteral => {
 				// TODO: Better number parsing
 				let string = self.get_program_string(main_struct)?;
-				let number = string.parse()
+				/*let number = string.parse()
 					.map_err(|_| BasicError::InvalidNumericalLiteral(string.to_string()))?;
-				ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(number)).compact())
+				ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(number)).compact())*/
+				if let Ok(value) = string.parse() {
+					return Ok(ScalarValue::Integer(BasicInteger::SmallInteger(value)));
+				}
+				if let Ok(value) = string.parse() {
+					return Ok(ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(value))));
+				}
+				if let Ok(value) = string.parse() {
+					return Ok(ScalarValue::Float(value));
+				}
+				return Err(BasicError::InvalidNumericalLiteral(string.to_string()))
 			},
 			ExpressionOpcode::StringLiteral => {
 				let string = self.get_program_string(main_struct)?
@@ -268,8 +278,7 @@ impl ProgramExecuter {
 				}
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
-		};
-		Ok(out)
+		})
 	}
 
 	/// Executes the program untill it stops.
