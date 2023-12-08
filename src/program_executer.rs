@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use num::BigInt;
+use num::{BigInt, complex::Complex64};
 use num_traits::FromPrimitive;
 
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
@@ -125,20 +125,28 @@ impl ProgramExecuter {
 		// Execute function
 		Ok(match opcode {
 			ExpressionOpcode::NumericalLiteral => {
-				// TODO: Better number parsing
+				// Get string from program
 				let string = self.get_program_string(main_struct)?;
-				/*let number = string.parse()
-					.map_err(|_| BasicError::InvalidNumericalLiteral(string.to_string()))?;
-				ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(number)).compact())*/
+				// Try to convert to complex number
+				if string.ends_with('i') {
+					let (string_without_i, _) = string.split_at(string.len() - 1);
+					if let Ok(value) = string_without_i.parse() {
+						return Ok(ScalarValue::ComplexFloat(Complex64::new(0., value)).compact());
+					}
+					return Err(BasicError::InvalidNumericalLiteral(string.to_string()))
+				}
+				// Try to convert to integer
 				if let Ok(value) = string.parse() {
 					return Ok(ScalarValue::Integer(BasicInteger::SmallInteger(value)));
 				}
 				if let Ok(value) = string.parse() {
 					return Ok(ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(value))));
 				}
+				// Try to convert to float
 				if let Ok(value) = string.parse() {
 					return Ok(ScalarValue::Float(value));
 				}
+				// Else error
 				return Err(BasicError::InvalidNumericalLiteral(string.to_string()))
 			},
 			ExpressionOpcode::StringLiteral => {
