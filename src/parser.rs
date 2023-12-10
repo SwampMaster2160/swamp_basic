@@ -1,6 +1,6 @@
 use std::mem;
 
-use crate::{lexer::{token::Token, separator::Separator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, operator::Operator, command::Command}, error::BasicError};
+use crate::{lexer::{token::Token, separator::Separator, built_in_function::BuiltInFunction, type_restriction::{TypeRestriction, self}, operator::Operator, command::Command}, error::BasicError};
 
 #[derive(Debug, Clone)]
 /// Parsing a line's tokens will result in a tree of parse tree elements for each statement.
@@ -12,7 +12,7 @@ pub enum ParseTreeElement {
 	BinaryOperator(Operator, Box<ParseTreeElement>, Box<ParseTreeElement>),
 	Identifier(String, TypeRestriction),
 	BuiltInFunction(BuiltInFunction, TypeRestriction, Vec<ParseTreeElement>),
-	UserDefinedFunction(String, TypeRestriction, Vec<ParseTreeElement>),
+	UserDefinedFunctionOrArrayElement(String, TypeRestriction, Vec<ParseTreeElement>),
 	Command(Command, Vec<ParseTreeElement>),
 	ExpressionSeparator(Separator),
 }
@@ -34,7 +34,7 @@ impl ParseTreeElement {
 			Self::Identifier(_, _) => false,
 			Self::BinaryOperator(_, _, _) => false,
 			Self::BuiltInFunction(_, _, _) => false,
-			Self::UserDefinedFunction(_, _, _) => false,
+			Self::UserDefinedFunctionOrArrayElement(_, _, _) => false,
 			Self::Command(_, _) => true,
 			Self::ExpressionSeparator(_) => false,
 		}
@@ -50,7 +50,7 @@ impl ParseTreeElement {
 			Self::Identifier(_, _) => true,
 			Self::BinaryOperator(_, _, _) => true,
 			Self::BuiltInFunction(_, _, _) => true,
-			Self::UserDefinedFunction(_, _, _) => true,
+			Self::UserDefinedFunctionOrArrayElement(_, _, _) => true,
 			Self::Command(_, _) => false,
 			Self::ExpressionSeparator(_) => true,
 		}
@@ -99,6 +99,39 @@ fn parse_statement(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError
 		Token::Command(command) => parse_command(*command, tokens),
 		_ => return Err(BasicError::ExpectedStatement),
 	}
+}
+
+fn parse_assignment(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
+	todo!()
+}
+
+/// Remove and parse a l-value variable or array element indexing that is at the start of the tokens.
+fn parse_l_value(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
+	debug_assert!(tokens.len() > 0 && matches!(tokens[0], Token::Identifier(..)));
+	// Extract name token
+	let identifier_token = &tokens[0];
+	*tokens = &mut &tokens[1..];
+	let (name, type_restriction) = match identifier_token {
+		Token::Identifier(name, type_restriction) => (name.clone(), *type_restriction),
+		_ => panic!(),
+	};
+	// If the l-value is just a simple variable
+	if !matches!(tokens.get(0), Some(Token::Separator(Separator::OpeningBracket))) {
+		return Ok(ParseTreeElement::Identifier(name, type_restriction));
+	}
+	// If the l-value is an array element
+	// Get the length of the arrays bracketed area
+	let bracketed_area_length = find_bracket_pair_length_in_tokens(tokens)?;
+	// Remove bracketed area
+	let bracketed_area;
+	(bracketed_area, *tokens) = tokens.split_at(bracketed_area_length);
+	// Parse bracketed area without brackets
+	let bracketed_area_trees: Vec<ParseTreeElement> = bracketed_area[1..bracketed_area_length - 1].iter()
+		.map(|token| ParseTreeElement::from_token(token.clone()))
+		.collect();
+	let bracketed_area_parsed = parse_function_or_array_expressions(&bracketed_area_trees)?;
+	// Return
+	Ok(ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, bracketed_area_parsed))
 }
 
 /// Parses and removes a single command or double commands "go to" and "go sub" from `tokens`.
@@ -226,6 +259,35 @@ fn find_bracket_pair_length(tokens: &[ParseTreeElement]) -> Result<usize, BasicE
 	Err(BasicError::TooManyOpeningBrackets)
 }
 
+/// Takes a slice of tokens and returns the length of the section from the opening bracket to it's matching closing bracket.
+///
+/// The section includes the opening bracket and the closing bracket and is not any larger.
+///
+/// The slice should start with an opening bracket.
+fn find_bracket_pair_length_in_tokens(tokens: &[Token]) -> Result<usize, BasicError> {
+	let mut bracket_depth = 0usize;
+	// Go over each token
+	for (index, token) in tokens.iter().enumerate() {
+		// Opening and closing brackets increase and decrease the bracket depth
+		match token {
+			Token::Separator(separator) => {
+				match separator {
+					Separator::OpeningBracket => bracket_depth += 1,
+					Separator::ClosingBracket => bracket_depth -= 1,
+					_ => {}
+				}
+			}
+			_ => {},
+		}
+		// If the bracket depth is 0, we've found the end of the bracket pair
+		if bracket_depth == 0 {
+			return Ok(index + 1);
+		}
+	}
+	// If we reach the end of the tokens without finding the end of the bracket pair, return an error
+	Err(BasicError::TooManyOpeningBrackets)
+}
+
 /// Parse a single expression and returned the parsed tree
 fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<ParseTreeElement, BasicError> {
 	// Parse code in brackets and parse functions
@@ -283,7 +345,7 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 					.collect();
 				bracketed_area.pop();
 				// Parse the bracketed area
-				let bracketed_area_parsed = parse_function_expressions(&bracketed_area)?;
+				let bracketed_area_parsed = parse_function_or_array_expressions(&bracketed_area)?;
 				let new_parse_tree_element = ParseTreeElement::BuiltInFunction(function, type_restriction, bracketed_area_parsed);
 				parse_tree_elements.insert(index, new_parse_tree_element);
 			}
@@ -303,8 +365,8 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 					.collect();
 				bracketed_area.pop();
 				// Parse the bracketed area
-				let bracketed_area_parsed = parse_function_expressions(&bracketed_area)?;
-				let new_parse_tree_element = ParseTreeElement::UserDefinedFunction(name, type_restriction, bracketed_area_parsed);
+				let bracketed_area_parsed = parse_function_or_array_expressions(&bracketed_area)?;
+				let new_parse_tree_element = ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, bracketed_area_parsed);
 				parse_tree_elements.insert(index, new_parse_tree_element);
 			}
 			// Ignore other tokens
@@ -400,8 +462,8 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 	Ok(parse_tree_elements.pop().unwrap())
 }
 
-// Parse a comma separated list of expressions for a function
-fn parse_function_expressions(mut tokens: &[ParseTreeElement]) -> Result<Vec<ParseTreeElement>, BasicError> {
+/// Parse a comma separated list of expressions for a function
+fn parse_function_or_array_expressions(mut tokens: &[ParseTreeElement]) -> Result<Vec<ParseTreeElement>, BasicError> {
 	let mut out = Vec::new();
 	// Loop over each token
 	let mut index = 0;
