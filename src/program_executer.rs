@@ -3,7 +3,7 @@ use std::rc::Rc;
 use num::{BigInt, complex::Complex64};
 use num_traits::FromPrimitive;
 
-use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
+use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::{TypeRestriction, self}, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
 pub struct ProgramExecuter {
 	program_counter: usize,
@@ -18,6 +18,13 @@ enum InstructionExecutionSuccessResult {
 	ContinueToNextInstruction,
 	ProgramEnd,
 	ProgramStopped,
+}
+
+#[derive(Clone)]
+struct LValue {
+	name: String,
+	type_restriction: TypeRestriction,
+	arguments_or_indices: Option<Box<[ScalarValue]>>,
 }
 
 impl ProgramExecuter {
@@ -102,7 +109,15 @@ impl ProgramExecuter {
 				self.is_executing_line_program = false;
 			}
 			StatementOpcode::Let => {
-				todo!()
+				// Get the l-value to assign to
+				let l_value = self.execute_l_value(main_struct)?
+					.ok_or(BasicError::UnexpectedLValueEndOpcode)?;
+				// Get the scalar value to assign to the l-value
+				let expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				let scalar_value = self.execute_expression(main_struct, expression_opcode, l_value.type_restriction)?;
+				// Assign the scalar value to the l-value
+				self.assign_value(&l_value, &scalar_value)?;
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
@@ -110,13 +125,82 @@ impl ProgramExecuter {
 		Ok(InstructionExecutionSuccessResult::ContinueToNextInstruction)
 	}
 
+	fn assign_value(&mut self, l_value: &LValue, value: &ScalarValue) -> Result<(), BasicError> {
+		todo!();
+		Ok(())
+	}
+
+	/// Retrives a l-value from the program and returns:
+	/// * `Ok(Some(l-value))` if we get a valid l-value non-zero opcode from the program.
+	/// * `Ok(None)` if we get a zero l-value opcode from the program.
+	/// * `Err(error)` otherwise.
+	fn execute_l_value<'a>(&'a mut self, main_struct: &'a mut Main) -> Result<Option<LValue>, BasicError> {
+		// Get opcode
+		let opcode_id = self.get_program_byte(main_struct)
+			.ok_or(BasicError::ExpectedLValueOpcodeButProgramEnd)?;
+		let opcode: LValueOpcode = FromPrimitive::from_u8(opcode_id)
+			.ok_or(BasicError::InvalidExpressionOpcode(opcode_id))?;
+		// Get name
+		let name = self.get_program_string(main_struct)?.to_string();
+		// Execute opcode
+		Ok(match opcode {
+			LValueOpcode::ScalarAny | LValueOpcode::ScalarBoolean | LValueOpcode::ScalarComplexFloat | LValueOpcode::ScalarFloat | LValueOpcode::ScalarInteger |
+			LValueOpcode::ScalarNumber | LValueOpcode::ScalarRealNumber | LValueOpcode::ScalarString => {
+				let type_restriction = match opcode {
+					LValueOpcode::ScalarAny => TypeRestriction::Any,
+					LValueOpcode::ScalarBoolean => TypeRestriction::Boolean,
+					LValueOpcode::ScalarComplexFloat => TypeRestriction::ComplexFloat,
+					LValueOpcode::ScalarFloat => TypeRestriction::Float,
+					LValueOpcode::ScalarInteger => TypeRestriction::Integer,
+					LValueOpcode::ScalarNumber => TypeRestriction::Number,
+					LValueOpcode::ScalarRealNumber => TypeRestriction::RealNumber,
+					LValueOpcode::ScalarString => TypeRestriction::String,
+					_ => unreachable!(),
+				};
+				Some(LValue {
+					name,
+					type_restriction,
+					arguments_or_indices: None,
+				})
+			}
+			LValueOpcode::ArrayElementAny | LValueOpcode::ArrayElementBoolean | LValueOpcode::ArrayElementComplexFloat | LValueOpcode::ArrayElementFloat | LValueOpcode::ArrayElementInteger |
+			LValueOpcode::ArrayElementNumber | LValueOpcode::ArrayElementRealNumber | LValueOpcode::ArrayElementString => {
+				let type_restriction = match opcode {
+					LValueOpcode::ArrayElementAny => TypeRestriction::Any,
+					LValueOpcode::ArrayElementBoolean => TypeRestriction::Boolean,
+					LValueOpcode::ArrayElementComplexFloat => TypeRestriction::ComplexFloat,
+					LValueOpcode::ArrayElementFloat => TypeRestriction::Float,
+					LValueOpcode::ArrayElementInteger => TypeRestriction::Integer,
+					LValueOpcode::ArrayElementNumber => TypeRestriction::Number,
+					LValueOpcode::ArrayElementRealNumber => TypeRestriction::RealNumber,
+					LValueOpcode::ArrayElementString => TypeRestriction::String,
+					_ => unreachable!(),
+				};
+				let mut arguments_or_indices = Vec::new();
+				loop {
+					let argument_opcode = match self.get_expression_opcode(main_struct)? {
+						Some(argument_opcode) => argument_opcode,
+						None => break,
+					};
+					arguments_or_indices.push(self.execute_expression(main_struct, argument_opcode, TypeRestriction::Any)?);
+				}
+				Some(LValue {
+					name,
+					type_restriction,
+					arguments_or_indices: Some(arguments_or_indices.into_boxed_slice()),
+				})
+			}
+			LValueOpcode::End => None,
+		})
+	}
+
 	/// Retrives an expression opcode from the program and increments the current program counter. Returns:
 	/// * `Ok(Some(opcode))` if we get a valid non-zero opcode from the program.
-	/// * `Ok(None)` if we a zero opcode from the program.
+	/// * `Ok(None)` if we get a zero opcode from the program.
 	/// * `Err(error)` otherwise.
 	fn get_expression_opcode(&mut self, main_struct: &mut Main) -> Result<Option<ExpressionOpcode>, BasicError> {
 		let opcode_id = self.get_program_byte(main_struct)
-			.ok_or(BasicError::ExpectedFunctionOpcodeButEnd)?;
+			.ok_or(BasicError::ExpectedFunctionOpcodeButProgramEnd)?;
 		Ok(match opcode_id {
 			0 => None,
 			_ => Some(FromPrimitive::from_u8(opcode_id).ok_or(BasicError::InvalidExpressionOpcode(opcode_id))?)

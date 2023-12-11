@@ -22,7 +22,9 @@ pub enum BasicError {
 	InvalidUtf8String,
 	InvalidStatementOpcode(u8),
 	InvalidExpressionOpcode(u8),
-	ExpectedFunctionOpcodeButEnd,
+	InvalidLValueOpcode(u8),
+	ExpectedFunctionOpcodeButProgramEnd,
+	ExpectedLValueOpcodeButProgramEnd,
 	InvalidNumericalLiteral(String),
 	InvalidSeparator(Separator),
 	NoOpeningBracketAfterFunction,
@@ -38,6 +40,7 @@ pub enum BasicError {
 	InvalidNullStatementOpcode,
 	DivisionByZero,
 	ExpectedEqualsChar,
+	UnexpectedLValueEndOpcode,
 }
 
 impl Display for BasicError {
@@ -59,7 +62,9 @@ impl Display for BasicError {
 			Self::InvalidUtf8String => write!(formatter, "Invalid byte sequence for a UTF-8 string."),
 			Self::InvalidStatementOpcode(opcode) => write!(formatter, "Invalid command opcode: {:#04X}.", opcode),
 			Self::InvalidExpressionOpcode(opcode) => write!(formatter, "Invalid function opcode: {:#04X}.", opcode),
-			Self::ExpectedFunctionOpcodeButEnd => write!(formatter, "Expected function opcode but bytecode ended."),
+			Self::InvalidLValueOpcode(opcode) => write!(formatter, "Invalid l-value opcode: {:#04X}.", opcode),
+			Self::ExpectedFunctionOpcodeButProgramEnd => write!(formatter, "Expected function opcode but bytecode ended."),
+			Self::ExpectedLValueOpcodeButProgramEnd => write!(formatter, "Expected l-value opcode but bytecode ended."),
 			Self::InvalidNumericalLiteral(string) => write!(formatter, "Invalid numerical literal: {string}."),
 			Self::InvalidSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_symbol_char()),
 			Self::NoOpeningBracketAfterFunction => write!(formatter, "No opening bracket immediately after function name and type."),
@@ -77,6 +82,7 @@ impl Display for BasicError {
 			Self::InvalidNullStatementOpcode => write!(formatter, "Invalid null statement opcode."),
 			Self::DivisionByZero => write!(formatter, "Division by zero."),
 			Self::ExpectedEqualsChar => write!(formatter, "Expected '=' character."),
+			Self::UnexpectedLValueEndOpcode => write!(formatter, "Unexpected l-value end."),
 		}
 	}
 }
