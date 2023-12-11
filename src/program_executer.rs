@@ -101,6 +101,9 @@ impl ProgramExecuter {
 				self.program_counter = new_program_counter;
 				self.is_executing_line_program = false;
 			}
+			StatementOpcode::Let => {
+				todo!()
+			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Continue onto next instruction
