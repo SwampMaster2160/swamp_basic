@@ -37,6 +37,7 @@ pub enum BasicError {
 	InvalidSize(BasicInteger),
 	InvalidNullStatementOpcode,
 	DivisionByZero,
+	ExpectedEqualsChar,
 }
 
 impl Display for BasicError {
@@ -75,6 +76,7 @@ impl Display for BasicError {
 			Self::InvalidSize(size) => write!(formatter, "Invalid size: {size}."),
 			Self::InvalidNullStatementOpcode => write!(formatter, "Invalid null statement opcode."),
 			Self::DivisionByZero => write!(formatter, "Division by zero."),
+			Self::ExpectedEqualsChar => write!(formatter, "Expected '=' character."),
 		}
 	}
 }

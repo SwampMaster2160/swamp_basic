@@ -8,4 +8,5 @@ pub enum StatementOpcode {
 	Goto,
 	Run,
 	List,
+	Let,
 }

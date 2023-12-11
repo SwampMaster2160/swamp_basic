@@ -1,6 +1,6 @@
 use std::mem;
 
-use crate::{lexer::{token::Token, separator::Separator, built_in_function::BuiltInFunction, type_restriction::{TypeRestriction, self}, operator::Operator, command::Command}, error::BasicError};
+use crate::{lexer::{token::Token, separator::Separator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, operator::Operator, command::Command}, error::BasicError};
 
 #[derive(Debug, Clone)]
 /// Parsing a line's tokens will result in a tree of parse tree elements for each statement.
@@ -15,6 +15,7 @@ pub enum ParseTreeElement {
 	UserDefinedFunctionOrArrayElement(String, TypeRestriction, Vec<ParseTreeElement>),
 	Command(Command, Vec<ParseTreeElement>),
 	ExpressionSeparator(Separator),
+	Assignment(Box<ParseTreeElement>, Box<ParseTreeElement>)
 }
 
 impl ParseTreeElement {
@@ -37,6 +38,7 @@ impl ParseTreeElement {
 			Self::UserDefinedFunctionOrArrayElement(_, _, _) => false,
 			Self::Command(_, _) => true,
 			Self::ExpressionSeparator(_) => false,
+			Self::Assignment(_, _) => true
 		}
 	}
 
@@ -53,6 +55,7 @@ impl ParseTreeElement {
 			Self::UserDefinedFunctionOrArrayElement(_, _, _) => true,
 			Self::Command(_, _) => false,
 			Self::ExpressionSeparator(_) => true,
+			Self::Assignment(_, _) => false,
 		}
 	}
 }
@@ -92,24 +95,46 @@ pub fn parse_tokens_to_parse_tree_elements(mut tokens: Vec<Token>) -> Result<(Ve
 fn parse_statement(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
 	// Extract the first token
 	let first_token = tokens.get(0).ok_or(BasicError::ExpectedStatement)?;
-	*tokens = &mut &tokens[1..];
 	// Parse the statement
 	match first_token {
-		Token::Identifier(_, _) => return Err(BasicError::FeatureNotYetSupported),
-		Token::Command(command) => parse_command(*command, tokens),
+		// Commands
+		Token::Command(command) => {
+			*tokens = &mut &tokens[1..];
+			parse_command(*command, tokens)
+		}
+
+		// Assignments without a let keyword
+		Token::Identifier(..) => parse_assignment(tokens),
+
 		_ => return Err(BasicError::ExpectedStatement),
 	}
 }
 
+/// Parses and removes an assignment to a variable or array at an index index.
 fn parse_assignment(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
-	todo!()
+	// Parse l value
+	let l_value = parse_l_value(tokens)?;
+	match tokens.get(0) {
+		Some(Token::Operator(Operator::EqualToAssign)) => {}
+		_ => return Err(BasicError::ExpectedEqualsChar),
+	}
+	*tokens = &tokens[1..];
+	// Parse r value
+	let mut r_values = parse_expressions(tokens)?;
+	if r_values.len() != 1 {
+		return Err(BasicError::InvalidArgumentCount);
+	}
+	// Return
+	Ok(ParseTreeElement::Assignment(Box::new(l_value), Box::new(r_values.pop().unwrap())))
 }
 
 /// Remove and parse a l-value variable or array element indexing that is at the start of the tokens.
 fn parse_l_value(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
-	debug_assert!(tokens.len() > 0 && matches!(tokens[0], Token::Identifier(..)));
 	// Extract name token
-	let identifier_token = &tokens[0];
+	let identifier_token = match tokens.get(0) {
+		Some(token) => token,
+		None => return Err(BasicError::ExpectedStatement),
+	};
 	*tokens = &mut &tokens[1..];
 	let (name, type_restriction) = match identifier_token {
 		Token::Identifier(name, type_restriction) => (name.clone(), *type_restriction),
@@ -154,6 +179,8 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 			let statement = parse_statement(tokens)?;
 			ParseTreeElement::Command(command, vec![statement])
 		}
+		// Let
+		Command::Let => parse_assignment(tokens)?,
 		// Merge "go" with "to" or "sub" to create one tree
 		Command::Go => {
 			// Extract the second command

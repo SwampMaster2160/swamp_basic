@@ -1,4 +1,4 @@
-use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode},
+use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode},
 parser::ParseTreeElement, lexer::{command::Command, operator::Operator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction}};
 
 /// Compiles a list of parse tree elements to bytecode
@@ -54,9 +54,64 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
+		ParseTreeElement::Assignment(l_value, r_value) => {
+			out.push(StatementOpcode::Let as u8);
+			out.extend(parse_l_value(&l_value)?);
+			out.extend(compile_expression(&r_value)?);
+		}
 		_ => return Err(BasicError::FeatureNotYetSupported),
 	}
 	Ok(out)
+}
+
+fn parse_l_value(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, BasicError> {
+	Ok(match parse_tree_element {
+		ParseTreeElement::Identifier(name, type_restriction) => {
+			let mut out = Vec::new();
+			// Push opcode
+			out.push(match type_restriction {
+				TypeRestriction::Any => LValueOpcode::ScalarAny,
+				TypeRestriction::RealNumber => LValueOpcode::ScalarRealNumber,
+				TypeRestriction::Integer => LValueOpcode::ScalarInteger,
+				TypeRestriction::Float => LValueOpcode::ScalarFloat,
+				TypeRestriction::String => LValueOpcode::ScalarString,
+				TypeRestriction::Boolean => LValueOpcode::ScalarBoolean,
+				TypeRestriction::ComplexFloat => LValueOpcode::ScalarFloat,
+				TypeRestriction::Number => LValueOpcode::ScalarNumber,
+			} as u8);
+			// Push name
+			out.extend(name.as_bytes());
+			out.push(0);
+			// Return
+			out
+		}
+		ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, indices) => {
+			let mut out = Vec::new();
+			// Push opcode
+			out.push(match type_restriction {
+				TypeRestriction::Any => LValueOpcode::ArrayElementAny,
+				TypeRestriction::RealNumber => LValueOpcode::ArrayElementRealNumber,
+				TypeRestriction::Integer => LValueOpcode::ArrayElementInteger,
+				TypeRestriction::Float => LValueOpcode::ArrayElementFloat,
+				TypeRestriction::String => LValueOpcode::ArrayElementString,
+				TypeRestriction::Boolean => LValueOpcode::ArrayElementBoolean,
+				TypeRestriction::ComplexFloat => LValueOpcode::ArrayElementFloat,
+				TypeRestriction::Number => LValueOpcode::ArrayElementNumber,
+			} as u8);
+			// Push name
+			out.extend(name.as_bytes());
+			out.push(0);
+			// Push bytecode for index
+			for index_expression in indices {
+				out.extend(compile_expression(index_expression)?);
+			}
+			// Null terminate
+			out.push(0);
+			// Return
+			out
+		}
+		_ => panic!()
+	})
 }
 
 /// Compiles a single parse tree element that is an expression to bytecode

@@ -16,7 +16,6 @@ pub enum TypeRestriction {
 	String,
 	Boolean,
 	ComplexFloat,
-	//GaussianInteger,
 	Number,
 }
 
@@ -25,7 +24,7 @@ impl TypeRestriction {
 
 	pub fn default_value(self) -> ScalarValue {
 		match self {
-			Self::Any | Self::Number | /*Self::GaussianInteger |*/ Self::RealNumber | Self::Integer => ScalarValue::Integer(BasicInteger::zero()),
+			Self::Any | Self::Number | Self::RealNumber | Self::Integer => ScalarValue::Integer(BasicInteger::zero()),
 			Self::Float | Self::ComplexFloat => ScalarValue::Float(0.0),
 			Self::Boolean => ScalarValue::Boolean(false),
 			Self::String => ScalarValue::String(BasicString::EmptyString),
