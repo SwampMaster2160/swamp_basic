@@ -6,7 +6,7 @@ use strum_macros::EnumIter;
 
 use crate::{Main, error::BasicError, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
-#[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, EnumIter, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum TypeRestriction {
 	Any,

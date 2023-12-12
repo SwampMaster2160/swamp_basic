@@ -1,15 +1,16 @@
-use std::rc::Rc;
+use std::{rc::Rc, collections::HashMap};
 
 use num::{BigInt, complex::Complex64};
 use num_traits::FromPrimitive;
 
-use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::{TypeRestriction, self}, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
+use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
 pub struct ProgramExecuter {
 	program_counter: usize,
 	line_program_counter: usize,
 	//continue_counter: Option<usize>,
 	is_executing_line_program: bool,
+	global_scalar_variables: HashMap<(String, TypeRestriction), ScalarValue>,
 }
 
 #[derive(Clone, Copy)]
@@ -35,6 +36,7 @@ impl ProgramExecuter {
 			line_program_counter: 0,
 			//continue_counter: None,
 			is_executing_line_program: false,
+			global_scalar_variables: HashMap::new(),
 		}
 	}
 
@@ -117,7 +119,7 @@ impl ProgramExecuter {
 					.ok_or(BasicError::InvalidNullStatementOpcode)?;
 				let scalar_value = self.execute_expression(main_struct, expression_opcode, l_value.type_restriction)?;
 				// Assign the scalar value to the l-value
-				self.assign_value(&l_value, &scalar_value)?;
+				self.assign_global_scalar_value(l_value, scalar_value)?;
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
@@ -125,8 +127,20 @@ impl ProgramExecuter {
 		Ok(InstructionExecutionSuccessResult::ContinueToNextInstruction)
 	}
 
-	fn assign_value(&mut self, l_value: &LValue, value: &ScalarValue) -> Result<(), BasicError> {
-		todo!();
+	fn assign_global_scalar_value(&mut self, l_value: LValue, value: ScalarValue) -> Result<(), BasicError> {
+		let LValue {
+			name,
+			type_restriction,
+			arguments_or_indices
+		} = l_value;
+		match arguments_or_indices {
+			None => {
+				self.global_scalar_variables.insert((name, type_restriction), value);
+			}
+			Some(_arguments_or_indices) => {
+				return Err(BasicError::FeatureNotYetSupported);
+			}
+		}
 		Ok(())
 	}
 
