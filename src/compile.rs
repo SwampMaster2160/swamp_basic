@@ -56,7 +56,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 		}
 		ParseTreeElement::Assignment(l_value, r_value) => {
 			out.push(StatementOpcode::Let as u8);
-			out.extend(parse_l_value(&l_value)?);
+			out.extend(compile_l_value(&l_value)?);
 			out.extend(compile_expression(&r_value)?);
 		}
 		_ => return Err(BasicError::FeatureNotYetSupported),
@@ -64,7 +64,8 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 	Ok(out)
 }
 
-fn parse_l_value(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, BasicError> {
+/// Compile a l-value parse tree element to bytecode
+fn compile_l_value(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, BasicError> {
 	Ok(match parse_tree_element {
 		ParseTreeElement::Identifier(name, type_restriction) => {
 			let mut out = Vec::new();
@@ -261,6 +262,44 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 					} as u8);
 				}
 			}
+		}
+		ParseTreeElement::Identifier(name, type_restriction) => {
+			// Push opcode
+			out.push(match *type_restriction {
+				TypeRestriction::Boolean => ExpressionOpcode::LoadScalarBoolean,
+				TypeRestriction::Integer => ExpressionOpcode::LoadScalarInteger,
+				TypeRestriction::String => ExpressionOpcode::LoadScalarString,
+				TypeRestriction::ComplexFloat => ExpressionOpcode::LoadScalarComplexFloat,
+				TypeRestriction::Number => ExpressionOpcode::LoadScalarNumber,
+				TypeRestriction::RealNumber => ExpressionOpcode::LoadScalarRealNumber,
+				TypeRestriction::Float => ExpressionOpcode::LoadScalarFloat,
+				TypeRestriction::Any => ExpressionOpcode::LoadScalarAny,
+			} as u8);
+			// Push null terminated name
+			out.extend(name.as_bytes());
+			out.push(0);
+		}
+		ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, arguments) => {
+			// Push opcode
+			out.push(match *type_restriction {
+				TypeRestriction::Boolean => ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean,
+				TypeRestriction::Integer => ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger,
+				TypeRestriction::String => ExpressionOpcode::CallUserFunctionOrGetArrayValueString,
+				TypeRestriction::ComplexFloat => ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat,
+				TypeRestriction::Number => ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber,
+				TypeRestriction::RealNumber => ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber,
+				TypeRestriction::Float => ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat,
+				TypeRestriction::Any => ExpressionOpcode::CallUserFunctionOrGetArrayValueAny,
+			} as u8);
+			// Push null terminated name
+			out.extend(name.as_bytes());
+			out.push(0);
+			// Push bytecode for sub-expressions
+			for argument_expression in arguments {
+				out.extend(compile_expression(argument_expression)?);
+			}
+			// Null terminate
+			out.push(0);
 		}
 		_ => return Err(BasicError::FeatureNotYetSupported),
 	}
