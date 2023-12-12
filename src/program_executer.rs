@@ -49,6 +49,11 @@ impl ProgramExecuter {
 		}
 	}
 
+	/// Clears everything about the program's execution state except the execution location including variables, arrays, functions, the stack, ect.
+	fn clear(&mut self) {
+		self.global_scalar_variables = HashMap::new();
+	}
+
 	/// Retrives a byte from the program and increments the current program counter. Or returns None if the end of the program has been reached.
 	fn get_program_byte(&mut self, main_struct: &mut Main) -> Option<u8> {
 		main_struct.program.get_byte(self.is_executing_line_program, self.get_program_counter())
@@ -84,9 +89,11 @@ impl ProgramExecuter {
 				}
 				println!();
 			}
-			StatementOpcode::Run => {
+			StatementOpcode::Run | StatementOpcode::Goto => {
+				// Get the opcode
 				let expression_opcode = self.get_expression_opcode(main_struct)?;
-				let new_program_counter = match expression_opcode {
+				// Jump to new location
+				self.program_counter = match expression_opcode {
 					None => 0,
 					Some(opcode) => {
 						let result = self.execute_expression(main_struct, opcode, TypeRestriction::Integer)?;
@@ -94,21 +101,12 @@ impl ProgramExecuter {
 						main_struct.program.get_bytecode_index_from_line_number(&line_number)?
 					}
 				};
-				self.program_counter = new_program_counter;
+				// We are now executing the main program, not a line program
 				self.is_executing_line_program = false;
-			}
-			StatementOpcode::Goto => {
-				let expression_opcode = self.get_expression_opcode(main_struct)?;
-				let new_program_counter = match expression_opcode {
-					None => 0,
-					Some(opcode) => {
-						let result = self.execute_expression(main_struct, opcode, TypeRestriction::Integer)?;
-						let line_number: Rc<BigInt> = result.try_into()?;
-						main_struct.program.get_bytecode_index_from_line_number(&line_number)?
-					}
-				};
-				self.program_counter = new_program_counter;
-				self.is_executing_line_program = false;
+				// Clear variables and some other stuff if the opcode is Run
+				if opcode == StatementOpcode::Run {
+					self.clear();
+				}
 			}
 			StatementOpcode::Let => {
 				// Get the l-value to assign to
@@ -127,6 +125,7 @@ impl ProgramExecuter {
 		Ok(InstructionExecutionSuccessResult::ContinueToNextInstruction)
 	}
 
+	/// Sets the value of a global scalar variable or an element of a global array.
 	fn assign_global_scalar_value(&mut self, l_value: LValue, value: ScalarValue) -> Result<(), BasicError> {
 		let LValue {
 			name,
@@ -142,6 +141,21 @@ impl ProgramExecuter {
 			}
 		}
 		Ok(())
+	}
+
+	/// Gets the value of a global scalar variable or an element of a global array.
+	fn load_global_scalar_value(&mut self, l_value: LValue) -> Result<ScalarValue, BasicError> {
+		let LValue {
+			name,
+			type_restriction,
+			arguments_or_indices
+		} = l_value;
+		Ok(match arguments_or_indices {
+			None => self.global_scalar_variables.get(&(name, type_restriction))
+				.cloned()
+				.unwrap_or_else(|| type_restriction.default_value()),
+			Some(_arguments_or_indices) => return Err(BasicError::FeatureNotYetSupported),
+		})
 	}
 
 	/// Retrives a l-value from the program and returns:
@@ -385,6 +399,30 @@ impl ProgramExecuter {
 					true => out,
 					false => return Err(BasicError::TypeMismatch(out, type_restriction_for_argument)),
 				}
+			}
+			// Variable reads
+			ExpressionOpcode::LoadScalarAny | ExpressionOpcode::LoadScalarBoolean | ExpressionOpcode::LoadScalarComplexFloat | ExpressionOpcode::LoadScalarFloat | ExpressionOpcode::LoadScalarInteger |
+			ExpressionOpcode::LoadScalarNumber | ExpressionOpcode::LoadScalarRealNumber | ExpressionOpcode::LoadScalarString => {
+				// Get type restriction
+				let type_restriction = match opcode {
+					ExpressionOpcode::LoadScalarAny => TypeRestriction::Any,
+					ExpressionOpcode::LoadScalarBoolean => TypeRestriction::Boolean,
+					ExpressionOpcode::LoadScalarComplexFloat => TypeRestriction::ComplexFloat,
+					ExpressionOpcode::LoadScalarFloat => TypeRestriction::Float,
+					ExpressionOpcode::LoadScalarInteger => TypeRestriction::Integer,
+					ExpressionOpcode::LoadScalarNumber => TypeRestriction::Number,
+					ExpressionOpcode::LoadScalarRealNumber => TypeRestriction::RealNumber,
+					ExpressionOpcode::LoadScalarString => TypeRestriction::String,
+					_ => unreachable!(),
+				};
+				// Get name
+				let name = self.get_program_string(main_struct)?.to_string();
+				// Load value
+				self.load_global_scalar_value(LValue {
+					name,
+					type_restriction,
+					arguments_or_indices: None
+				})?
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		})
