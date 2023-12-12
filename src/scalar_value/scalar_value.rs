@@ -363,6 +363,17 @@ impl TryInto<Rc<BigInt>> for ScalarValue {
 	}
 }
 
+impl TryInto<bool> for ScalarValue {
+	type Error = BasicError;
+
+	fn try_into(self) -> Result<bool, Self::Error> {
+		match self {
+			Self::Boolean(value) => Ok(value),
+			_ => return Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Boolean)),
+		}
+	}
+}
+
 impl Display for ScalarValue {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {

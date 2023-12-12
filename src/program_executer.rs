@@ -6,11 +6,31 @@ use num_traits::FromPrimitive;
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
 pub struct ProgramExecuter {
+	/// The opcode that will next be executed by the executer if executing the main program.
 	program_counter: usize,
+	/// The opcode that will next be executed by the executer if executing a line program.
 	line_program_counter: usize,
 	//continue_counter: Option<usize>,
+	/// Is the program executing a line program?
 	is_executing_line_program: bool,
+	/// All the global scalar variables.
 	global_scalar_variables: HashMap<(String, TypeRestriction), ScalarValue>,
+	/// When gosub is called, the current routine level info is pushed here.
+	routine_stack: Vec<RoutineLevel>,
+	/// The current routine level info.
+	current_routine: RoutineLevel,
+}
+
+pub struct RoutineLevel {
+	if_condition: Option<bool>,
+}
+
+impl RoutineLevel {
+	pub fn new() -> Self {
+		RoutineLevel {
+			if_condition: None,
+		}
+	}
 }
 
 #[derive(Clone, Copy)]
@@ -37,6 +57,8 @@ impl ProgramExecuter {
 			//continue_counter: None,
 			is_executing_line_program: false,
 			global_scalar_variables: HashMap::new(),
+			current_routine: RoutineLevel::new(),
+			routine_stack: Vec::new(),
 		}
 	}
 
@@ -52,6 +74,8 @@ impl ProgramExecuter {
 	/// Clears everything about the program's execution state except the execution location including variables, arrays, functions, the stack, ect.
 	fn clear(&mut self) {
 		self.global_scalar_variables = HashMap::new();
+		self.current_routine = RoutineLevel::new();
+		self.routine_stack = Vec::new();
 	}
 
 	/// Retrives a byte from the program and increments the current program counter. Or returns None if the end of the program has been reached.
@@ -89,9 +113,13 @@ impl ProgramExecuter {
 				}
 				println!();
 			}
-			StatementOpcode::Run | StatementOpcode::Goto => {
+			StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => {
 				// Get the opcode
 				let expression_opcode = self.get_expression_opcode(main_struct)?;
+				// Gosub
+				if opcode == StatementOpcode::GoSubroutine {
+					return Err(BasicError::FeatureNotYetSupported);
+				}
 				// Jump to new location
 				self.program_counter = match expression_opcode {
 					None => 0,
@@ -121,6 +149,14 @@ impl ProgramExecuter {
 				let scalar_value = self.execute_expression(main_struct, expression_opcode, l_value.type_restriction)?;
 				// Assign the scalar value to the l-value
 				self.assign_global_scalar_value(l_value, scalar_value)?;
+			}
+			StatementOpcode::If => {
+				// Get the opcode
+				let expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				let expression_result = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Boolean)?
+					.try_into()?;
+				self.current_routine.if_condition = Some(expression_result);
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
