@@ -27,6 +27,7 @@ pub enum BasicError {
 	ExpectedLValueOpcodeButProgramEnd,
 	InvalidNumericalLiteral(String),
 	InvalidSeparator(Separator),
+	ExpectedSeparator(Separator),
 	NoOpeningBracketAfterFunction,
 	OperatorUsedOnNothing,
 	InvalidTypeRestriction(String),
@@ -83,6 +84,7 @@ impl Display for BasicError {
 			Self::DivisionByZero => write!(formatter, "Division by zero."),
 			Self::ExpectedEqualsChar => write!(formatter, "Expected '=' character."),
 			Self::UnexpectedLValueEndOpcode => write!(formatter, "Unexpected l-value end."),
+			Self::ExpectedSeparator(separator) => write!(formatter, "Expected separator \"{}\"", separator.get_symbol_char()),
 		}
 	}
 }

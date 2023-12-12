@@ -9,4 +9,11 @@ pub enum StatementOpcode {
 	Run,
 	List,
 	Let,
+	If,
+	On,
+	Then,
+	Else,
+	GoSubroutine,
+	Step,
+	To,
 }

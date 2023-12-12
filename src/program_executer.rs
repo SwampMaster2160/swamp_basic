@@ -98,6 +98,9 @@ impl ProgramExecuter {
 					Some(opcode) => {
 						let result = self.execute_expression(main_struct, opcode, TypeRestriction::Integer)?;
 						let line_number: Rc<BigInt> = result.try_into()?;
+						if self.get_expression_opcode(main_struct)? != None {
+							return Err(BasicError::InvalidArgumentCount);
+						}
 						main_struct.program.get_bytecode_index_from_line_number(&line_number)?
 					}
 				};

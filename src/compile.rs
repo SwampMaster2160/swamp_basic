@@ -1,5 +1,5 @@
 use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode},
-parser::ParseTreeElement, lexer::{command::Command, operator::Operator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction}};
+parser::ParseTreeElement, lexer::{command::Command, operator::Operator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator}};
 
 /// Compiles a list of parse tree elements to bytecode
 #[inline(always)]
@@ -20,37 +20,77 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 	debug_assert!(parse_tree_element.is_statement());
 
 	match parse_tree_element {
-		ParseTreeElement::Command(command, sub_elements) => match command {
+		ParseTreeElement::Command(command, arguments) => match command {
+			// End
 			Command::End => out.push(StatementOpcode::End as u8),
+			// Print
 			Command::Print => {
 				out.push(StatementOpcode::Print as u8);
-				for element in sub_elements {
-					match element {
+				for argument in arguments {
+					match argument {
 						ParseTreeElement::ExpressionSeparator(..) => return Err(BasicError::FeatureNotYetSupported),
-						_ => out.extend(compile_expression(element)?),
+						_ => out.extend(compile_expression(argument)?),
 					}
 				}
 				out.push(StatementOpcode::End as u8);
 			}
-			Command::Goto | Command::Run => {
+			// Commands that take in a list of expressions and ignore commas and semicolons
+			Command::Goto | Command::Run | Command::GoSubroutine => {
 				// Push the respective opcode
 				out.push(match command {
 					Command::Goto => StatementOpcode::Goto,
 					Command::Run => StatementOpcode::Run,
+					Command::GoSubroutine => StatementOpcode::GoSubroutine,
 					_ => unreachable!(),
 				} as u8);
-				// Can only have 0 or 1 arguments
-				// TODO: Many arguments for on statements
-				match sub_elements.len() {
-					0 => {},
-					1 => match &sub_elements[0] {
-						ParseTreeElement::ExpressionSeparator(separator) => return Err(BasicError::InvalidSeparator(*separator)),
-						_ => out.extend(compile_expression(&sub_elements[0])?),
+				// Push arguments
+				for argument in arguments {
+					match argument {
+						ParseTreeElement::ExpressionSeparator(separator) => {
+							if *separator != Separator::Comma && *separator != Separator::Semicolon {
+								return Err(BasicError::InvalidSeparator(*separator));
+							}
+						}
+						_ => {
+							debug_assert!(argument.is_expression());
+							out.extend(compile_expression(argument)?);
+						}
 					}
-					_ => return Err(BasicError::InvalidArgumentCount),
 				}
 				// Null terminate
 				out.push(StatementOpcode::End as u8);
+			}
+			// Commands that take in a sub-expression
+			Command::Then | Command::Else => {
+				// Push opcode
+				out.push(match command {
+					Command::Then => StatementOpcode::Then,
+					Command::Else => StatementOpcode::Else,
+					_ => unreachable!(),
+				} as u8);
+				// Push sub-statement
+				let sub_statement = match arguments.as_slice() {
+					[sub_statement] => sub_statement,
+					_ => return Err(BasicError::InvalidArgumentCount),
+				};
+				out.extend(compile_statement(sub_statement)?);
+			}
+			// Commands that take in a single expression
+			Command::If | Command::On | Command::Step | Command::To => {
+				// Push opcode
+				out.push(match command {
+					Command::If => StatementOpcode::If,
+					Command::On => StatementOpcode::On,
+					Command::Step => StatementOpcode::Step,
+					Command::To => StatementOpcode::To,
+					_ => unreachable!(),
+				} as u8);
+				// Push expression bytecode
+				let expression = match arguments.as_slice() {
+					[sub_statement] => sub_statement,
+					_ => return Err(BasicError::InvalidArgumentCount),
+				};
+				out.extend(compile_expression(expression)?);
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
