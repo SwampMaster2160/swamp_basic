@@ -495,7 +495,21 @@ impl ProgramExecuter {
 				}
 			}
 			ExpressionOpcode::Logarithm => {
-				return Err(BasicError::FeatureNotYetSupported);
+				let first_expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => return Err(BasicError::InvalidArgumentCount),
+				};
+				let first_argument = self.execute_expression(main_struct, first_expression_opcode, return_type_restriction)?;
+				match self.get_expression_opcode(main_struct)? {
+					Some(second_expression_opcode) => {
+						let second_argument = self.execute_expression(main_struct, second_expression_opcode, return_type_restriction)?;
+						if self.get_expression_opcode(main_struct)? != None {
+							return Err(BasicError::InvalidArgumentCount);
+						}
+						second_argument.logarithm(first_argument, return_type_restriction)?
+					}
+					None => first_argument.logarithm(ScalarValue::eulers_number(), return_type_restriction)?,
+				}
 			}
 			// Constants
 			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber | ExpressionOpcode::ImaginaryUnit => {
