@@ -128,6 +128,22 @@ impl Program {
 		byte
 	}
 
+	/// Skips the string that is pointed to in the program by the program counter.
+	///
+	/// The program counter is incremented to point to the byte after the string's null byte.
+	pub fn skip_string(&self, is_line_program: bool, program_counter: &mut usize) -> Result<(), BasicError> {
+		// Get bytecode
+		let bytecode = self.get_bytecode(is_line_program);
+		// Get null byte index or return an error if none exist
+		let null_byte_index = bytecode.iter()
+			.skip(*program_counter)
+			.position(|byte| *byte == 0)
+			.ok_or(BasicError::UnterminatedString)?;
+		// Repoint program counter to point to the byte after the null byte
+		*program_counter += null_byte_index + 1;
+		Ok(())
+	}
+
 	/// Returns the null-terminated utf-8 encoded string that is pointed to in the program by the program counter.
 	///
 	/// The program counter is incremented to point to the byte after the string's null byte.

@@ -83,9 +83,14 @@ impl ProgramExecuter {
 		main_struct.program.get_byte(self.is_executing_line_program, self.get_program_counter())
 	}
 
-	/// Retrives a string from the program and increments the current program counter.
+	/// Retrives a string from the program and increments the current program counter to the byte after the string's null byte.
 	fn get_program_string<'a>(&'a mut self, main_struct: &'a Main) -> Result<&str, BasicError> {
 		main_struct.program.get_string(self.is_executing_line_program, self.get_program_counter())
+	}
+
+	/// Skips a string from the program and increments the current program counter to the byte after the string's null byte.
+	fn skip_program_string(&mut self, main_struct: &Main) -> Result<(), BasicError> {
+		main_struct.program.skip_string(self.is_executing_line_program, self.get_program_counter())
 	}
 
 	/// Executes a single statement.
@@ -200,7 +205,7 @@ impl ProgramExecuter {
 			// Skip a l-value and an expression
 			StatementOpcode::Let => {
 				// Skip the l-value
-				if self.skip_l_value(main_struct)? {
+				if !self.skip_l_value(main_struct)? {
 					return Err(BasicError::UnexpectedLValueEndOpcode);
 				}
 				// Skip the expression
@@ -218,7 +223,7 @@ impl ProgramExecuter {
 			}
 			// Skip a sub-statement
 			StatementOpcode::Then | StatementOpcode::Else => self.skip_statement(main_struct)?,
-			
+
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Return that there where no errors
@@ -267,7 +272,7 @@ impl ProgramExecuter {
 		let opcode_id = self.get_program_byte(main_struct)
 			.ok_or(BasicError::ExpectedLValueOpcodeButProgramEnd)?;
 		let opcode: LValueOpcode = FromPrimitive::from_u8(opcode_id)
-			.ok_or(BasicError::InvalidExpressionOpcode(opcode_id))?;
+			.ok_or(BasicError::InvalidLValueOpcode(opcode_id))?;
 		// Get name
 		let name = self.get_program_string(main_struct)?.to_string();
 		// Execute opcode
@@ -322,8 +327,32 @@ impl ProgramExecuter {
 		})
 	}
 
-	fn skip_l_value(&mut self, _main_struct: &Main) -> Result<bool, BasicError> {
-		todo!();
+	fn skip_l_value(&mut self, main_struct: &Main) -> Result<bool, BasicError> {
+		// Get opcode
+		let opcode_id = self.get_program_byte(main_struct)
+			.ok_or(BasicError::ExpectedLValueOpcodeButProgramEnd)?;
+		let opcode: LValueOpcode = FromPrimitive::from_u8(opcode_id)
+			.ok_or(BasicError::InvalidLValueOpcode(opcode_id))?;
+		// Skip name
+		self.skip_program_string(main_struct)?;
+		// Skip opcode
+		Ok(match opcode {
+			LValueOpcode::ScalarAny | LValueOpcode::ScalarBoolean | LValueOpcode::ScalarComplexFloat | LValueOpcode::ScalarFloat | LValueOpcode::ScalarInteger |
+			LValueOpcode::ScalarNumber | LValueOpcode::ScalarRealNumber | LValueOpcode::ScalarString => true,
+
+			LValueOpcode::ArrayElementAny | LValueOpcode::ArrayElementBoolean | LValueOpcode::ArrayElementComplexFloat | LValueOpcode::ArrayElementFloat | LValueOpcode::ArrayElementInteger |
+			LValueOpcode::ArrayElementNumber | LValueOpcode::ArrayElementRealNumber | LValueOpcode::ArrayElementString => {
+				loop {
+					let argument_opcode = match self.get_expression_opcode(main_struct)? {
+						Some(argument_opcode) => argument_opcode,
+						None => break,
+					};
+					self.skip_expression(main_struct, argument_opcode)?;
+				}
+				true
+			}
+			LValueOpcode::End => false,
+		})
 	}
 
 	/// Retrives an expression opcode from the program and increments the current program counter. Returns:
@@ -341,7 +370,7 @@ impl ProgramExecuter {
 
 	/// Executes an expression.
 	fn execute_expression(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, return_type_restriction: TypeRestriction) -> Result<ScalarValue, BasicError> {
-		// Execute function
+		// Execute expression
 		Ok(match opcode {
 			ExpressionOpcode::NumericalLiteral => {
 				// Get string from program
@@ -431,7 +460,7 @@ impl ProgramExecuter {
 			}
 			// Expressions that take in 1 argument
 			ExpressionOpcode::AbsoluteValue | ExpressionOpcode::Arctangent | ExpressionOpcode::Cosine | ExpressionOpcode::Sine | ExpressionOpcode::Tangent |
-			ExpressionOpcode::Integer | ExpressionOpcode::Negate | ExpressionOpcode::Not | ExpressionOpcode::SquareRoot | ExpressionOpcode::Sign => {
+			ExpressionOpcode::Integer | ExpressionOpcode::Negate | ExpressionOpcode::Not | ExpressionOpcode::SquareRoot | ExpressionOpcode::Sign | ExpressionOpcode::Exponential => {
 				let expression_opcode = match self.get_expression_opcode(main_struct)? {
 					Some(expression_opcode) => expression_opcode,
 					None => return Err(BasicError::InvalidNullStatementOpcode),
@@ -448,6 +477,7 @@ impl ProgramExecuter {
 					ExpressionOpcode::Not => argument.not()?,
 					ExpressionOpcode::SquareRoot => argument.square_root(return_type_restriction)?,
 					ExpressionOpcode::Sign => argument.sign(return_type_restriction)?,
+					ExpressionOpcode::Exponential => ScalarValue::eulers_number().power(argument)?,
 					_ => unreachable!(),
 				}
 			}
@@ -532,8 +562,54 @@ impl ProgramExecuter {
 		})
 	}
 
-	fn skip_expression(&mut self, _main_struct: &Main, _opcode: ExpressionOpcode) -> Result<(), BasicError> {
-		todo!();
+	fn skip_expression(&mut self, main_struct: &Main, opcode: ExpressionOpcode) -> Result<(), BasicError> {
+		// Execute expression
+		match opcode {
+			// Skip a string
+			ExpressionOpcode::NumericalLiteral | ExpressionOpcode::StringLiteral |
+			ExpressionOpcode::LoadScalarAny | ExpressionOpcode::LoadScalarBoolean | ExpressionOpcode::LoadScalarComplexFloat | ExpressionOpcode::LoadScalarFloat | ExpressionOpcode::LoadScalarInteger |
+			ExpressionOpcode::LoadScalarNumber | ExpressionOpcode::LoadScalarRealNumber | ExpressionOpcode::LoadScalarString => self.skip_program_string(main_struct)?,
+			// Skip expressions until a null opcode is found
+			ExpressionOpcode::SumConcatenate | ExpressionOpcode::Product | ExpressionOpcode::Random | ExpressionOpcode::Logarithm => loop {
+				let expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => break,
+				};
+				self.skip_expression(main_struct, expression_opcode)?;
+			}
+			// Skip 2 arguments
+			ExpressionOpcode::EqualTo | ExpressionOpcode::LessThan | ExpressionOpcode::LessThanOrEqualTo | ExpressionOpcode::GreaterThan |
+			ExpressionOpcode::GreaterThanOrEqualTo | ExpressionOpcode::NotEqualTo |
+			ExpressionOpcode::Subtract | ExpressionOpcode::Divide | ExpressionOpcode::Exponent | ExpressionOpcode::Modulus | ExpressionOpcode::And |
+			ExpressionOpcode::ExclusiveOr | ExpressionOpcode::Or | ExpressionOpcode::FlooredDivide => {
+				let left_expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => return Err(BasicError::InvalidNullStatementOpcode),
+				};
+				self.skip_expression(main_struct, left_expression_opcode)?;
+				let right_expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => return Err(BasicError::InvalidNullStatementOpcode),
+				};
+				self.skip_expression(main_struct, right_expression_opcode)?;
+			}
+			// Expressions that take in 1 argument
+			ExpressionOpcode::AbsoluteValue | ExpressionOpcode::Arctangent | ExpressionOpcode::Cosine | ExpressionOpcode::Sine | ExpressionOpcode::Tangent |
+			ExpressionOpcode::Integer | ExpressionOpcode::Negate | ExpressionOpcode::Not | ExpressionOpcode::SquareRoot | ExpressionOpcode::Sign |
+			ExpressionOpcode::GetBoolean | ExpressionOpcode::GetComplexFloat | ExpressionOpcode::GetFloat | ExpressionOpcode::GetInteger |
+			ExpressionOpcode::GetNumber | ExpressionOpcode::GetRealNumber | ExpressionOpcode::GetString | ExpressionOpcode::Exponential => {
+				let expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => return Err(BasicError::InvalidNullStatementOpcode),
+				};
+				self.skip_expression(main_struct, expression_opcode)?;
+			}
+			// Skip nothing
+			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber | ExpressionOpcode::ImaginaryUnit => {}
+
+			_ => return Err(BasicError::FeatureNotYetSupported),
+		}
+		Ok(())
 	}
 
 	/// Executes the program untill it stops.
