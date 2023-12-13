@@ -79,29 +79,31 @@ impl ProgramExecuter {
 	}
 
 	/// Retrives a byte from the program and increments the current program counter. Or returns None if the end of the program has been reached.
-	fn get_program_byte(&mut self, main_struct: &mut Main) -> Option<u8> {
+	fn get_program_byte(&mut self, main_struct: &Main) -> Option<u8> {
 		main_struct.program.get_byte(self.is_executing_line_program, self.get_program_counter())
 	}
 
 	/// Retrives a string from the program and increments the current program counter.
-	fn get_program_string<'a>(&'a mut self, main_struct: &'a mut Main) -> Result<&str, BasicError> {
+	fn get_program_string<'a>(&'a mut self, main_struct: &'a Main) -> Result<&str, BasicError> {
 		main_struct.program.get_string(self.is_executing_line_program, self.get_program_counter())
 	}
 
 	/// Executes a single statement.
-	fn execute_statement(&mut self, main_struct: &mut Main) -> Result<InstructionExecutionSuccessResult, BasicError> {
+	fn execute_statement(&mut self, main_struct: &mut Main, should_exist: bool) -> Result<InstructionExecutionSuccessResult, BasicError> {
+		let mut out = InstructionExecutionSuccessResult::ContinueToNextInstruction;
 		// Get opcode
 		let opcode_id = match self.get_program_byte(main_struct) {
 			Some(opcode_id) => opcode_id,
-			None => {
-				return Ok(InstructionExecutionSuccessResult::ProgramEnd)
+			None => match should_exist {
+				false => return Ok(InstructionExecutionSuccessResult::ProgramEnd),
+				true => return Err(BasicError::ExpectedStatementOpcodeButProgramEnd),
 			},
 		};
 		let opcode: StatementOpcode = FromPrimitive::from_u8(opcode_id)
 			.ok_or(BasicError::InvalidStatementOpcode(opcode_id))?;
 		// Execute statment instruction
 		match opcode {
-			StatementOpcode::End => return Ok(InstructionExecutionSuccessResult::ProgramStopped),
+			StatementOpcode::End => out = InstructionExecutionSuccessResult::ProgramStopped,
 			StatementOpcode::Print => {
 				loop {
 					let expression_opcode = match self.get_expression_opcode(main_struct)? {
@@ -158,10 +160,69 @@ impl ProgramExecuter {
 					.try_into()?;
 				self.current_routine.if_condition = Some(expression_result);
 			}
+			StatementOpcode::Then | StatementOpcode::Else => {
+				let condition = match self.current_routine.if_condition {
+					Some(condition) => condition,
+					None => return Err(BasicError::ThenWithoutIf),
+				};
+				let should_execute_sub_statement = condition != (opcode == StatementOpcode::Else);
+				match should_execute_sub_statement {
+					true => out = self.execute_statement(main_struct, should_exist)?,
+					false => self.skip_statement(main_struct)?,
+				}
+			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Continue onto next instruction
-		Ok(InstructionExecutionSuccessResult::ContinueToNextInstruction)
+		Ok(out)
+	}
+
+	fn skip_statement(&mut self, main_struct: &Main) -> Result<(), BasicError> {
+		// Get opcode
+		let opcode_id = match self.get_program_byte(main_struct) {
+			Some(opcode_id) => opcode_id,
+			None => return Err(BasicError::ExpectedStatementOpcodeButProgramEnd),
+		};
+		let opcode: StatementOpcode = FromPrimitive::from_u8(opcode_id)
+			.ok_or(BasicError::InvalidStatementOpcode(opcode_id))?;
+		// Skip statement arguments
+		match opcode {
+			// Skip opcodes with no arguments
+			StatementOpcode::End => {}
+			// Skip expressions untill a null opcode is found
+			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => loop {
+				let expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => break,
+				};
+				self.skip_expression(main_struct, expression_opcode)?;
+			}
+			// Skip a l-value and an expression
+			StatementOpcode::Let => {
+				// Skip the l-value
+				if self.skip_l_value(main_struct)? {
+					return Err(BasicError::UnexpectedLValueEndOpcode);
+				}
+				// Skip the expression
+				let expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				self.skip_expression(main_struct, expression_opcode)?;
+			}
+			// Skip an expression
+			StatementOpcode::If => {
+				// Get the opcode
+				let expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				// Skip the expression
+				self.skip_expression(main_struct, expression_opcode)?;
+			}
+			// Skip a sub-statement
+			StatementOpcode::Then | StatementOpcode::Else => self.skip_statement(main_struct)?,
+			
+			_ => return Err(BasicError::FeatureNotYetSupported),
+		}
+		// Return that there where no errors
+		Ok(())
 	}
 
 	/// Sets the value of a global scalar variable or an element of a global array.
@@ -261,13 +322,17 @@ impl ProgramExecuter {
 		})
 	}
 
+	fn skip_l_value(&mut self, _main_struct: &Main) -> Result<bool, BasicError> {
+		todo!();
+	}
+
 	/// Retrives an expression opcode from the program and increments the current program counter. Returns:
 	/// * `Ok(Some(opcode))` if we get a valid non-zero opcode from the program.
 	/// * `Ok(None)` if we get a zero opcode from the program.
 	/// * `Err(error)` otherwise.
-	fn get_expression_opcode(&mut self, main_struct: &mut Main) -> Result<Option<ExpressionOpcode>, BasicError> {
+	fn get_expression_opcode(&mut self, main_struct: &Main) -> Result<Option<ExpressionOpcode>, BasicError> {
 		let opcode_id = self.get_program_byte(main_struct)
-			.ok_or(BasicError::ExpectedFunctionOpcodeButProgramEnd)?;
+			.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
 		Ok(match opcode_id {
 			0 => None,
 			_ => Some(FromPrimitive::from_u8(opcode_id).ok_or(BasicError::InvalidExpressionOpcode(opcode_id))?)
@@ -467,12 +532,16 @@ impl ProgramExecuter {
 		})
 	}
 
+	fn skip_expression(&mut self, _main_struct: &Main, _opcode: ExpressionOpcode) -> Result<(), BasicError> {
+		todo!();
+	}
+
 	/// Executes the program untill it stops.
 	#[inline(always)]
 	fn execute(&mut self, main_struct: &mut Main) {
 		// Execute instructions
 		loop {
-			let instruction_result = self.execute_statement(main_struct);
+			let instruction_result = self.execute_statement(main_struct, false);
 			match instruction_result {
 				Err(error) if !self.is_executing_line_program => {
 					let line = main_struct.program.get_line_number_bytecode_is_in(self.program_counter);

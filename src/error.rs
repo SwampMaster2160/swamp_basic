@@ -23,7 +23,8 @@ pub enum BasicError {
 	InvalidStatementOpcode(u8),
 	InvalidExpressionOpcode(u8),
 	InvalidLValueOpcode(u8),
-	ExpectedFunctionOpcodeButProgramEnd,
+	ExpectedExpressionOpcodeButProgramEnd,
+	ExpectedStatementOpcodeButProgramEnd,
 	ExpectedLValueOpcodeButProgramEnd,
 	InvalidNumericalLiteral(String),
 	InvalidSeparator(Separator),
@@ -42,6 +43,7 @@ pub enum BasicError {
 	DivisionByZero,
 	ExpectedEqualsChar,
 	UnexpectedLValueEndOpcode,
+	ThenWithoutIf,
 }
 
 impl Display for BasicError {
@@ -64,7 +66,8 @@ impl Display for BasicError {
 			Self::InvalidStatementOpcode(opcode) => write!(formatter, "Invalid command opcode: {:#04X}.", opcode),
 			Self::InvalidExpressionOpcode(opcode) => write!(formatter, "Invalid function opcode: {:#04X}.", opcode),
 			Self::InvalidLValueOpcode(opcode) => write!(formatter, "Invalid l-value opcode: {:#04X}.", opcode),
-			Self::ExpectedFunctionOpcodeButProgramEnd => write!(formatter, "Expected function opcode but bytecode ended."),
+			Self::ExpectedExpressionOpcodeButProgramEnd => write!(formatter, "Expected expression opcode but bytecode ended."),
+			Self::ExpectedStatementOpcodeButProgramEnd => write!(formatter, "Expected statement opcode but bytecode ended."),
 			Self::ExpectedLValueOpcodeButProgramEnd => write!(formatter, "Expected l-value opcode but bytecode ended."),
 			Self::InvalidNumericalLiteral(string) => write!(formatter, "Invalid numerical literal: {string}."),
 			Self::InvalidSeparator(separator) => write!(formatter, "Invalid separator: {}", separator.get_symbol_char()),
@@ -85,6 +88,7 @@ impl Display for BasicError {
 			Self::ExpectedEqualsChar => write!(formatter, "Expected '=' character."),
 			Self::UnexpectedLValueEndOpcode => write!(formatter, "Unexpected l-value end."),
 			Self::ExpectedSeparator(separator) => write!(formatter, "Expected separator \"{}\"", separator.get_symbol_char()),
+			Self::ThenWithoutIf => write!(formatter, "A \"then\" or \"else\" was executed without a \"if\" statement being executed since the program start or last gosub call."),
 		}
 	}
 }
