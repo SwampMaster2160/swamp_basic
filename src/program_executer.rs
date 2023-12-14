@@ -22,7 +22,9 @@ pub struct ProgramExecuter {
 }
 
 pub struct RoutineLevel {
-	if_condition: Option<bool>,
+	/// `None` if if has not been called since the subroutine start.
+	/// The first bool hold weather the next "then" should be taken, the second holds weather the next "else" should be taken.
+	if_condition: Option<(bool, bool)>,
 }
 
 impl RoutineLevel {
@@ -161,16 +163,25 @@ impl ProgramExecuter {
 				// Get the opcode
 				let expression_opcode = self.get_expression_opcode(main_struct)?
 					.ok_or(BasicError::InvalidNullStatementOpcode)?;
-				let expression_result = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Boolean)?
+				let expression_result: bool = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Boolean)?
 					.try_into()?;
-				self.current_routine.if_condition = Some(expression_result);
+				self.current_routine.if_condition = Some((expression_result, !expression_result));
 			}
 			StatementOpcode::Then | StatementOpcode::Else => {
-				let condition = match self.current_routine.if_condition {
+				// Get weather then and else statement's sub-statements should be executed or skipped.
+				let (execute_then, execute_else) = match &mut self.current_routine.if_condition {
 					Some(condition) => condition,
 					None => return Err(BasicError::ThenWithoutIf),
 				};
-				let should_execute_sub_statement = condition != (opcode == StatementOpcode::Else);
+				// Get weather the current sub-statement statement should be executed
+				let should_execute_sub_statement = match opcode {
+					StatementOpcode::Then => *execute_then,
+					StatementOpcode::Else => *execute_else,
+					_ => unreachable!(),
+				};
+				// Dont execute the next then statement
+				*execute_then = false;
+				// Execute or skip the sub-statement
 				match should_execute_sub_statement {
 					true => out = self.execute_statement(main_struct, should_exist)?,
 					false => self.skip_statement(main_struct)?,
