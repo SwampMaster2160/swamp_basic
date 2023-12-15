@@ -331,25 +331,13 @@ impl ScalarValue {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn true_value() -> Self {
-		Self::Boolean(true)
-	}
-
-	pub fn false_value() -> Self {
-		Self::Boolean(false)
-	}
-
-	pub fn pi() -> Self {
-		Self::Float(PI)
-	}
-
-	pub fn eulers_number() -> Self {
-		Self::Float(E)
-	}
-
-	pub fn imaginary_unit() -> Self {
-		Self::ComplexFloat(Complex64::new(0.0, 1.0))
-	}
+	pub const TRUE: Self = Self::Boolean(true);
+	pub const FALSE: Self = Self::Boolean(false);
+	pub const PI: Self = Self::Float(PI);
+	pub const EULERS_NUMBER: Self = Self::Float(E);
+	pub const IMAGINARY_UNIT: Self = Self::ComplexFloat(Complex64::new(0.0, 1.0));
+	pub const SPACE: Self = Self::String(BasicString::SPACE);
+	pub const NEW_LINE: Self = Self::String(BasicString::NEW_LINE);
 }
 
 impl TryInto<Rc<BigInt>> for ScalarValue {

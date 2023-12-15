@@ -63,4 +63,6 @@ pub enum ExpressionOpcode {
 	CallUserFunctionOrGetArrayValueBoolean,
 	CallUserFunctionOrGetArrayValueComplexFloat,
 	CallUserFunctionOrGetArrayValueNumber,
+	Space,
+	NewLine,
 }

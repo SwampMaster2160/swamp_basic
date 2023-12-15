@@ -120,7 +120,6 @@ impl ProgramExecuter {
 					let result = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
 					print!("{result}");
 				}
-				println!();
 			}
 			StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => {
 				// Get the opcode
@@ -488,7 +487,7 @@ impl ProgramExecuter {
 					ExpressionOpcode::Not => argument.not()?,
 					ExpressionOpcode::SquareRoot => argument.square_root(return_type_restriction)?,
 					ExpressionOpcode::Sign => argument.sign(return_type_restriction)?,
-					ExpressionOpcode::Exponential => ScalarValue::eulers_number().power(argument)?,
+					ExpressionOpcode::Exponential => ScalarValue::EULERS_NUMBER.power(argument)?,
 					_ => unreachable!(),
 				}
 			}
@@ -519,17 +518,20 @@ impl ProgramExecuter {
 						}
 						second_argument.logarithm(first_argument, return_type_restriction)?
 					}
-					None => first_argument.logarithm(ScalarValue::eulers_number(), return_type_restriction)?,
+					None => first_argument.logarithm(ScalarValue::EULERS_NUMBER, return_type_restriction)?,
 				}
 			}
 			// Constants
-			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber | ExpressionOpcode::ImaginaryUnit => {
+			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber | ExpressionOpcode::ImaginaryUnit |
+			ExpressionOpcode::Space | ExpressionOpcode::NewLine => {
 				match opcode {
-					ExpressionOpcode::False => ScalarValue::false_value(),
-					ExpressionOpcode::True => ScalarValue::true_value(),
-					ExpressionOpcode::Pi => ScalarValue::pi(),
-					ExpressionOpcode::EulersNumber => ScalarValue::eulers_number(),
-					ExpressionOpcode::ImaginaryUnit => ScalarValue::imaginary_unit(),
+					ExpressionOpcode::False => ScalarValue::FALSE,
+					ExpressionOpcode::True => ScalarValue::TRUE,
+					ExpressionOpcode::Pi => ScalarValue::PI,
+					ExpressionOpcode::EulersNumber => ScalarValue::EULERS_NUMBER,
+					ExpressionOpcode::ImaginaryUnit => ScalarValue::IMAGINARY_UNIT,
+					ExpressionOpcode::Space => ScalarValue::SPACE,
+					ExpressionOpcode::NewLine => ScalarValue::NEW_LINE,
 					_ => unreachable!(),
 				}
 			}

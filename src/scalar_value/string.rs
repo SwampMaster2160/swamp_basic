@@ -65,6 +65,9 @@ impl BasicString {
 			}
 		}
 	}
+
+	pub const SPACE: Self = Self::Char(' ');
+	pub const NEW_LINE: Self = Self::Char('\n');
 }
 
 impl Display for BasicString {

@@ -28,9 +28,17 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 				out.push(StatementOpcode::Print as u8);
 				for argument in arguments {
 					match argument {
-						ParseTreeElement::ExpressionSeparator(..) => return Err(BasicError::FeatureNotYetSupported),
+						ParseTreeElement::ExpressionSeparator(separator) => match separator {
+							Separator::Semicolon => {}
+							Separator::Comma => out.push(ExpressionOpcode::Space as u8),
+							_ => panic!(),
+						}
 						_ => out.extend(compile_expression(argument)?),
 					}
+				}
+				match arguments.last() {
+					Some(ParseTreeElement::ExpressionSeparator(Separator::Semicolon | Separator::Comma)) => {}
+					_ => out.push(ExpressionOpcode::NewLine as u8),
 				}
 				out.push(StatementOpcode::End as u8);
 			}
