@@ -5,6 +5,8 @@ use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One, CheckedRem, Pow, pow, 
 
 use crate::{error::BasicError, get_rc_only_or_clone};
 
+use super::string::BasicString;
+
 #[derive(Debug, Clone, PartialEq, Eq, Ord)]
 #[repr(u8)]
 pub enum BasicInteger {
@@ -114,10 +116,39 @@ impl BasicInteger {
 		}
 	}
 
+	pub const fn from_bool(value: bool) -> Self {
+		Self::SmallInteger(value as usize)
+	}
+
 	pub fn sign_bit(self) -> bool {
 		match self {
 			Self::SmallInteger(_) => false,
 			Self::BigInteger(value) => value.is_negative(),
+		}
+	}
+
+	pub fn abs(self) -> Self {
+		match self {
+			Self::SmallInteger(_) => self,
+			Self::BigInteger(value) => Self::BigInteger(Rc::new(value.abs())).compact(),
+		}
+	}
+
+	pub fn from_basic_string(basic_string: BasicString) -> Option<Self> {
+		match basic_string {
+			BasicString::EmptyString => None,
+			BasicString::String(value) => {
+				match value.parse::<usize>() {
+					Ok(value) => return Some(Self::SmallInteger(value)),
+					Err(_) => {}
+				}
+				match value.parse::<BigInt>() {
+					Ok(value) => Some(Self::BigInteger(Rc::new(value))),
+					Err(_) => None
+				}
+			},
+			BasicString::Char(value) => value.to_digit(10)
+				.map(|digit| Self::SmallInteger(digit as usize)),
 		}
 	}
 }

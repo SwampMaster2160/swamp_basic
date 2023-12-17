@@ -16,6 +16,7 @@ pub enum BasicError {
 	ExpectedStatement,
 	ExpectedStatementEnd,
 	FeatureNotYetSupported,
+	InvalidValue(ScalarValue),
 	TooManyClosingBrackets,
 	TooManyOpeningBrackets,
 	UnterminatedString,
@@ -89,6 +90,7 @@ impl Display for BasicError {
 			Self::UnexpectedLValueEndOpcode => write!(formatter, "Unexpected l-value end."),
 			Self::ExpectedSeparator(separator) => write!(formatter, "Expected separator \"{}\"", separator.get_symbol_char()),
 			Self::ThenWithoutIf => write!(formatter, "A \"then\" or \"else\" was executed without a \"if\" statement being executed since the program start or last gosub call."),
+			Self::InvalidValue(value) => write!(formatter, "Invalid value: {value}."),
 		}
 	}
 }

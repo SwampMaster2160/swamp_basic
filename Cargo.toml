@@ -1,6 +1,6 @@
 [package]
 name = "swamp_basic"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 description = "A BASIC interpreter"
 

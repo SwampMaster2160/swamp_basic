@@ -477,12 +477,12 @@ impl ProgramExecuter {
 				};
 				let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
 				match opcode {
-					ExpressionOpcode::AbsoluteValue => argument.absolute_value(return_type_restriction)?,
+					ExpressionOpcode::AbsoluteValue => argument.absolute_value()?,
 					ExpressionOpcode::Arctangent => argument.arctangent(return_type_restriction)?,
 					ExpressionOpcode::Cosine => argument.cosine(return_type_restriction)?,
 					ExpressionOpcode::Sine => argument.sine(return_type_restriction)?,
 					ExpressionOpcode::Tangent => argument.tangent(return_type_restriction)?,
-					ExpressionOpcode::Integer => argument.integer(return_type_restriction)?,
+					ExpressionOpcode::Integer => argument.integer()?,
 					ExpressionOpcode::Negate => argument.negate()?,
 					ExpressionOpcode::Not => argument.not()?,
 					ExpressionOpcode::SquareRoot => argument.square_root(return_type_restriction)?,
@@ -632,9 +632,22 @@ impl ProgramExecuter {
 				self.skip_expression(main_struct, expression_opcode)?;
 			}
 			// Skip nothing
-			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber | ExpressionOpcode::ImaginaryUnit => {}
+			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber |
+			ExpressionOpcode::ImaginaryUnit | ExpressionOpcode::NewLine | ExpressionOpcode::Space => {}
 
-			_ => return Err(BasicError::FeatureNotYetSupported),
+			// Skip string then null terminated expression list.
+			ExpressionOpcode::CallUserFunctionOrGetArrayValueAny | ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean |
+			ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat | ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat | ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger |
+			ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber | ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber | ExpressionOpcode::CallUserFunctionOrGetArrayValueString => {
+				self.skip_program_string(main_struct)?;
+				loop {
+					let expression_opcode = match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => expression_opcode,
+						None => break,
+					};
+					self.skip_expression(main_struct, expression_opcode)?;
+				}
+			}
 		}
 		Ok(())
 	}

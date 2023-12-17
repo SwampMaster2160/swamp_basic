@@ -54,7 +54,7 @@ impl ParseTreeElement {
 			Self::BuiltInFunction(_, _, _) => true,
 			Self::UserDefinedFunctionOrArrayElement(_, _, _) => true,
 			Self::Command(_, _) => false,
-			Self::ExpressionSeparator(_) => true,
+			Self::ExpressionSeparator(_) => false,
 			Self::Assignment(_, _) => false,
 		}
 	}

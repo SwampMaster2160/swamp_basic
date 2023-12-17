@@ -107,7 +107,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 			out.extend(compile_l_value(&l_value)?);
 			out.extend(compile_expression(&r_value)?);
 		}
-		_ => return Err(BasicError::FeatureNotYetSupported),
+		_ => panic!(),
 	}
 	Ok(out)
 }
@@ -349,7 +349,7 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 			// Null terminate
 			out.push(0);
 		}
-		_ => return Err(BasicError::FeatureNotYetSupported),
+		_ => panic!(),
 	}
 	Ok(out)
 }

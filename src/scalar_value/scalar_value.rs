@@ -240,32 +240,78 @@ impl ScalarValue {
 		}))
 	}
 
-	pub fn absolute_value(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn absolute_value(self) -> Result<Self, BasicError> {
+		Ok(match self {
+			Self::Integer(value) => Self::Integer(value.abs()),
+			Self::Float(value) => Self::Float(value.abs()),
+			Self::ComplexFloat(value) => Self::Float(value.norm()),
+			_ => return Err(BasicError::TypeMismatch(self, TypeRestriction::Number)),
+		})
 	}
 
-	pub fn arctangent(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn arctangent(self, type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		Ok(match (self, type_restriction) {
+			(Self::ComplexFloat(value), _) => Self::ComplexFloat(value.atan()).compact(),
+			(Self::Float(value), _) => Self::Float(value.atan()),
+			(Self::Integer(value), TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.to_f64().atan()),
+			(Self::Integer(value), _) if value.is_zero() => Self::Integer(BasicInteger::zero()),
+			(Self::Integer(_), TypeRestriction::Integer) => return Err(BasicError::FeatureNotYetSupported),
+			(Self::Integer(value), _) => Self::Float(value.to_f64().atan()),
+			(other, _) => return Err(BasicError::TypeMismatch(other, TypeRestriction::Number)),
+		})
 	}
 
-	pub fn cosine(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn cosine(self, type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		Ok(match (self, type_restriction) {
+			(Self::ComplexFloat(value), _) => Self::ComplexFloat(value.cos()).compact(),
+			(Self::Float(value), _) => Self::Float(value.cos()),
+			(Self::Integer(value), TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.to_f64().cos()),
+			(Self::Integer(value), _) if value.is_zero() => Self::Integer(BasicInteger::one()),
+			(Self::Integer(_), TypeRestriction::Integer) => return Err(BasicError::FeatureNotYetSupported),
+			(Self::Integer(value), _) => Self::Float(value.to_f64().cos()),
+			(other, _) => return Err(BasicError::TypeMismatch(other, TypeRestriction::Number)),
+		})
 	}
 
-	pub fn sine(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn sine(self, type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		Ok(match (self, type_restriction) {
+			(Self::ComplexFloat(value), _) => Self::ComplexFloat(value.sin()).compact(),
+			(Self::Float(value), _) => Self::Float(value.sin()),
+			(Self::Integer(value), TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.to_f64().sin()),
+			(Self::Integer(value), _) if value.is_zero() => Self::Integer(BasicInteger::zero()),
+			(Self::Integer(_), TypeRestriction::Integer) => return Err(BasicError::FeatureNotYetSupported),
+			(Self::Integer(value), _) => Self::Float(value.to_f64().sin()),
+			(other, _) => return Err(BasicError::TypeMismatch(other, TypeRestriction::Number)),
+		})
 	}
 
-	pub fn tangent(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn tangent(self, type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		Ok(match (self, type_restriction) {
+			(Self::ComplexFloat(value), _) => Self::ComplexFloat(value.tan()).compact(),
+			(Self::Float(value), _) => Self::Float(value.tan()),
+			(Self::Integer(value), TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.to_f64().tan()),
+			(Self::Integer(value), _) if value.is_zero() => Self::Integer(BasicInteger::zero()),
+			(Self::Integer(_), TypeRestriction::Integer) => return Err(BasicError::FeatureNotYetSupported),
+			(Self::Integer(value), _) => Self::Float(value.to_f64().tan()),
+			(other, _) => return Err(BasicError::TypeMismatch(other, TypeRestriction::Number)),
+		})
 	}
 
 	pub fn random_1_argument(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
 		return Err(BasicError::FeatureNotYetSupported)
 	}
 
-	pub fn integer(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn integer(self) -> Result<Self, BasicError> {
+		Ok(match self.clone() {
+			Self::Boolean(value) => ScalarValue::Integer(BasicInteger::from_bool(value)),
+			Self::Float(value) => ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(value.floor().to_bigint().ok_or(BasicError::InvalidValue(Self::Float(value)))?)).compact()),
+			Self::Integer(value) => Self::Integer(value),
+			Self::String(string_value) => match BasicInteger::from_basic_string(string_value) {
+				Some(value) => Self::Integer(value),
+				None => return Err(BasicError::InvalidValue(self)),
+			},
+			Self::ComplexFloat(..) => return Err(BasicError::TypeMismatch(self, TypeRestriction::RealNumber)),
+		})
 	}
 
 	pub fn logarithm(self, _base: Self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
