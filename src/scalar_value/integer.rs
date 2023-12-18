@@ -1,6 +1,6 @@
 use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem, BitAnd, BitOr, BitXor, Not}, cmp::Ordering};
 
-use num::{BigInt, bigint::{Sign, ToBigInt}, BigUint};
+use num::{BigInt, bigint::{Sign, ToBigInt}, BigUint, integer::Roots};
 use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One, CheckedRem, Pow, pow, checked_pow, Signed};
 
 use crate::{error::BasicError, get_rc_only_or_clone};
@@ -149,6 +149,54 @@ impl BasicInteger {
 			},
 			BasicString::Char(value) => value.to_digit(10)
 				.map(|digit| Self::SmallInteger(digit as usize)),
+		}
+	}
+
+	pub fn exact_sqrt(self) -> Option<Self> {
+		match self {
+			Self::SmallInteger(value) => {
+				let root = value.sqrt();
+				match root * root == value {
+					true => Some(Self::SmallInteger(root as usize)),
+					false => None,
+				}
+			}
+			Self::BigInteger(value) => {
+				if value.is_negative() {
+					return None;
+				}
+				let root = value.sqrt();
+				match &root * &root == *value {
+					true => match (&root).try_into() {
+						Ok(value) => Some(Self::SmallInteger(value)),
+						Err(..) => Some(Self::BigInteger(Rc::new(root))),
+					}
+					false => None,
+				}
+			}
+		}
+	}
+
+	pub fn floor_sqrt(self) -> Option<Self> {
+		match self {
+			Self::SmallInteger(value) => Some(Self::SmallInteger(value.sqrt() as usize)),
+			Self::BigInteger(value) => match value.is_negative() {
+				true => None,
+				false => Some({
+					let root = value.sqrt();
+					match (&root).try_into() {
+						Ok(value) => Self::SmallInteger(value),
+						Err(..) => Self::BigInteger(Rc::new(root)),
+					}
+				})
+			}
+		}
+	}
+
+	pub fn is_negative(&self) -> bool {
+		match self {
+			Self::SmallInteger(_) => false,
+			Self::BigInteger(value) => value.is_negative(),
 		}
 	}
 }

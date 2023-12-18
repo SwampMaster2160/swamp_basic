@@ -253,9 +253,7 @@ impl ScalarValue {
 		Ok(match (self, type_restriction) {
 			(Self::ComplexFloat(value), _) => Self::ComplexFloat(value.atan()).compact(),
 			(Self::Float(value), _) => Self::Float(value.atan()),
-			(Self::Integer(value), TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.to_f64().atan()),
-			(Self::Integer(value), _) if value.is_zero() => Self::Integer(BasicInteger::zero()),
-			(Self::Integer(_), TypeRestriction::Integer) => return Err(BasicError::FeatureNotYetSupported),
+			(Self::Integer(value), _) if value.is_zero() && !matches!(type_restriction, TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Integer(BasicInteger::zero()),
 			(Self::Integer(value), _) => Self::Float(value.to_f64().atan()),
 			(other, _) => return Err(BasicError::TypeMismatch(other, TypeRestriction::Number)),
 		})
@@ -265,9 +263,7 @@ impl ScalarValue {
 		Ok(match (self, type_restriction) {
 			(Self::ComplexFloat(value), _) => Self::ComplexFloat(value.cos()).compact(),
 			(Self::Float(value), _) => Self::Float(value.cos()),
-			(Self::Integer(value), TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.to_f64().cos()),
-			(Self::Integer(value), _) if value.is_zero() => Self::Integer(BasicInteger::one()),
-			(Self::Integer(_), TypeRestriction::Integer) => return Err(BasicError::FeatureNotYetSupported),
+			(Self::Integer(value), _) if value.is_zero() && !matches!(type_restriction, TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Integer(BasicInteger::one()),
 			(Self::Integer(value), _) => Self::Float(value.to_f64().cos()),
 			(other, _) => return Err(BasicError::TypeMismatch(other, TypeRestriction::Number)),
 		})
@@ -277,9 +273,7 @@ impl ScalarValue {
 		Ok(match (self, type_restriction) {
 			(Self::ComplexFloat(value), _) => Self::ComplexFloat(value.sin()).compact(),
 			(Self::Float(value), _) => Self::Float(value.sin()),
-			(Self::Integer(value), TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.to_f64().sin()),
-			(Self::Integer(value), _) if value.is_zero() => Self::Integer(BasicInteger::zero()),
-			(Self::Integer(_), TypeRestriction::Integer) => return Err(BasicError::FeatureNotYetSupported),
+			(Self::Integer(value), _) if value.is_zero() && !matches!(type_restriction, TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Integer(BasicInteger::zero()),
 			(Self::Integer(value), _) => Self::Float(value.to_f64().sin()),
 			(other, _) => return Err(BasicError::TypeMismatch(other, TypeRestriction::Number)),
 		})
@@ -289,9 +283,7 @@ impl ScalarValue {
 		Ok(match (self, type_restriction) {
 			(Self::ComplexFloat(value), _) => Self::ComplexFloat(value.tan()).compact(),
 			(Self::Float(value), _) => Self::Float(value.tan()),
-			(Self::Integer(value), TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.to_f64().tan()),
-			(Self::Integer(value), _) if value.is_zero() => Self::Integer(BasicInteger::zero()),
-			(Self::Integer(_), TypeRestriction::Integer) => return Err(BasicError::FeatureNotYetSupported),
+			(Self::Integer(value), _) if value.is_zero() && !matches!(type_restriction, TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Integer(BasicInteger::zero()),
 			(Self::Integer(value), _) => Self::Float(value.to_f64().tan()),
 			(other, _) => return Err(BasicError::TypeMismatch(other, TypeRestriction::Number)),
 		})
@@ -335,8 +327,27 @@ impl ScalarValue {
 		}
 	}
 
-	pub fn square_root(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn square_root(self, type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		Ok(match (self, type_restriction) {
+			(Self::ComplexFloat(value), _) => Self::ComplexFloat(value.sqrt()).compact(),
+			(Self::Float(value), _) => match value < 0. {
+				true => Self::ComplexFloat(Complex64::new(0., value.abs().sqrt())),
+				false => Self::Float(value.sqrt()),
+			}
+			(Self::Integer(value), TypeRestriction::Float | TypeRestriction::ComplexFloat) => Self::Float(value.to_f64().sqrt()),
+			(Self::Integer(value), TypeRestriction::Integer) => match value.clone().floor_sqrt() {
+				None => return Err(BasicError::InvalidValue(Self::Integer(value))),
+				Some(result) => Self::Integer(result),
+			}
+			(Self::Integer(value), _) => match value.clone().exact_sqrt() {
+				Some(result) => Self::Integer(result),
+				None => match (&value).is_negative() {
+					true => Self::ComplexFloat(Complex64::new(0., value.to_f64().abs().sqrt())),
+					false => Self::Float(value.to_f64().sqrt()),
+				}
+			}
+			(value, _) => return Err(BasicError::TypeMismatch(value, TypeRestriction::Number)),
+		})
 	}
 
 	pub fn sign(self, type_restriction: TypeRestriction) -> Result<Self, BasicError> {
