@@ -193,6 +193,38 @@ impl BasicInteger {
 		}
 	}
 
+	pub fn log_floor(self, base: Self) -> Option<Self> {
+		Some(match (self, base) {
+			(Self::SmallInteger(value), Self::SmallInteger(base)) => Self::SmallInteger(value.checked_ilog(base)? as usize),
+			(value, base) => {
+				let value: Rc<BigInt> = value.into();
+				let base: Rc<BigInt> = base.into();
+				let base: BigInt = get_rc_only_or_clone(base);
+				if !value.is_positive() || base <= BigInt::one() {
+					return None;
+				}
+				else {
+					let mut n: BigInt = BigInt::zero();
+					let mut r = get_rc_only_or_clone(value);
+	
+					while r >= base {
+						r /= &base;
+						n += 1;
+					}
+					return Some(BasicInteger::BigInteger(Rc::new(n)).compact());
+				}
+			}
+		})
+	}
+
+	pub fn log_exact(self, base: Self) -> Option<Self> {
+		let result = self.clone().log_floor(base.clone())?;
+		if result.clone().pow(base)? != self {
+			return None;
+		}
+		Some(result)
+	}
+
 	pub fn is_negative(&self) -> bool {
 		match self {
 			Self::SmallInteger(_) => false,

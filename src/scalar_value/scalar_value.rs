@@ -306,8 +306,23 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn logarithm(self, _base: Self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn logarithm(self, base: Self, type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		Ok(match (self, base, type_restriction) {
+			(other, Self::ComplexFloat(base), _) => Self::ComplexFloat(other.to_complex64()?.ln() / base.ln()).compact(),
+			(Self::ComplexFloat(value), base, _) => Self::ComplexFloat(value.log(base.to_f64()?)).compact(),
+
+			(Self::Float(value), base, _) => Self::ComplexFloat(Self::Float(value).to_complex64()?.log(base.to_f64()?)).compact(),
+			(other, Self::Float(base), _) => Self::ComplexFloat(other.to_complex64()?.log(base)).compact(),
+
+			(Self::Integer(value), Self::Integer(base), TypeRestriction::Integer) =>
+				Self::Integer(value.clone().log_floor(base).ok_or(BasicError::InvalidValue(Self::Integer(value)))?),
+			(Self::Integer(value), Self::Integer(base), _) => match value.clone().log_exact(base.clone()) {
+				Some(result) => Self::Integer(result),
+				None => Self::ComplexFloat(Complex64::new(value.to_f64(), 0.).log(Self::Integer(base).to_f64()?)).compact()
+			}
+
+			_ => todo!(),
+		})
 	}
 
 	pub fn negate(self) -> Result<Self, BasicError> {
