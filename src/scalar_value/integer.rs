@@ -1,11 +1,12 @@
 use std::{rc::Rc, fmt::Display, ops::{Add, Sub, Neg, Mul, Div, Rem, BitAnd, BitOr, BitXor, Not}, cmp::Ordering};
 
-use num::{BigInt, bigint::{Sign, ToBigInt}, BigUint, integer::Roots};
+use num::{BigInt, bigint::{Sign, ToBigInt, RandBigInt}, BigUint, integer::Roots};
 use num_traits::{Zero, ToPrimitive, CheckedDiv, Num, One, CheckedRem, Pow, pow, checked_pow, Signed};
+use rand::Rng;
 
 use crate::{error::BasicError, get_rc_only_or_clone};
 
-use super::string::BasicString;
+use super::{string::BasicString, scalar_value::ScalarValue};
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord)]
 #[repr(u8)]
@@ -229,6 +230,28 @@ impl BasicInteger {
 		match self {
 			Self::SmallInteger(_) => false,
 			Self::BigInteger(value) => value.is_negative(),
+		}
+	}
+
+	pub fn get_random(min: BasicInteger, max: BasicInteger) -> Result<Self, BasicError> {
+		let mut rng = rand::thread_rng();
+		match (min.clone(), max.clone()) {
+			(Self::SmallInteger(small_min), Self::SmallInteger(small_max)) => {
+				let range = small_min..small_max;
+				match range.is_empty() {
+					false => Ok(Self::SmallInteger(rng.gen_range(range))),
+					true => Err(BasicError::InvalidRange(ScalarValue::Integer(min), ScalarValue::Integer(max))),
+				}
+			}
+			(min, max) => {
+				let big_min: Rc<BigInt> = min.clone().into();
+				let big_max: Rc<BigInt> = max.clone().into();
+				let range = big_min.clone()..big_max.clone();
+				match range.is_empty() {
+					false => Ok(Self::BigInteger(Rc::new(rng.gen_bigint_range(big_min.as_ref(), big_max.as_ref()))).compact()),
+					true => Err(BasicError::InvalidRange(ScalarValue::Integer(min), ScalarValue::Integer(max))),
+				}
+			}
 		}
 	}
 }

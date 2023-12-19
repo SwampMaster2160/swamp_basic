@@ -2,6 +2,7 @@ use std::{fmt::Display, rc::Rc, f64::consts::{PI, E}};
 
 use num::{BigInt, complex::Complex64, bigint::ToBigInt};
 use num_traits::{Zero, CheckedDiv, CheckedRem, Pow, One};
+use rand::Rng;
 
 use crate::{lexer::type_restriction::TypeRestriction, error::BasicError};
 
@@ -289,10 +290,6 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn random_1_argument(self, _type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
-	}
-
 	pub fn integer(self) -> Result<Self, BasicError> {
 		Ok(match self.clone() {
 			Self::Boolean(value) => ScalarValue::Integer(BasicInteger::from_bool(value)),
@@ -399,8 +396,46 @@ impl ScalarValue {
 		})
 	}
 
-	pub fn get_random_no_arguments(_type_restriction: TypeRestriction) -> Result<Self, BasicError> {
-		return Err(BasicError::FeatureNotYetSupported)
+	pub fn get_random(min: Option<ScalarValue>, max: Option<ScalarValue>, type_restriction: TypeRestriction) -> Result<Self, BasicError> {
+		match type_restriction {
+			TypeRestriction::Any | TypeRestriction::ComplexFloat | TypeRestriction::Number | TypeRestriction::RealNumber => {
+				let min = match min {
+					None => 0.0,
+					Some(value) => value.to_f64()?,
+				};
+				let max = match max {
+					None => 1.0,
+					Some(value) => value.to_f64()?,
+				};
+				let range = min..max;
+				if range.is_empty() || !min.is_finite() || ! max.is_finite() {
+					return Err(BasicError::InvalidRange(Self::Float(min), Self::Float(max)))
+				}
+				let mut rng = rand::thread_rng();
+				Ok(ScalarValue::Float(rng.gen_range(range)))
+			}
+			TypeRestriction::Integer => {
+				let min = match min {
+					None => BasicInteger::zero(),
+					Some(Self::Integer(value)) => value,
+					Some(bad_value) => return Err(BasicError::TypeMismatch(bad_value, TypeRestriction::Integer)),
+				};
+				let max = match max {
+					None => BasicInteger::SmallInteger(2),
+					Some(Self::Integer(value)) => value,
+					Some(bad_value) => return Err(BasicError::TypeMismatch(bad_value, TypeRestriction::Integer)),
+				};
+				Ok(ScalarValue::Integer(BasicInteger::get_random(min, max)?))
+			}
+			TypeRestriction::Boolean => {
+				if min.is_some() || max.is_some() {
+					return Err(BasicError::InvalidArgumentCount)
+				}
+				let mut rng = rand::thread_rng();
+				Ok(ScalarValue::Boolean(rng.gen()))
+			}
+			_ => return Err(BasicError::InvalidTypeRestriction(format!("{}", type_restriction.get_type_restriction_suffix().unwrap()))),
+		}
 	}
 
 	pub const TRUE: Self = Self::Boolean(true);

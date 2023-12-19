@@ -1,6 +1,6 @@
 [package]
 name = "swamp_basic"
-version = "0.6.4"
+version = "0.6.5"
 edition = "2021"
 description = "A BASIC interpreter"
 
@@ -9,6 +9,7 @@ description = "A BASIC interpreter"
 [dependencies]
 strum = "0.25"
 strum_macros = "0.25"
-num = "0.4"
+num = { version = "0.4", features = ["rand"] }
 num-traits = "0.2"
 num-derive = "0.4"
+rand = "0.8"

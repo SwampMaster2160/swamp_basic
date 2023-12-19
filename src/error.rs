@@ -45,6 +45,7 @@ pub enum BasicError {
 	ExpectedEqualsChar,
 	UnexpectedLValueEndOpcode,
 	ThenWithoutIf,
+	InvalidRange(ScalarValue, ScalarValue),
 }
 
 impl Display for BasicError {
@@ -91,6 +92,7 @@ impl Display for BasicError {
 			Self::ExpectedSeparator(separator) => write!(formatter, "Expected separator \"{}\"", separator.get_symbol_char()),
 			Self::ThenWithoutIf => write!(formatter, "A \"then\" or \"else\" was executed without a \"if\" statement being executed since the program start or last gosub call."),
 			Self::InvalidValue(value) => write!(formatter, "Invalid value: {value}."),
+			Self::InvalidRange(start, end) => write!(formatter, "Invalid range: {start} to {end}."),
 		}
 	}
 }

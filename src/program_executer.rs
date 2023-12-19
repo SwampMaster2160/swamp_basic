@@ -495,13 +495,20 @@ impl ProgramExecuter {
 				let first_expression_opcode = self.get_expression_opcode(main_struct)?;
 				match first_expression_opcode {
 					Some(first_expression_opcode) => {
-						let argument = self.execute_expression(main_struct, first_expression_opcode, TypeRestriction::Any)?;
-						if self.get_expression_opcode(main_struct)? != None {
-							return Err(BasicError::InvalidArgumentCount);
+						let first_argument = self.execute_expression(main_struct, first_expression_opcode, TypeRestriction::Any)?;
+						let second_expression_opcode = self.get_expression_opcode(main_struct)?;
+						match second_expression_opcode {
+							Some(second_expression_opcode) => {
+								let second_argument = self.execute_expression(main_struct, second_expression_opcode, TypeRestriction::Any)?;
+								if self.get_expression_opcode(main_struct)? != None {
+									return Err(BasicError::InvalidArgumentCount);
+								}
+								ScalarValue::get_random(Some(first_argument), Some(second_argument), return_type_restriction)?
+							}
+							None => ScalarValue::get_random(None, Some(first_argument), return_type_restriction)?,
 						}
-						argument.random_1_argument(return_type_restriction)?
 					}
-					None => ScalarValue::get_random_no_arguments(return_type_restriction)?,
+					None => ScalarValue::get_random(None, None, return_type_restriction)?,
 				}
 			}
 			ExpressionOpcode::Logarithm => {
