@@ -112,15 +112,22 @@ fn parse_statement(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError
 
 /// Parses and removes an assignment to a variable or array at an index index.
 fn parse_assignment(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
+	// Get the length of the expressions (up to the next command token)
+	let expression_index = tokens.iter()
+	.position(|token| matches!(token, Token::Command(_)))
+	.unwrap_or_else(|| tokens.len());
+	// Get the expression tokens
+	let mut expression_tokens;
+	(expression_tokens, *tokens) = tokens.split_at(expression_index);
 	// Parse l value
-	let l_value = parse_l_value(tokens)?;
-	match tokens.get(0) {
+	let l_value = parse_l_value(&mut expression_tokens)?;
+	match expression_tokens.get(0) {
 		Some(Token::Operator(Operator::EqualToAssign)) => {}
 		_ => return Err(BasicError::ExpectedEqualsChar),
 	}
-	*tokens = &tokens[1..];
+	expression_tokens = &expression_tokens[1..];
 	// Parse r value
-	let mut r_values = parse_expressions(tokens)?;
+	let mut r_values = parse_expressions(&mut expression_tokens)?;
 	if r_values.len() != 1 {
 		return Err(BasicError::InvalidArgumentCount);
 	}
@@ -138,7 +145,7 @@ fn parse_l_value(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> 
 	*tokens = &mut &tokens[1..];
 	let (name, type_restriction) = match identifier_token {
 		Token::Identifier(name, type_restriction) => (name.clone(), *type_restriction),
-		_ => panic!(),
+		_ => return Err(BasicError::ExpectedLValue),
 	};
 	// If the l-value is just a simple variable
 	if !matches!(tokens.get(0), Some(Token::Separator(Separator::OpeningBracket))) {
@@ -201,16 +208,19 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 			parse_command(merged_commands, tokens)?
 		}
 		// For
-		Command::For => {
+		Command::For => ParseTreeElement::Command(command, vec![parse_assignment(tokens)?]),
+		// Commands with a single l-value
+		Command::Next => {
 			// Get the length of the expressions (up to the next command token)
 			let expression_index = tokens.iter()
 				.position(|token| matches!(token, Token::Command(_)))
 				.unwrap_or_else(|| tokens.len());
 			// Get the expression tokens
-			let mut extression_tokens;
-			(extression_tokens, *tokens) = tokens.split_at(expression_index);
-			// Parse into tree element
-			ParseTreeElement::Command(command, vec![parse_assignment(&mut extression_tokens)?])
+			let mut expression_tokens;
+			(expression_tokens, *tokens) = tokens.split_at(expression_index);
+			// Parse l-value
+			let l_value = parse_l_value(&mut expression_tokens)?;
+			ParseTreeElement::Command(command, vec![l_value])
 		}
 
 		_ => return Err(BasicError::FeatureNotYetSupported),

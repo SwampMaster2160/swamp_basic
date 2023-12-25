@@ -100,6 +100,24 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 				};
 				out.extend(compile_expression(expression)?);
 			}
+			// Commands that take in an assignment
+			Command::For => {
+				// Get values for assignment
+				let (l_value, r_value) = match &arguments[0] {
+					ParseTreeElement::Assignment(l_value, r_value) => (l_value, r_value),
+					_ => panic!()
+				};
+				// Push expression bytecode
+				out.push(StatementOpcode::For as u8);
+				out.extend(compile_l_value(&l_value)?);
+				out.extend(compile_expression(&r_value)?);
+			}
+			Command::Next => {
+				// Push bytecode
+				out.push(StatementOpcode::For as u8);
+				out.extend(compile_l_value(&arguments[0])?);
+			}
+
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		ParseTreeElement::Assignment(l_value, r_value) => {
