@@ -163,11 +163,12 @@ fn parse_l_value(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> 
 fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
 	Ok(match command {
 		// Commands that have a list of expressions and separators as sub-trees
-		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::To | Command::List | Command::On | Command::Return | Command::Stop => {
+		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::To | Command::Step | Command::List | Command::On | Command::Return | Command::Stop => {
 			// Get the length of the expressions (up to the next command token)
 			let expression_index = tokens.iter()
 				.position(|token| matches!(token, Token::Command(_)))
 				.unwrap_or_else(|| tokens.len());
+			// Get the expression tokens
 			let mut extression_tokens;
 			(extression_tokens, *tokens) = tokens.split_at(expression_index);
 			// Parse expressions
@@ -198,6 +199,18 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 			};
 			// Parse the merged command
 			parse_command(merged_commands, tokens)?
+		}
+		// For
+		Command::For => {
+			// Get the length of the expressions (up to the next command token)
+			let expression_index = tokens.iter()
+				.position(|token| matches!(token, Token::Command(_)))
+				.unwrap_or_else(|| tokens.len());
+			// Get the expression tokens
+			let mut extression_tokens;
+			(extression_tokens, *tokens) = tokens.split_at(expression_index);
+			// Parse into tree element
+			ParseTreeElement::Command(command, vec![parse_assignment(&mut extression_tokens)?])
 		}
 
 		_ => return Err(BasicError::FeatureNotYetSupported),
