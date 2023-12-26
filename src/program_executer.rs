@@ -22,15 +22,34 @@ pub struct ProgramExecuter {
 }
 
 pub struct RoutineLevel {
-	/// `None` if if has not been called since the subroutine start.
+	/// `None` if "if" has not been called since the subroutine start.
 	/// The first bool hold weather the next "then" should be taken, the second holds weather the next "else" should be taken.
 	if_condition: Option<(bool, bool)>,
+	/// A list of l-values that for loops are using as counters. Maps said l-values to the index of the opcode that is at the start of the loop.
+	for_loop_counters: HashMap<LValue, ForLoop>,
 }
 
 impl RoutineLevel {
 	pub fn new() -> Self {
 		RoutineLevel {
 			if_condition: None,
+			for_loop_counters: HashMap::new(),
+		}
+	}
+}
+
+pub struct ForLoop {
+	start_bytecode_index: usize,
+	end_value: Option<ScalarValue>,
+	step_value: Option<ScalarValue>,
+}
+
+impl ForLoop {
+	pub const fn new(start_bytecode_index: usize) -> Self {
+		Self {
+			start_bytecode_index,
+			end_value: None,
+			step_value: None,
 		}
 	}
 }
