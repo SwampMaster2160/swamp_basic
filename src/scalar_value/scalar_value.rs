@@ -8,7 +8,7 @@ use crate::{lexer::type_restriction::TypeRestriction, error::BasicError};
 
 use super::{integer::BasicInteger, string::BasicString};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[repr(u8)]
 pub enum ScalarValue {
 	Integer(BasicInteger),
@@ -165,36 +165,6 @@ impl ScalarValue {
 			(Self::Boolean(left_value), Self::Boolean(right_value)) => Self::Boolean(left_value || right_value),
 			(left, _) => return Err(BasicError::TypeMismatch(left, TypeRestriction::Integer)),
 		})
-	}
-
-	pub fn equal_to(self, rhs: Self) -> Result<Self, BasicError> {
-		Ok(Self::Boolean(match (self, rhs) {
-			(Self::ComplexFloat(left_value), Self::ComplexFloat(right_value)) => left_value == right_value,
-			(Self::ComplexFloat(..), _) | (_, Self::ComplexFloat(..)) => false,
-			(Self::Float(float_value), other_value) | (other_value, Self::Float(float_value)) => match other_value.to_f64() {
-				Ok(converted_value) => float_value == converted_value,
-				Err(_) => false,
-			}
-			(Self::Integer(left_value), Self::Integer(right_value)) => left_value == right_value,
-			(Self::Boolean(left_value), Self::Boolean(right_value)) => left_value == right_value,
-			(Self::String(left_value), Self::String(right_value)) => left_value == right_value,
-			_ => false,
-		}))
-	}
-
-	pub fn not_equal_to(self, rhs: Self) -> Result<Self, BasicError> {
-		Ok(Self::Boolean(match (self, rhs) {
-			(Self::ComplexFloat(left_value), Self::ComplexFloat(right_value)) => left_value != right_value,
-			(Self::ComplexFloat(..), _) | (_, Self::ComplexFloat(..)) => true,
-			(Self::Float(float_value), other_value) | (other_value, Self::Float(float_value)) => match other_value.to_f64() {
-				Ok(converted_value) => float_value != converted_value,
-				Err(_) => true,
-			}
-			(Self::Integer(left_value), Self::Integer(right_value)) => left_value != right_value,
-			(Self::Boolean(left_value), Self::Boolean(right_value)) => left_value != right_value,
-			(Self::String(left_value), Self::String(right_value)) => left_value != right_value,
-			_ => true,
-		}))
 	}
 
 	pub fn less_than(self, rhs: Self) -> Result<Self, BasicError> {
@@ -446,6 +416,36 @@ impl ScalarValue {
 	pub const SPACE: Self = Self::String(BasicString::SPACE);
 	pub const NEW_LINE: Self = Self::String(BasicString::NEW_LINE);
 }
+
+/// Check if two f64 values are equal.
+/// All NaN values are equal.
+fn f64_eq_all_nans_are_eq(left: f64, right: f64) -> bool {
+	match left.is_nan() {
+		false => left == right,
+		true => right.is_nan(),
+	}
+}
+
+impl PartialEq for ScalarValue {
+	fn eq(&self, other: &Self) -> bool {
+		match (self, other) {
+			(Self::ComplexFloat(left_value), Self::ComplexFloat(right_value)) =>
+			f64_eq_all_nans_are_eq(left_value.re, right_value.re) && f64_eq_all_nans_are_eq(left_value.im, right_value.im),
+			(Self::ComplexFloat(..), _) | (_, Self::ComplexFloat(..)) => false,
+			(Self::Float(float_value), other_value) | (other_value, Self::Float(float_value)) => match other_value.clone().to_f64() {
+				// All Nan's are equal.
+				Ok(converted_value) => f64_eq_all_nans_are_eq(*float_value, converted_value),
+				Err(_) => false,
+			}
+			(Self::Integer(left_value), Self::Integer(right_value)) => left_value == right_value,
+			(Self::Boolean(left_value), Self::Boolean(right_value)) => left_value == right_value,
+			(Self::String(left_value), Self::String(right_value)) => left_value == right_value,
+			_ => false,
+		}
+	}
+}
+
+impl Eq for ScalarValue {}
 
 impl TryInto<Rc<BigInt>> for ScalarValue {
 	type Error = BasicError;

@@ -3,7 +3,7 @@ use core::fmt::Display;
 
 use crate::get_rc_only_or_clone;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum BasicString {
 	/// A UTF-8 string

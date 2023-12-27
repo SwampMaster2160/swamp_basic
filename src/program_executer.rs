@@ -1,4 +1,5 @@
 use std::{rc::Rc, collections::HashMap};
+use std::hash::Hash;
 
 use num::{BigInt, complex::Complex64};
 use num_traits::FromPrimitive;
@@ -21,12 +22,16 @@ pub struct ProgramExecuter {
 	current_routine: RoutineLevel,
 }
 
-pub struct RoutineLevel {
+struct RoutineLevel {
 	/// `None` if "if" has not been called since the subroutine start.
 	/// The first bool hold weather the next "then" should be taken, the second holds weather the next "else" should be taken.
 	if_condition: Option<(bool, bool)>,
 	/// A list of l-values that for loops are using as counters. Maps said l-values to the index of the opcode that is at the start of the loop.
 	for_loop_counters: HashMap<LValue, ForLoop>,
+	/// The for loop l-value that "to" and "step" will change.
+	/// `Err(true)` if we have looped back since a "for".
+	/// `Err(false)` if the program started or a subroutine was entered since the last "for" keyword.
+	current_for_loop_counter: Result<LValue, bool>,
 }
 
 impl RoutineLevel {
@@ -34,20 +39,23 @@ impl RoutineLevel {
 		RoutineLevel {
 			if_condition: None,
 			for_loop_counters: HashMap::new(),
+			current_for_loop_counter: Err(false),
 		}
 	}
 }
 
-pub struct ForLoop {
+struct ForLoop {
 	start_bytecode_index: usize,
+	is_in_line_program: bool,
 	end_value: Option<ScalarValue>,
 	step_value: Option<ScalarValue>,
 }
 
 impl ForLoop {
-	pub const fn new(start_bytecode_index: usize) -> Self {
+	pub const fn new(start_bytecode_index: usize, is_in_line_program: bool) -> Self {
 		Self {
 			start_bytecode_index,
+			is_in_line_program,
 			end_value: None,
 			step_value: None,
 		}
@@ -62,11 +70,19 @@ enum InstructionExecutionSuccessResult {
 	ProgramStopped,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 struct LValue {
 	name: String,
 	type_restriction: TypeRestriction,
 	arguments_or_indices: Option<Box<[ScalarValue]>>,
+}
+
+impl Hash for LValue {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.name.hash(state);
+		self.type_restriction.hash(state);
+		// Arguments are not hashed
+	}
 }
 
 impl ProgramExecuter {
@@ -205,6 +221,21 @@ impl ProgramExecuter {
 					false => self.skip_statement(main_struct)?,
 				}
 			}
+			StatementOpcode::For => {
+				// Get the l-value to assign to
+				let l_value = self.execute_l_value(main_struct)?
+					.ok_or(BasicError::UnexpectedLValueEndOpcode)?;
+				// Get the scalar value to assign to the l-value
+				let expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				let scalar_value = self.execute_expression(main_struct, expression_opcode, l_value.type_restriction)?;
+				// Assign the scalar value to the l-value
+				self.assign_global_scalar_value(l_value.clone(), scalar_value)?;
+				// Save info about the for loop
+				let for_loop = ForLoop::new(*self.get_program_counter(), self.is_executing_line_program);
+				self.current_routine.for_loop_counters.insert(l_value.clone(), for_loop);
+				self.current_routine.current_for_loop_counter = Ok(l_value);
+			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Continue onto next instruction
@@ -224,7 +255,7 @@ impl ProgramExecuter {
 			// Skip opcodes with no arguments
 			StatementOpcode::End => {}
 			// Skip expressions untill a null opcode is found
-			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => loop {
+			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine | StatementOpcode::List => loop {
 				let expression_opcode = match self.get_expression_opcode(main_struct)? {
 					Some(expression_opcode) => expression_opcode,
 					None => break,
@@ -232,7 +263,7 @@ impl ProgramExecuter {
 				self.skip_expression(main_struct, expression_opcode)?;
 			}
 			// Skip a l-value and an expression
-			StatementOpcode::Let => {
+			StatementOpcode::Let | StatementOpcode::For => {
 				// Skip the l-value
 				if !self.skip_l_value(main_struct)? {
 					return Err(BasicError::UnexpectedLValueEndOpcode);
@@ -243,7 +274,7 @@ impl ProgramExecuter {
 				self.skip_expression(main_struct, expression_opcode)?;
 			}
 			// Skip an expression
-			StatementOpcode::If => {
+			StatementOpcode::If | StatementOpcode::On | StatementOpcode::Step | StatementOpcode::To => {
 				// Get the opcode
 				let expression_opcode = self.get_expression_opcode(main_struct)?
 					.ok_or(BasicError::InvalidNullStatementOpcode)?;
@@ -252,8 +283,6 @@ impl ProgramExecuter {
 			}
 			// Skip a sub-statement
 			StatementOpcode::Then | StatementOpcode::Else => self.skip_statement(main_struct)?,
-
-			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Return that there where no errors
 		Ok(())
@@ -478,8 +507,8 @@ impl ProgramExecuter {
 					ExpressionOpcode::ExclusiveOr => left_argument.xor(right_argument)?,
 					ExpressionOpcode::Or => left_argument.or(right_argument)?,
 					ExpressionOpcode::Modulus => left_argument.modulus(right_argument)?,
-					ExpressionOpcode::EqualTo => left_argument.equal_to(right_argument)?,
-					ExpressionOpcode::NotEqualTo => left_argument.not_equal_to(right_argument)?,
+					ExpressionOpcode::EqualTo => ScalarValue::Boolean(left_argument == right_argument),
+					ExpressionOpcode::NotEqualTo => ScalarValue::Boolean(left_argument != right_argument),
 					ExpressionOpcode::LessThan => left_argument.less_than(right_argument)?,
 					ExpressionOpcode::LessThanOrEqualTo => left_argument.less_than_or_equal_to(right_argument)?,
 					ExpressionOpcode::GreaterThan => left_argument.greater_than(right_argument)?,

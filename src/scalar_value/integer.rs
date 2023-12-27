@@ -8,7 +8,7 @@ use crate::{error::BasicError, get_rc_only_or_clone};
 
 use super::{string::BasicString, scalar_value::ScalarValue};
 
-#[derive(Debug, Clone, PartialEq, Eq, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Ord, Hash)]
 #[repr(u8)]
 pub enum BasicInteger {
 	/// Small integer
