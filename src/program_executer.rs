@@ -236,6 +236,31 @@ impl ProgramExecuter {
 				self.current_routine.for_loop_counters.insert(l_value.clone(), for_loop);
 				self.current_routine.current_for_loop_counter = Ok(l_value);
 			}
+			StatementOpcode::To | StatementOpcode::Step => {
+				// Get the expression opcode
+				let expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				// See if there is a for loop to modify
+				match self.current_routine.current_for_loop_counter.clone() {
+					// If so then modify the for loop
+					Ok(current_for_loop) => {
+						// Execute the sub-expression to get the value to assign to the for loop
+						let value = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+						// Get the loop to modify
+						let for_loop = self.current_routine.for_loop_counters.get_mut(&current_for_loop).unwrap();
+						// Assign value to the for loop end or step
+						match opcode {
+							StatementOpcode::To => for_loop.end_value = Some(value),
+							StatementOpcode::Step => for_loop.step_value = Some(value),
+							_ => unreachable!(),
+						}
+					}
+					// Error if we have not executed a "for" statement since the program start or last gosub call
+					Err(false) => return Err(BasicError::ToStepNoForLoop),
+					// Skip the sub-expression if we have looped back since the last "for" statement
+					Err(true) => self.skip_expression(main_struct, expression_opcode)?,
+				}
+			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Continue onto next instruction

@@ -47,6 +47,7 @@ pub enum BasicError {
 	ThenWithoutIf,
 	InvalidRange(ScalarValue, ScalarValue),
 	ExpectedLValue,
+	ToStepNoForLoop,
 }
 
 impl Display for BasicError {
@@ -95,6 +96,7 @@ impl Display for BasicError {
 			Self::InvalidValue(value) => write!(formatter, "Invalid value: {value}."),
 			Self::InvalidRange(start, end) => write!(formatter, "Invalid range: {start} to {end}."),
 			Self::ExpectedLValue => write!(formatter, "Expected l-value."),
+			Self::ToStepNoForLoop => write!(formatter, "A \"to\" or \"step\" was executed without a \"for\" loop being executed since the program start or last gosub call."),
 		}
 	}
 }
