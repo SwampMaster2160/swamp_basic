@@ -16,5 +16,6 @@ pub enum StatementOpcode {
 	GoSubroutine,
 	Step,
 	To,
-	For
+	For,
+	Next,
 }

@@ -112,9 +112,10 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 				out.extend(compile_l_value(&l_value)?);
 				out.extend(compile_expression(&r_value)?);
 			}
+			// Commands that take in a l-value
 			Command::Next => {
 				// Push bytecode
-				out.push(StatementOpcode::For as u8);
+				out.push(StatementOpcode::Next as u8);
 				out.extend(compile_l_value(&arguments[0])?);
 			}
 

@@ -261,6 +261,16 @@ impl ProgramExecuter {
 					Err(true) => self.skip_expression(main_struct, expression_opcode)?,
 				}
 			}
+			StatementOpcode::Next => {
+				// Get the l-value to increment
+				let l_value = self.execute_l_value(main_struct)?
+					.ok_or(BasicError::ExpectedLValue)?;
+				// Get the for loop to loop back on
+				let for_loop = self.current_routine.for_loop_counters.get(&l_value)
+					.ok_or(BasicError::NextOnLValueWithoutLoop)?;
+				// Get current value of the l-value
+				let current_value = self.load_global_scalar_value(l_value)?;
+			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Continue onto next instruction
@@ -308,6 +318,10 @@ impl ProgramExecuter {
 			}
 			// Skip a sub-statement
 			StatementOpcode::Then | StatementOpcode::Else => self.skip_statement(main_struct)?,
+			// Skip l-value
+			StatementOpcode::Next => {
+				self.skip_l_value(main_struct)?;
+			}
 		}
 		// Return that there where no errors
 		Ok(())

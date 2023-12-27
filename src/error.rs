@@ -48,6 +48,7 @@ pub enum BasicError {
 	InvalidRange(ScalarValue, ScalarValue),
 	ExpectedLValue,
 	ToStepNoForLoop,
+	NextOnLValueWithoutLoop,
 }
 
 impl Display for BasicError {
@@ -97,6 +98,7 @@ impl Display for BasicError {
 			Self::InvalidRange(start, end) => write!(formatter, "Invalid range: {start} to {end}."),
 			Self::ExpectedLValue => write!(formatter, "Expected l-value."),
 			Self::ToStepNoForLoop => write!(formatter, "A \"to\" or \"step\" was executed without a \"for\" loop being executed since the program start or last gosub call."),
+			Self::NextOnLValueWithoutLoop => write!(formatter, "A \"next\" was executed on a l-value that is not bound to a for loop."),
 		}
 	}
 }
