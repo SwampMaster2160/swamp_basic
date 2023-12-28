@@ -1,7 +1,7 @@
 use std::{fmt::Display, rc::Rc, f64::consts::{PI, E}};
 
 use num::{BigInt, complex::Complex64, bigint::ToBigInt};
-use num_traits::{Zero, CheckedDiv, CheckedRem, Pow, One};
+use num_traits::{Zero, CheckedDiv, CheckedRem, Pow, One, Signed};
 use rand::Rng;
 
 use crate::{lexer::type_restriction::TypeRestriction, error::BasicError};
@@ -357,6 +357,16 @@ impl ScalarValue {
 		})
 	}
 
+	pub fn get_type_restriction(&self) -> TypeRestriction {
+		match self {
+			Self::Boolean(_) => TypeRestriction::Boolean,
+			Self::ComplexFloat(_) => TypeRestriction::ComplexFloat,
+			Self::Float(_) => TypeRestriction::Float,
+			Self::Integer(_) => TypeRestriction::Integer,
+			Self::String(_) => TypeRestriction::String,
+		}
+	}
+
 	pub fn to_complex64(self) -> Result<Complex64, BasicError> {
 		Ok(match self {
 			Self::Float(value) => value.into(),
@@ -408,6 +418,14 @@ impl ScalarValue {
 		}
 	}
 
+	pub fn is_negative(&self) -> Result<bool, BasicError> {
+		Ok(match self {
+			Self::Integer(value) => value.is_negative(),
+			Self::Float(value) => value.is_negative(),
+			_ => return Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::RealNumber)),
+		})
+	}
+
 	pub const TRUE: Self = Self::Boolean(true);
 	pub const FALSE: Self = Self::Boolean(false);
 	pub const PI: Self = Self::Float(PI);
@@ -415,6 +433,7 @@ impl ScalarValue {
 	pub const IMAGINARY_UNIT: Self = Self::ComplexFloat(Complex64::new(0.0, 1.0));
 	pub const SPACE: Self = Self::String(BasicString::SPACE);
 	pub const NEW_LINE: Self = Self::String(BasicString::NEW_LINE);
+	pub const ONE: Self = Self::Integer(BasicInteger::SmallInteger(1));
 }
 
 /// Check if two f64 values are equal.

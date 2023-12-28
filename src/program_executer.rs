@@ -268,8 +268,41 @@ impl ProgramExecuter {
 				// Get the for loop to loop back on
 				let for_loop = self.current_routine.for_loop_counters.get(&l_value)
 					.ok_or(BasicError::NextOnLValueWithoutLoop)?;
-				// Get current value of the l-value
-				let current_value = self.load_global_scalar_value(l_value)?;
+				// Get the new value
+				let current_value = self.load_global_scalar_value(l_value.clone())?;
+				let increment = for_loop.step_value.clone()
+					.unwrap_or(ScalarValue::ONE);
+				let new_value = current_value.add_concatenate(increment.clone())?;
+				// Get weather we should loop back
+				let do_continue = match &for_loop.end_value {
+					None => true,
+					Some(end_value) => {
+						// Get the direction the increment is going in
+						let is_decrementing = increment.is_negative()?;
+						// Have we reached the end value?
+						let do_break = match is_decrementing {
+							false => new_value.clone().greater_than(end_value.clone())?,
+							true => new_value.clone().less_than(end_value.clone())?,
+						};
+						// Unwrap bool
+						match do_break {
+							ScalarValue::Boolean(do_break) => !do_break,
+							_ => panic!(),
+						}
+					}
+				};
+				// If we should loop back to the start of the loop
+				if do_continue {
+					let is_in_line_program = for_loop.is_in_line_program;
+					let start_bytecode_index = for_loop.start_bytecode_index;
+					// Increment counter
+					self.assign_global_scalar_value(l_value, new_value)?;
+					// Jump to start of loop
+					match is_in_line_program {
+						true => self.line_program_counter = start_bytecode_index,
+						false => self.program_counter = start_bytecode_index,
+					}
+				}
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
@@ -346,7 +379,7 @@ impl ProgramExecuter {
 	}
 
 	/// Gets the value of a global scalar variable or an element of a global array.
-	fn load_global_scalar_value(&mut self, l_value: LValue) -> Result<ScalarValue, BasicError> {
+	fn load_global_scalar_value(&self, l_value: LValue) -> Result<ScalarValue, BasicError> {
 		let LValue {
 			name,
 			type_restriction,
