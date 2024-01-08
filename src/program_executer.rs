@@ -304,6 +304,9 @@ impl ProgramExecuter {
 					}
 				}
 			}
+			StatementOpcode::List => {
+				
+			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Continue onto next instruction
@@ -502,6 +505,7 @@ impl ProgramExecuter {
 	fn execute_expression(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, return_type_restriction: TypeRestriction) -> Result<ScalarValue, BasicError> {
 		// Execute expression
 		Ok(match opcode {
+			ExpressionOpcode::OneElement | ExpressionOpcode::FromStartOrToEnd => return Err(BasicError::InvalidExpressionOpcode(opcode as u8)),
 			ExpressionOpcode::NumericalLiteral => {
 				// Get string from program
 				let string = self.get_program_string(main_struct)?;
