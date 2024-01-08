@@ -65,4 +65,6 @@ pub enum ExpressionOpcode {
 	CallUserFunctionOrGetArrayValueNumber,
 	Space,
 	NewLine,
+	FromStartOrToEnd,
+	OneElement,
 }

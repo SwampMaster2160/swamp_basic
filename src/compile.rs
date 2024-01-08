@@ -118,6 +118,54 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 				out.push(StatementOpcode::Next as u8);
 				out.extend(compile_l_value(&arguments[0])?);
 			}
+			Command::List => {
+				// Look for invalid separators
+				for argument in arguments {
+					match argument {
+						ParseTreeElement::ExpressionSeparator(Separator::Comma | Separator::Semicolon) => {}
+						ParseTreeElement::ExpressionSeparator(separator) => return Err(BasicError::InvalidSeparator(*separator)),
+						_ => {}
+					}
+				}
+				// Push opcode
+				out.push(StatementOpcode::List as u8);
+				// Push arguments
+				match arguments.as_slice() {
+					// "list", "list ,"
+					// List entire program
+					[] | [ParseTreeElement::ExpressionSeparator(..)] => {
+						out.push(ExpressionOpcode::FromStartOrToEnd as u8);
+						out.push(ExpressionOpcode::FromStartOrToEnd as u8);
+					},
+					// "list x"
+					// List one line
+					[line_number] => {
+						out.extend(compile_expression(line_number)?);
+						out.push(ExpressionOpcode::OneElement as u8);
+					}
+					// "list x,"
+					// A line onwards
+					[start_line_number, ParseTreeElement::ExpressionSeparator(..)] => {
+						out.extend(compile_expression(start_line_number)?);
+						out.push(ExpressionOpcode::FromStartOrToEnd as u8);
+					}
+					// "list ,x"
+					// From the program start up untill a line
+					[ParseTreeElement::ExpressionSeparator(..), end_line_number] => {
+						out.push(ExpressionOpcode::FromStartOrToEnd as u8);
+						out.extend(compile_expression(end_line_number)?);
+					}
+					// "list x,y", "list x y"
+					// Between lines
+					[start_line_number, end_line_number] |
+					[start_line_number, ParseTreeElement::ExpressionSeparator(..), end_line_number] => {
+						out.extend(compile_expression(start_line_number)?);
+						out.extend(compile_expression(end_line_number)?);
+					}
+
+					_ => return Err(BasicError::InvalidArgumentCount),
+				}
+			}
 
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}

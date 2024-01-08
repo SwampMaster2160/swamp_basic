@@ -759,8 +759,8 @@ impl ProgramExecuter {
 				self.skip_expression(main_struct, expression_opcode)?;
 			}
 			// Skip nothing
-			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber |
-			ExpressionOpcode::ImaginaryUnit | ExpressionOpcode::NewLine | ExpressionOpcode::Space => {}
+			ExpressionOpcode::True | ExpressionOpcode::False | ExpressionOpcode::Pi | ExpressionOpcode::EulersNumber | ExpressionOpcode::OneElement |
+			ExpressionOpcode::ImaginaryUnit | ExpressionOpcode::NewLine | ExpressionOpcode::Space | ExpressionOpcode::FromStartOrToEnd => {}
 
 			// Skip string then null terminated expression list.
 			ExpressionOpcode::CallUserFunctionOrGetArrayValueAny | ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean |
