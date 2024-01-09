@@ -352,7 +352,7 @@ impl ProgramExecuter {
 			// Skip opcodes with no arguments
 			StatementOpcode::End => {}
 			// Skip expressions untill a null opcode is found
-			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine | StatementOpcode::List => loop {
+			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => loop {
 				let expression_opcode = match self.get_expression_opcode(main_struct)? {
 					Some(expression_opcode) => expression_opcode,
 					None => break,
@@ -372,6 +372,19 @@ impl ProgramExecuter {
 			}
 			// Skip an expression
 			StatementOpcode::If | StatementOpcode::On | StatementOpcode::Step | StatementOpcode::To => {
+				// Get the opcode
+				let expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				// Skip the expression
+				self.skip_expression(main_struct, expression_opcode)?;
+			}
+			// Skip two expressions
+			StatementOpcode::List => {
+				// Get the opcode
+				let expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				// Skip the expression
+				self.skip_expression(main_struct, expression_opcode)?;
 				// Get the opcode
 				let expression_opcode = self.get_expression_opcode(main_struct)?
 					.ok_or(BasicError::InvalidNullStatementOpcode)?;
