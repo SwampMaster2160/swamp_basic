@@ -1,4 +1,4 @@
-use std::str::from_utf8;
+use std::{str::from_utf8, rc::Rc};
 
 use num::BigInt;
 
@@ -162,5 +162,47 @@ impl Program {
 		// Return string slice or an error if is not a valid utf-8 string
 		from_utf8(utf_8_byte_slice)
 			.map_err(|_| BasicError::InvalidUtf8String)
+	}
+
+	/// Get the index of the line number in the list of line numbers.
+	/// `None` will return 0.
+	/// If the line number is not in the program then returns the line index afterwards.
+	pub fn get_lines_start_index(&self, line_number: Option<Rc<BigInt>>) -> usize {
+		match line_number {
+			Some(line_number) => {
+				match self.line_numbers.binary_search_by(|(line_numbers_number, _)| line_numbers_number.cmp(&line_number)) {
+					Ok(index) => index,
+					Err(index) => index,
+				}
+			}
+			None => 0
+		}
+	}
+
+	/// Get the index of the line number in the list of line numbers.
+	/// `None` will return the index of the last line.
+	/// If the line number is not in the program then returns the line index beforehand.
+	/// Returns `None` id the line number is less than the first line number in the program
+	pub fn get_lines_end_index(&self, line_number: Option<Rc<BigInt>>) -> Option<usize> {
+		match line_number {
+			Some(line_number) => match self.line_numbers.binary_search_by(|(line_numbers_number, _)| line_numbers_number.cmp(&line_number)) {
+				Ok(index) => Some(index),
+				Err(index) => index.checked_sub(1),
+			}
+			None => self.line_numbers.len().checked_sub(1),
+		}
+	}
+
+	/// Takes in the index of a line and returns the line number and bytecode.
+	/// Returns `None` if the index is out of bounds.
+	pub fn get_line_and_number_number_from_line_index(&self, index: usize) -> (&BigInt, &[u8]) {
+		let (line_number, bytecode_start_index) = &self.line_numbers[index];
+		let bytecode_start_index = *bytecode_start_index;
+		let bytecode_end_index = match self.line_numbers.get(index + 1) {
+			Some((_, bytecode_end_index)) => *bytecode_end_index,
+			None => self.bytecode.len(),
+		};
+		let bytecode = &self.bytecode[bytecode_start_index..bytecode_end_index];
+		(line_number, bytecode)
 	}
 }

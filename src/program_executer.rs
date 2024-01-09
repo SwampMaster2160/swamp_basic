@@ -304,8 +304,34 @@ impl ProgramExecuter {
 					}
 				}
 			}
-			StatementOpcode::List => {
+			StatementOpcode::List => 'a: {
+				// Get the start line index
+				let start_expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				let start_expression_result: Option<Rc<BigInt>> = match start_expression_opcode {
+					ExpressionOpcode::FromStartOrToEnd => None,
+					_ => Some(self.execute_expression(main_struct, start_expression_opcode, TypeRestriction::Integer)?.try_into()?),
+				};
+				let start_line_number_index = main_struct.program.get_lines_start_index(start_expression_result.clone());
+				// Get the end line index
+				let end_expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				let end_expression_result: Option<Rc<BigInt>> = match end_expression_opcode {
+					ExpressionOpcode::FromStartOrToEnd => None,
+					ExpressionOpcode::OneElement => start_expression_result.clone(),
+					_ => Some(self.execute_expression(main_struct, end_expression_opcode, TypeRestriction::Integer)?.try_into()?),
+				};
+				let end_line_number_index = match main_struct.program.get_lines_end_index(end_expression_result) {
+					Some(end_line_number_index) => end_line_number_index,
+					None => break 'a,
 				
+				};
+				// List lines
+				// TODO: Decompile lines
+				for line_number_index in start_line_number_index..=end_line_number_index {
+					let (line_number, line_program) = main_struct.program.get_line_and_number_number_from_line_index(line_number_index);
+					println!("{line_number} {:?}", line_program);
+				}
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
