@@ -50,6 +50,7 @@ pub enum BasicError {
 	ToStepNoForLoop,
 	NextOnLValueWithoutLoop,
 	NoProgramLines,
+	InvalidNewline,
 }
 
 impl Display for BasicError {
@@ -101,6 +102,7 @@ impl Display for BasicError {
 			Self::ToStepNoForLoop => write!(formatter, "A \"to\" or \"step\" was executed without a \"for\" loop being executed since the program start or last gosub call."),
 			Self::NextOnLValueWithoutLoop => write!(formatter, "A \"next\" was executed on a l-value that is not bound to a for loop."),
 			Self::NoProgramLines => write!(formatter, "No program lines."),
+			Self::InvalidNewline => write!(formatter, "Invalid newline."),
 		}
 	}
 }

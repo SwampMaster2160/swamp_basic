@@ -1,3 +1,5 @@
+use num_traits::FromPrimitive;
+
 use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode},
 parser::ParseTreeElement, lexer::{command::Command, operator::Operator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator}};
 
@@ -419,4 +421,78 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 		_ => panic!(),
 	}
 	Ok(out)
+}
+
+/// Decompiles the bytecode for a line to list of statements.
+pub fn decompile_line(bytecode: &[u8]) -> Result<Vec<ParseTreeElement>, BasicError> {
+	let mut bytecode = bytecode;
+	let mut out = Vec::new();
+	while !bytecode.is_empty() {
+		out.push(decompile_statement(&mut bytecode)?);
+	}
+	Ok(out)
+}
+
+/// Decompiles the bytecode for a statement to a parse tree element.
+fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElement, BasicError> {
+	// Extract opcode
+	let opcode_id = *statement_bytecode.get(0)
+		.ok_or(BasicError::ExpectedStatementOpcodeButProgramEnd)?;
+	let opcode: StatementOpcode = FromPrimitive::from_u8(opcode_id)
+		.ok_or(BasicError::InvalidStatementOpcode(opcode_id))?;
+	*statement_bytecode = &statement_bytecode[1..];
+	// Decompile statement
+	Ok(match opcode {
+		StatementOpcode::End => ParseTreeElement::Command(Command::End, Vec::new()),
+		StatementOpcode::Print => {
+			let mut sub_expressions = Vec::new();
+			let mut should_print_semicolon = false;
+			let mut had_newline = false;
+			loop {
+				// Get opcode
+				let bytecode_id = statement_bytecode.get(0);
+				let bytecode_id = match bytecode_id {
+					None => return Err(BasicError::ExpectedExpressionOpcodeButProgramEnd),
+					Some(0) => {
+						if !had_newline {
+							sub_expressions.push(ParseTreeElement::ExpressionSeparator(Separator::Semicolon));
+						}
+						*statement_bytecode = &statement_bytecode[1..];
+						break;
+					},
+					Some(bytecode_id) => *bytecode_id,
+				};
+				*statement_bytecode = &statement_bytecode[1..];
+				let opcode: ExpressionOpcode = FromPrimitive::from_u8(bytecode_id)
+					.ok_or(BasicError::InvalidExpressionOpcode(bytecode_id))?;
+				// Decompile expression
+				match opcode {
+					ExpressionOpcode::Space => {
+						sub_expressions.push(ParseTreeElement::ExpressionSeparator(Separator::Comma));
+						should_print_semicolon = false;
+					}
+					ExpressionOpcode::NewLine => {
+						if statement_bytecode.get(0) != Some(&0) {
+							return Err(BasicError::InvalidNewline);
+						}
+						had_newline = true;
+					}
+					other => {
+						if should_print_semicolon {
+							sub_expressions.push(ParseTreeElement::ExpressionSeparator(Separator::Semicolon));
+						}
+						sub_expressions.push(decompile_expression(statement_bytecode, other)?);
+						should_print_semicolon = true;
+					}
+				}
+			}
+			ParseTreeElement::Command(Command::Print, sub_expressions)
+		}
+		_ => todo!(),
+	})
+}
+
+/// Decompiles the bytecode for an expression to a parse tree element.
+fn decompile_expression(_statement_bytecode: &mut &[u8], _opcode: ExpressionOpcode) -> Result<ParseTreeElement, BasicError> {
+	todo!()
 }

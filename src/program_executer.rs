@@ -4,6 +4,7 @@ use std::hash::Hash;
 use num::{BigInt, complex::Complex64};
 use num_traits::FromPrimitive;
 
+use crate::compile::decompile_line;
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
 pub struct ProgramExecuter {
@@ -329,8 +330,12 @@ impl ProgramExecuter {
 				// List lines
 				// TODO: Decompile lines
 				for line_number_index in start_line_number_index..=end_line_number_index {
-					let (line_number, line_program) = main_struct.program.get_line_and_number_number_from_line_index(line_number_index);
-					println!("{line_number} {:?}", line_program);
+					// Get bytecode for line
+					let (line_number, line_bytecode) = main_struct.program.get_line_and_number_number_from_line_index(line_number_index);
+					// Decompile line
+					let line_parse_tree_elements = decompile_line(line_bytecode);
+					// Print line
+					println!("{line_number} {:?}", line_parse_tree_elements);
 				}
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
