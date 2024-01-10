@@ -333,7 +333,7 @@ impl ProgramExecuter {
 					// Get bytecode for line
 					let (line_number, line_bytecode) = main_struct.program.get_line_and_number_number_from_line_index(line_number_index);
 					// Decompile line
-					let line_parse_tree_elements = decompile_line(line_bytecode);
+					let line_parse_tree_elements = decompile_line(line_bytecode)?;
 					// Print line
 					println!("{line_number} {:?}", line_parse_tree_elements);
 				}

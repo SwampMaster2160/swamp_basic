@@ -1,3 +1,5 @@
+use std::str::from_utf8;
+
 use num_traits::FromPrimitive;
 
 use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode},
@@ -427,8 +429,13 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 pub fn decompile_line(bytecode: &[u8]) -> Result<Vec<ParseTreeElement>, BasicError> {
 	let mut bytecode = bytecode;
 	let mut out = Vec::new();
+	let mut is_first_statement = true;
 	while !bytecode.is_empty() {
+		if !is_first_statement {
+			out.push(ParseTreeElement::ExpressionSeparator(Separator::Colon));
+		}
 		out.push(decompile_statement(&mut bytecode)?);
+		is_first_statement = false;
 	}
 	Ok(out)
 }
@@ -493,6 +500,33 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 }
 
 /// Decompiles the bytecode for an expression to a parse tree element.
-fn decompile_expression(_statement_bytecode: &mut &[u8], _opcode: ExpressionOpcode) -> Result<ParseTreeElement, BasicError> {
-	todo!()
+fn decompile_expression(statement_bytecode: &mut &[u8], opcode: ExpressionOpcode) -> Result<ParseTreeElement, BasicError> {
+	Ok(match opcode {
+		// Literals
+		ExpressionOpcode::NumericalLiteral | ExpressionOpcode::StringLiteral => {
+			let string = decompile_string(statement_bytecode)?;
+			match opcode {
+				ExpressionOpcode::NumericalLiteral => ParseTreeElement::NumericalLiteral(string),
+				ExpressionOpcode::StringLiteral => ParseTreeElement::StringLiteral(string),
+				_ => unreachable!(),
+			}
+		}
+		_ => todo!(),
+	})
+}
+
+/// Decompiles the bytecode for a string to a string.
+fn decompile_string(bytecode: &mut &[u8]) -> Result<String, BasicError> {
+	// Get null byte index or return an error if none exist
+	let null_byte_index = bytecode.iter()
+		.position(|byte| *byte == 0)
+		.ok_or(BasicError::UnterminatedString)?;
+	// Get the byte slice that contains the string without the null byte
+	let utf_8_byte_slice = &bytecode[..null_byte_index];
+	// Repoint program counter to point to the byte after the null byte
+	*bytecode = &bytecode[null_byte_index + 1..];
+	// Return string slice or an error if is not a valid utf-8 string
+	Ok(from_utf8(utf_8_byte_slice)
+		.map_err(|_| BasicError::InvalidUtf8String)?
+		.to_string())
 }
