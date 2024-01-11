@@ -531,10 +531,10 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 		// Statements that take in a single expression
 		StatementOpcode::If | StatementOpcode::On | StatementOpcode::Step | StatementOpcode::To => {
 			// Get the opcode.
-			let opcode_id = *statement_bytecode.get(0)
+			let expression_opcode_id = *statement_bytecode.get(0)
 				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
 			*statement_bytecode = &statement_bytecode[1..];
-			let expression_opcode: ExpressionOpcode = match opcode_id {
+			let expression_opcode: ExpressionOpcode = match expression_opcode_id {
 				0 => return Err(BasicError::InvalidNullExpressionOpcode),
 				bytecode_id => FromPrimitive::from_u8(bytecode_id)
 					.ok_or_else(|| BasicError::InvalidExpressionOpcode(bytecode_id))?,
@@ -604,7 +604,35 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 			}
 			ParseTreeElement::Command(Command::List, out)
 		}
-		_ => todo!(),
+		// Statements that take in an l-value and an expression and convert them to assignments.
+		StatementOpcode::Let | StatementOpcode::For => {
+			// Get the l-value
+			let l_value = decompile_l_value(statement_bytecode)?;
+			// Get the expression opcode.
+			let expression_opcode_id = *statement_bytecode.get(0)
+				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+			*statement_bytecode = &statement_bytecode[1..];
+			let expression_opcode: ExpressionOpcode = match expression_opcode_id {
+				0 => return Err(BasicError::InvalidNullExpressionOpcode),
+				expression_opcode_id => FromPrimitive::from_u8(expression_opcode_id)
+					.ok_or_else(|| BasicError::InvalidExpressionOpcode(expression_opcode_id))?,
+			};
+			// Decompile the expression
+			let decompiled_expression = decompile_expression(statement_bytecode, expression_opcode);
+			// Construct parse tree element
+			let command = match opcode {
+				StatementOpcode::Let => Command::Let,
+				StatementOpcode::For => Command::For,
+				_ => unreachable!(),
+			};
+			let assignment = ParseTreeElement::Assignment(Box::new(l_value), Box::new(decompiled_expression?));
+			ParseTreeElement::Command(command, vec![assignment])
+		}
+		// Statements that take in a single l-value
+		StatementOpcode::Next => {
+			let l_value = decompile_l_value(statement_bytecode)?;
+			ParseTreeElement::Command(Command::Next, vec![l_value])
+		}
 	})
 }
 
@@ -622,6 +650,11 @@ fn decompile_expression(statement_bytecode: &mut &[u8], opcode: ExpressionOpcode
 		}
 		_ => todo!(),
 	})
+}
+
+/// Decompiles the bytecode for an l-value to a parse tree element.
+fn decompile_l_value(_l_value_bytecode: &mut &[u8]) -> Result<ParseTreeElement, BasicError> {
+	todo!()
 }
 
 /// Decompiles the bytecode for a string to a string.
