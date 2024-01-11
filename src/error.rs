@@ -24,6 +24,7 @@ pub enum BasicError {
 	InvalidStatementOpcode(u8),
 	InvalidExpressionOpcode(u8),
 	InvalidLValueOpcode(u8),
+	InvalidNullExpressionOpcode,
 	ExpectedExpressionOpcodeButProgramEnd,
 	ExpectedStatementOpcodeButProgramEnd,
 	ExpectedLValueOpcodeButProgramEnd,
@@ -103,6 +104,7 @@ impl Display for BasicError {
 			Self::NextOnLValueWithoutLoop => write!(formatter, "A \"next\" was executed on a l-value that is not bound to a for loop."),
 			Self::NoProgramLines => write!(formatter, "No program lines."),
 			Self::InvalidNewline => write!(formatter, "Invalid newline."),
+			Self::InvalidNullExpressionOpcode => write!(formatter, "Invalid null expression opcode."),
 		}
 	}
 }

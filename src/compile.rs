@@ -535,7 +535,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
 			*statement_bytecode = &statement_bytecode[1..];
 			let expression_opcode: ExpressionOpcode = match opcode_id {
-				0 => return Err(BasicError::InvalidExpressionOpcode(0)),
+				0 => return Err(BasicError::InvalidNullExpressionOpcode),
 				bytecode_id => FromPrimitive::from_u8(bytecode_id)
 					.ok_or_else(|| BasicError::InvalidExpressionOpcode(bytecode_id))?,
 			};
@@ -550,6 +550,59 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 				_ => unreachable!(),
 			};
 			ParseTreeElement::Command(command, vec![sub_expressions])
+		}
+		// Statements that take in another statement.
+		StatementOpcode::Then | StatementOpcode::Else => {
+			let command = match opcode {
+				StatementOpcode::Then => Command::Then,
+				StatementOpcode::Else => Command::Else,
+				_ => unreachable!(),
+			};
+			ParseTreeElement::Command(command, vec![decompile_statement(statement_bytecode)?])
+		}
+		StatementOpcode::List => {
+			let mut out = Vec::new();
+			// Get the opcode for the first sub-expression.
+			let first_expression_opcode_id = *statement_bytecode.get(0)
+				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+			*statement_bytecode = &statement_bytecode[1..];
+			let first_expression_opcode: ExpressionOpcode = match first_expression_opcode_id {
+				0 => return Err(BasicError::InvalidNullExpressionOpcode),
+				bytecode_id => FromPrimitive::from_u8(bytecode_id)
+					.ok_or_else(|| BasicError::InvalidExpressionOpcode(bytecode_id))?,
+			};
+			// Decompile range start
+			match first_expression_opcode {
+				ExpressionOpcode::FromStartOrToEnd => {}
+				_ => {
+					let decompiled_first_expression = decompile_expression(statement_bytecode, first_expression_opcode)?;
+					out.push(decompiled_first_expression);
+				}
+			}
+			// Get the opcode for the second sub-expression.
+			let second_expression_opcode_id = *statement_bytecode.get(0)
+				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+			*statement_bytecode = &statement_bytecode[1..];
+			let second_expression_opcode: ExpressionOpcode = match second_expression_opcode_id {
+				0 => return Err(BasicError::InvalidNullExpressionOpcode),
+				bytecode_id => FromPrimitive::from_u8(bytecode_id)
+					.ok_or_else(|| BasicError::InvalidExpressionOpcode(bytecode_id))?,
+			};
+			// Decompile range end
+			match second_expression_opcode {
+				ExpressionOpcode::FromStartOrToEnd => {
+					if first_expression_opcode != ExpressionOpcode::FromStartOrToEnd {
+						out.push(ParseTreeElement::ExpressionSeparator(Separator::Comma));
+					}
+				}
+				ExpressionOpcode::OneElement => {}
+				_ => {
+					out.push(ParseTreeElement::ExpressionSeparator(Separator::Comma));
+					let decompiled_second_expression = decompile_expression(statement_bytecode, second_expression_opcode)?;
+					out.push(decompiled_second_expression);
+				}
+			}
+			ParseTreeElement::Command(Command::List, out)
 		}
 		_ => todo!(),
 	})
