@@ -495,6 +495,62 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 			}
 			ParseTreeElement::Command(Command::Print, sub_expressions)
 		}
+		// Decompile null terminated expression list to comma separated expression list
+		StatementOpcode::Goto | StatementOpcode::Run | StatementOpcode::GoSubroutine => {
+			let mut is_first_expression = true;
+			let mut sub_expressions = Vec::new();
+			// For each sub-expression
+			loop {
+				// Get the opcode or break if we get a null byte.
+				let opcode_id = *statement_bytecode.get(0)
+					.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+				*statement_bytecode = &statement_bytecode[1..];
+				let opcode: ExpressionOpcode = match opcode_id {
+					0 => break,
+					bytecode_id => FromPrimitive::from_u8(bytecode_id)
+						.ok_or_else(|| BasicError::InvalidExpressionOpcode(bytecode_id))?,
+				};
+				// Push a comma if it is not the first expression.
+				if !is_first_expression {
+					sub_expressions.push(ParseTreeElement::ExpressionSeparator(Separator::Comma));
+				}
+				// Decompile the sub-expression
+				sub_expressions.push(decompile_expression(statement_bytecode, opcode)?);
+				// The next expression is not the first expression.
+				is_first_expression = false;
+			}
+			// Create the parse tree element
+			let command = match opcode {
+				StatementOpcode::Goto => Command::Goto,
+				StatementOpcode::Run => Command::Run,
+				StatementOpcode::GoSubroutine => Command::GoSubroutine,
+				_ => unreachable!(),
+			};
+			ParseTreeElement::Command(command, sub_expressions)
+		}
+		// Statements that take in a single expression
+		StatementOpcode::If | StatementOpcode::On | StatementOpcode::Step | StatementOpcode::To => {
+			// Get the opcode.
+			let opcode_id = *statement_bytecode.get(0)
+				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+			*statement_bytecode = &statement_bytecode[1..];
+			let expression_opcode: ExpressionOpcode = match opcode_id {
+				0 => return Err(BasicError::InvalidExpressionOpcode(0)),
+				bytecode_id => FromPrimitive::from_u8(bytecode_id)
+					.ok_or_else(|| BasicError::InvalidExpressionOpcode(bytecode_id))?,
+			};
+			// Decompile the sub-expression
+			let sub_expressions = decompile_expression(statement_bytecode, expression_opcode)?;
+			// Construct parse tree element.
+			let command = match opcode {
+				StatementOpcode::If => Command::If,
+				StatementOpcode::On => Command::On,
+				StatementOpcode::Step => Command::Step,
+				StatementOpcode::To => Command::To,
+				_ => unreachable!(),
+			};
+			ParseTreeElement::Command(command, vec![sub_expressions])
+		}
 		_ => todo!(),
 	})
 }
