@@ -607,7 +607,8 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 		// Statements that take in an l-value and an expression and convert them to assignments.
 		StatementOpcode::Let | StatementOpcode::For => {
 			// Get the l-value
-			let l_value = decompile_l_value(statement_bytecode)?;
+			let l_value = decompile_l_value(statement_bytecode)?
+				.ok_or(BasicError::UnexpectedLValueEndOpcode)?;
 			// Get the expression opcode.
 			let expression_opcode_id = *statement_bytecode.get(0)
 				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
@@ -630,7 +631,8 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 		}
 		// Statements that take in a single l-value
 		StatementOpcode::Next => {
-			let l_value = decompile_l_value(statement_bytecode)?;
+			let l_value = decompile_l_value(statement_bytecode)?
+				.ok_or(BasicError::UnexpectedLValueEndOpcode)?;
 			ParseTreeElement::Command(Command::Next, vec![l_value])
 		}
 	})
@@ -653,8 +655,76 @@ fn decompile_expression(statement_bytecode: &mut &[u8], opcode: ExpressionOpcode
 }
 
 /// Decompiles the bytecode for an l-value to a parse tree element.
-fn decompile_l_value(_l_value_bytecode: &mut &[u8]) -> Result<ParseTreeElement, BasicError> {
-	todo!()
+/// Returns `Ok(None)` if a null opcode was encountered.
+fn decompile_l_value(l_value_bytecode: &mut &[u8]) -> Result<Option<ParseTreeElement>, BasicError> {
+	// Extract opcode
+	let opcode_id = *l_value_bytecode.get(0)
+		.ok_or(BasicError::ExpectedStatementOpcodeButProgramEnd)?;
+	let opcode: LValueOpcode = FromPrimitive::from_u8(opcode_id)
+		.ok_or(BasicError::InvalidStatementOpcode(opcode_id))?;
+	*l_value_bytecode = &l_value_bytecode[1..];
+	// Decompile l-value
+	Ok(match opcode {
+		// Simple indentifiers
+		LValueOpcode::ScalarAny | LValueOpcode::ScalarBoolean | LValueOpcode::ScalarComplexFloat | LValueOpcode::ScalarFloat | LValueOpcode::ScalarInteger |
+		LValueOpcode::ScalarNumber | LValueOpcode::ScalarString | LValueOpcode::ScalarRealNumber => Some({
+			// Get name
+			let name = decompile_string(l_value_bytecode)?;
+			// Get type restriction
+			let type_restriction = match opcode {
+				LValueOpcode::ScalarAny => TypeRestriction::Any,
+				LValueOpcode::ScalarBoolean => TypeRestriction::Boolean,
+				LValueOpcode::ScalarComplexFloat => TypeRestriction::ComplexFloat,
+				LValueOpcode::ScalarFloat => TypeRestriction::Float,
+				LValueOpcode::ScalarInteger => TypeRestriction::Integer,
+				LValueOpcode::ScalarNumber => TypeRestriction::Number,
+				LValueOpcode::ScalarString => TypeRestriction::String,
+				LValueOpcode::ScalarRealNumber => TypeRestriction::RealNumber,
+				_ => unreachable!(),
+			};
+			// Construct parse tree element
+			ParseTreeElement::Identifier(name, type_restriction)
+		}),
+		// Arrays
+		LValueOpcode::ArrayElementAny | LValueOpcode::ArrayElementBoolean | LValueOpcode::ArrayElementComplexFloat | LValueOpcode::ArrayElementFloat |
+		LValueOpcode::ArrayElementInteger | LValueOpcode::ArrayElementNumber | LValueOpcode::ArrayElementString | LValueOpcode::ArrayElementRealNumber => Some({
+			// Get name
+			let name = decompile_string(l_value_bytecode)?;
+			// Get type restriction
+			let type_restriction = match opcode {
+				LValueOpcode::ArrayElementAny => TypeRestriction::Any,
+				LValueOpcode::ArrayElementBoolean => TypeRestriction::Boolean,
+				LValueOpcode::ArrayElementComplexFloat => TypeRestriction::ComplexFloat,
+				LValueOpcode::ArrayElementFloat => TypeRestriction::Float,
+				LValueOpcode::ArrayElementInteger => TypeRestriction::Integer,
+				LValueOpcode::ArrayElementNumber => TypeRestriction::Number,
+				LValueOpcode::ArrayElementString => TypeRestriction::String,
+				LValueOpcode::ArrayElementRealNumber => TypeRestriction::RealNumber,
+				_ => unreachable!(),
+			};
+			// Get indices
+			let mut indices = Vec::new();
+			loop {
+				// Get the expression opcode.
+				let expression_opcode_id = *l_value_bytecode.get(0)
+					.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+				*l_value_bytecode = &l_value_bytecode[1..];
+				let expression_opcode: ExpressionOpcode = match expression_opcode_id {
+					0 => break,
+					bytecode_id => FromPrimitive::from_u8(bytecode_id)
+						.ok_or_else(|| BasicError::InvalidExpressionOpcode(bytecode_id))?,
+				};
+				// Decompile the expression
+				let decompiled_expression = decompile_expression(l_value_bytecode, expression_opcode)?;
+				// Add array element to output
+				indices.push(decompiled_expression);
+			}
+			// Construct parse tree element
+			ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, indices)
+		}),
+		// End of l-value list
+		LValueOpcode::End => None,
+	})
 }
 
 /// Decompiles the bytecode for a string to a string.
