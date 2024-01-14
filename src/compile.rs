@@ -719,6 +719,118 @@ fn decompile_expression(statement_bytecode: &mut &[u8], opcode: ExpressionOpcode
 			// Construct parse tree element
 			ParseTreeElement::BuiltInFunction(function, TypeRestriction::Any, decompiled_sub_expressions)
 		}
+		// Unary operators
+		ExpressionOpcode::Negate | ExpressionOpcode::Not => {
+			// Get operator
+			let operator = match opcode {
+				ExpressionOpcode::Negate => Operator::MinusNegate,
+				ExpressionOpcode::Not => Operator::Not,
+				_ => unreachable!(),
+			};
+			// Get the sub-expression opcode.
+			let sub_expression_opcode_id = *statement_bytecode.get(0)
+				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+			*statement_bytecode = &statement_bytecode[1..];
+			let sub_expression_opcode: ExpressionOpcode = match sub_expression_opcode_id {
+				0 => return Err(BasicError::InvalidNullExpressionOpcode),
+				sub_expression_opcode_id => FromPrimitive::from_u8(sub_expression_opcode_id)
+					.ok_or_else(|| BasicError::InvalidExpressionOpcode(sub_expression_opcode_id))?,
+			};
+			// Decompile the sub-expression
+			let decompiled_sub_expression = decompile_expression(statement_bytecode, sub_expression_opcode, TypeRestriction::Any)?;
+			// Construct parse tree element
+			ParseTreeElement::UnaryOperator(operator, Box::new(decompiled_sub_expression))
+		}
+		// Binary operators
+		ExpressionOpcode::And | ExpressionOpcode::Divide | ExpressionOpcode::EqualTo | ExpressionOpcode::ExclusiveOr | ExpressionOpcode::FlooredDivide |
+		ExpressionOpcode::GreaterThan | ExpressionOpcode::GreaterThanOrEqualTo | ExpressionOpcode::LessThan | ExpressionOpcode::LessThanOrEqualTo |
+		ExpressionOpcode::Modulus | ExpressionOpcode::Subtract | ExpressionOpcode::NotEqualTo | ExpressionOpcode::Exponent | ExpressionOpcode::Or => {
+			// Get operator
+			let operator = match opcode {
+				ExpressionOpcode::And => Operator::And,
+				ExpressionOpcode::Divide => Operator::Divide,
+				ExpressionOpcode::EqualTo => Operator::EqualTo,
+				ExpressionOpcode::NotEqualTo => Operator::NotEqualTo,
+				ExpressionOpcode::ExclusiveOr => Operator::ExclusiveOr,
+				ExpressionOpcode::FlooredDivide => Operator::FlooredDivide,
+				ExpressionOpcode::GreaterThan => Operator::GreaterThan,
+				ExpressionOpcode::GreaterThanOrEqualTo => Operator::GreaterThanOrEqualTo,
+				ExpressionOpcode::LessThan => Operator::LessThan,
+				ExpressionOpcode::LessThanOrEqualTo => Operator::LessThanOrEqualTo,
+				ExpressionOpcode::Modulus => Operator::Modulus,
+				ExpressionOpcode::Subtract => Operator::MinusNegate,
+				ExpressionOpcode::Exponent => Operator::Exponent,
+				ExpressionOpcode::Or => Operator::Or,
+				_ => unreachable!(),
+			};
+			// Get the first sub-expression opcode.
+			let first_sub_expression_opcode_id = *statement_bytecode.get(0)
+				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+			*statement_bytecode = &statement_bytecode[1..];
+			let first_sub_expression_opcode: ExpressionOpcode = match first_sub_expression_opcode_id {
+				0 => return Err(BasicError::InvalidNullExpressionOpcode),
+				first_sub_expression_opcode_id => FromPrimitive::from_u8(first_sub_expression_opcode_id)
+					.ok_or_else(|| BasicError::InvalidExpressionOpcode(first_sub_expression_opcode_id))?,
+			};
+			// Decompile the first sub-expression
+			let decompiled_first_sub_expression = decompile_expression(statement_bytecode, first_sub_expression_opcode, TypeRestriction::Any)?;
+			// Get the second sub-expression opcode.
+			let second_sub_expression_opcode_id = *statement_bytecode.get(0)
+				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+			*statement_bytecode = &statement_bytecode[1..];
+			let second_sub_expression_opcode: ExpressionOpcode = match second_sub_expression_opcode_id {
+				0 => return Err(BasicError::InvalidNullExpressionOpcode),
+				second_sub_expression_opcode_id => FromPrimitive::from_u8(second_sub_expression_opcode_id)
+					.ok_or_else(|| BasicError::InvalidExpressionOpcode(second_sub_expression_opcode_id))?,
+			};
+			// Decompile the second sub-expression
+			let decompiled_second_sub_expression = decompile_expression(statement_bytecode, second_sub_expression_opcode, TypeRestriction::Any)?;
+			// Construct parse tree element
+			ParseTreeElement::BinaryOperator(operator, Box::new(decompiled_first_sub_expression), Box::new(decompiled_second_sub_expression))
+		}
+		// Sum and product
+		ExpressionOpcode::SumConcatenate | ExpressionOpcode::Product => {
+			// Get each sub-expression
+			let mut decompiled_sub_expressions = Vec::new();
+			loop {
+				// Get the sub-expression opcode.
+				let sub_expression_opcode_id = *statement_bytecode.get(0)
+					.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+				*statement_bytecode = &statement_bytecode[1..];
+				let sub_expression_opcode: ExpressionOpcode = match sub_expression_opcode_id {
+					0 => break,
+					sub_expression_opcode_id => FromPrimitive::from_u8(sub_expression_opcode_id)
+						.ok_or_else(|| BasicError::InvalidExpressionOpcode(sub_expression_opcode_id))?,
+				};
+				// Decompile the sub-expression
+				decompiled_sub_expressions.push(decompile_expression(statement_bytecode, sub_expression_opcode, TypeRestriction::Any)?);
+			}
+			if decompiled_sub_expressions.len() == 2 {
+				// Get operator
+				let operator = match opcode {
+					ExpressionOpcode::SumConcatenate => Operator::AddConcatenate,
+					ExpressionOpcode::Product => Operator::Multiply,
+					_ => unreachable!(),
+				};
+				// Unpack operand_list
+				let (left_operand, right_operand) = match &decompiled_sub_expressions[..] {
+					[left_operand, right_operand] => (left_operand.clone(), right_operand.clone()),
+					_ => unreachable!(),
+				};
+				// Construct the parse tree element
+				ParseTreeElement::BinaryOperator(operator, Box::new(left_operand), Box::new(right_operand))
+			}
+			else {
+				// Get function
+				let function = match opcode {
+					ExpressionOpcode::SumConcatenate => BuiltInFunction::Sum,
+					ExpressionOpcode::Product => BuiltInFunction::Product,
+					_ => unreachable!(),
+				};
+				// Construct the parse tree element
+				ParseTreeElement::BuiltInFunction(function, type_restriction, decompiled_sub_expressions)
+			}
+		}
 		// Type restrictions
 		ExpressionOpcode::GetBoolean | ExpressionOpcode::GetComplexFloat | ExpressionOpcode::GetFloat | ExpressionOpcode::GetInteger | ExpressionOpcode::GetNumber |
 		ExpressionOpcode::GetRealNumber | ExpressionOpcode::GetString => {
@@ -745,7 +857,66 @@ fn decompile_expression(statement_bytecode: &mut &[u8], opcode: ExpressionOpcode
 			// Decompile the sub-expression
 			decompile_expression(statement_bytecode, sub_expression_opcode, type_restriction)?
 		}
-		_ => todo!(),
+		// A variable
+		ExpressionOpcode::LoadScalarAny | ExpressionOpcode::LoadScalarBoolean | ExpressionOpcode::LoadScalarComplexFloat | ExpressionOpcode::LoadScalarFloat |
+		ExpressionOpcode::LoadScalarInteger | ExpressionOpcode::LoadScalarNumber | ExpressionOpcode::LoadScalarRealNumber | ExpressionOpcode::LoadScalarString => {
+			// Get name
+			let name = decompile_string(statement_bytecode)?;
+			// Get type restriction
+			let type_restriction = match opcode {
+				ExpressionOpcode::LoadScalarAny => TypeRestriction::Any,
+				ExpressionOpcode::LoadScalarBoolean => TypeRestriction::Boolean,
+				ExpressionOpcode::LoadScalarComplexFloat => TypeRestriction::ComplexFloat,
+				ExpressionOpcode::LoadScalarFloat => TypeRestriction::Float,
+				ExpressionOpcode::LoadScalarInteger => TypeRestriction::Integer,
+				ExpressionOpcode::LoadScalarNumber => TypeRestriction::Number,
+				ExpressionOpcode::LoadScalarRealNumber => TypeRestriction::RealNumber,
+				ExpressionOpcode::LoadScalarString => TypeRestriction::String,
+				_ => unreachable!(),
+			};
+			// Construct parse tree element
+			ParseTreeElement::Identifier(name, type_restriction)
+		}
+		// An array access or user defined function
+		ExpressionOpcode::CallUserFunctionOrGetArrayValueAny | ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean |
+		ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat | ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat |
+		ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger | ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber |
+		ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber | ExpressionOpcode::CallUserFunctionOrGetArrayValueString => {
+			// Get name
+			let name = decompile_string(statement_bytecode)?;
+			// Get type restriction
+			let type_restriction = match opcode {
+				ExpressionOpcode::CallUserFunctionOrGetArrayValueAny => TypeRestriction::Any,
+				ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean => TypeRestriction::Boolean,
+				ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat => TypeRestriction::ComplexFloat,
+				ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat => TypeRestriction::Float,
+				ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger => TypeRestriction::Integer,
+				ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber => TypeRestriction::Number,
+				ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber => TypeRestriction::RealNumber,
+				ExpressionOpcode::CallUserFunctionOrGetArrayValueString => TypeRestriction::String,
+				_ => unreachable!(),
+			};
+			// Get each sub-expression
+			let mut decompiled_sub_expressions = Vec::new();
+			loop {
+				// Get the sub-expression opcode.
+				let sub_expression_opcode_id = *statement_bytecode.get(0)
+					.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+				*statement_bytecode = &statement_bytecode[1..];
+				let sub_expression_opcode: ExpressionOpcode = match sub_expression_opcode_id {
+					0 => break,
+					sub_expression_opcode_id => FromPrimitive::from_u8(sub_expression_opcode_id)
+						.ok_or_else(|| BasicError::InvalidExpressionOpcode(sub_expression_opcode_id))?,
+				};
+				// Decompile the sub-expression
+				decompiled_sub_expressions.push(decompile_expression(statement_bytecode, sub_expression_opcode, TypeRestriction::Any)?);
+			}
+			// Construct the parse tree element
+			ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, decompiled_sub_expressions)
+		}
+		ExpressionOpcode::FromStartOrToEnd | ExpressionOpcode::NewLine | ExpressionOpcode::OneElement | ExpressionOpcode::Space => {
+			return Err(BasicError::InvalidExpressionOpcode(opcode as u8));
+		}
 	})
 }
 
