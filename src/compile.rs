@@ -488,7 +488,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 						if should_print_semicolon {
 							sub_expressions.push(ParseTreeElement::ExpressionSeparator(Separator::Semicolon));
 						}
-						sub_expressions.push(decompile_expression(statement_bytecode, other)?);
+						sub_expressions.push(decompile_expression(statement_bytecode, other, TypeRestriction::Any)?);
 						should_print_semicolon = true;
 					}
 				}
@@ -515,7 +515,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 					sub_expressions.push(ParseTreeElement::ExpressionSeparator(Separator::Comma));
 				}
 				// Decompile the sub-expression
-				sub_expressions.push(decompile_expression(statement_bytecode, opcode)?);
+				sub_expressions.push(decompile_expression(statement_bytecode, opcode, TypeRestriction::Any)?);
 				// The next expression is not the first expression.
 				is_first_expression = false;
 			}
@@ -540,7 +540,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 					.ok_or_else(|| BasicError::InvalidExpressionOpcode(bytecode_id))?,
 			};
 			// Decompile the sub-expression
-			let sub_expressions = decompile_expression(statement_bytecode, expression_opcode)?;
+			let sub_expressions = decompile_expression(statement_bytecode, expression_opcode, TypeRestriction::Any)?;
 			// Construct parse tree element.
 			let command = match opcode {
 				StatementOpcode::If => Command::If,
@@ -575,7 +575,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 			match first_expression_opcode {
 				ExpressionOpcode::FromStartOrToEnd => {}
 				_ => {
-					let decompiled_first_expression = decompile_expression(statement_bytecode, first_expression_opcode)?;
+					let decompiled_first_expression = decompile_expression(statement_bytecode, first_expression_opcode, TypeRestriction::Any)?;
 					out.push(decompiled_first_expression);
 				}
 			}
@@ -598,7 +598,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 				ExpressionOpcode::OneElement => {}
 				_ => {
 					out.push(ParseTreeElement::ExpressionSeparator(Separator::Comma));
-					let decompiled_second_expression = decompile_expression(statement_bytecode, second_expression_opcode)?;
+					let decompiled_second_expression = decompile_expression(statement_bytecode, second_expression_opcode, TypeRestriction::Any)?;
 					out.push(decompiled_second_expression);
 				}
 			}
@@ -619,7 +619,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 					.ok_or_else(|| BasicError::InvalidExpressionOpcode(expression_opcode_id))?,
 			};
 			// Decompile the expression
-			let decompiled_expression = decompile_expression(statement_bytecode, expression_opcode);
+			let decompiled_expression = decompile_expression(statement_bytecode, expression_opcode, TypeRestriction::Any);
 			// Construct parse tree element
 			let command = match opcode {
 				StatementOpcode::Let => Command::Let,
@@ -639,7 +639,8 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 }
 
 /// Decompiles the bytecode for an expression to a parse tree element.
-fn decompile_expression(statement_bytecode: &mut &[u8], opcode: ExpressionOpcode) -> Result<ParseTreeElement, BasicError> {
+/// `type_restriction` is the type restriction from a type restriction opciode.
+fn decompile_expression(statement_bytecode: &mut &[u8], opcode: ExpressionOpcode, type_restriction: TypeRestriction) -> Result<ParseTreeElement, BasicError> {
 	Ok(match opcode {
 		// Literals
 		ExpressionOpcode::NumericalLiteral | ExpressionOpcode::StringLiteral => {
@@ -649,6 +650,100 @@ fn decompile_expression(statement_bytecode: &mut &[u8], opcode: ExpressionOpcode
 				ExpressionOpcode::StringLiteral => ParseTreeElement::StringLiteral(string),
 				_ => unreachable!(),
 			}
+		}
+		// No parameters
+		ExpressionOpcode::EulersNumber | ExpressionOpcode::False | ExpressionOpcode::True | ExpressionOpcode::ImaginaryUnit | ExpressionOpcode::Pi => {
+			let function = match opcode {
+				ExpressionOpcode::EulersNumber => BuiltInFunction::EulersNumber,
+				ExpressionOpcode::False => BuiltInFunction::False,
+				ExpressionOpcode::True => BuiltInFunction::True,
+				ExpressionOpcode::ImaginaryUnit => BuiltInFunction::ImaginaryUnit,
+				ExpressionOpcode::Pi => BuiltInFunction::Pi,
+				_ => unreachable!(),
+			};
+			ParseTreeElement::BuiltInFunction(function, type_restriction, Vec::new())
+		}
+		// Single argument functions
+		ExpressionOpcode::AbsoluteValue | ExpressionOpcode::Arctangent | ExpressionOpcode::Cosine | ExpressionOpcode::Exponential | ExpressionOpcode::Integer |
+		ExpressionOpcode::Sign | ExpressionOpcode::Sine | ExpressionOpcode::SquareRoot | ExpressionOpcode::Tangent => {
+			// Get function
+			let function = match opcode {
+				ExpressionOpcode::AbsoluteValue => BuiltInFunction::AbsoluteValue,
+				ExpressionOpcode::Arctangent => BuiltInFunction::AbsoluteValue,
+				ExpressionOpcode::Cosine => BuiltInFunction::Cosine,
+				ExpressionOpcode::Exponential => BuiltInFunction::Exponential,
+				ExpressionOpcode::Integer => BuiltInFunction::Integer,
+				ExpressionOpcode::Sign => BuiltInFunction::Sign,
+				ExpressionOpcode::Sine => BuiltInFunction::Sine,
+				ExpressionOpcode::SquareRoot => BuiltInFunction::SquareRoot,
+				ExpressionOpcode::Tangent => BuiltInFunction::Tangent,
+				_ => unreachable!(),
+			};
+			// Get the sub-expression opcode.
+			let sub_expression_opcode_id = *statement_bytecode.get(0)
+				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+			*statement_bytecode = &statement_bytecode[1..];
+			let sub_expression_opcode: ExpressionOpcode = match sub_expression_opcode_id {
+				0 => return Err(BasicError::InvalidNullExpressionOpcode),
+				sub_expression_opcode_id => FromPrimitive::from_u8(sub_expression_opcode_id)
+					.ok_or_else(|| BasicError::InvalidExpressionOpcode(sub_expression_opcode_id))?,
+			};
+			// Decompile the sub-expression
+			let decompiled_sub_expression = decompile_expression(statement_bytecode, sub_expression_opcode, TypeRestriction::Any)?;
+			// Construct parse tree element
+			ParseTreeElement::BuiltInFunction(function, type_restriction, vec![decompiled_sub_expression])
+		}
+		// Function with a null-terminated argument list
+		ExpressionOpcode::Logarithm | ExpressionOpcode::Random => {
+			// Get function
+			let function = match opcode {
+				ExpressionOpcode::Logarithm => BuiltInFunction::Logarithm,
+				ExpressionOpcode::Random => BuiltInFunction::Random,
+				_ => unreachable!(),
+			};
+			// Get each sub-expression
+			let mut decompiled_sub_expressions = Vec::new();
+			loop {
+				// Get the sub-expression opcode.
+				let sub_expression_opcode_id = *statement_bytecode.get(0)
+					.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+				*statement_bytecode = &statement_bytecode[1..];
+				let sub_expression_opcode: ExpressionOpcode = match sub_expression_opcode_id {
+					0 => break,
+					sub_expression_opcode_id => FromPrimitive::from_u8(sub_expression_opcode_id)
+						.ok_or_else(|| BasicError::InvalidExpressionOpcode(sub_expression_opcode_id))?,
+				};
+				// Decompile the sub-expression
+				decompiled_sub_expressions.push(decompile_expression(statement_bytecode, sub_expression_opcode, TypeRestriction::Any)?);
+			}
+			// Construct parse tree element
+			ParseTreeElement::BuiltInFunction(function, TypeRestriction::Any, decompiled_sub_expressions)
+		}
+		// Type restrictions
+		ExpressionOpcode::GetBoolean | ExpressionOpcode::GetComplexFloat | ExpressionOpcode::GetFloat | ExpressionOpcode::GetInteger | ExpressionOpcode::GetNumber |
+		ExpressionOpcode::GetRealNumber | ExpressionOpcode::GetString => {
+			// Get the type restriction
+			let type_restriction = match opcode {
+				ExpressionOpcode::GetBoolean => TypeRestriction::Boolean,
+				ExpressionOpcode::GetComplexFloat => TypeRestriction::ComplexFloat,
+				ExpressionOpcode::GetFloat => TypeRestriction::Float,
+				ExpressionOpcode::GetInteger => TypeRestriction::Integer,
+				ExpressionOpcode::GetNumber => TypeRestriction::Number,
+				ExpressionOpcode::GetRealNumber => TypeRestriction::RealNumber,
+				ExpressionOpcode::GetString => TypeRestriction::String,
+				_ => unreachable!(),
+			};
+			// Get the sub-expression opcode.
+			let sub_expression_opcode_id = *statement_bytecode.get(0)
+				.ok_or(BasicError::ExpectedExpressionOpcodeButProgramEnd)?;
+			*statement_bytecode = &statement_bytecode[1..];
+			let sub_expression_opcode: ExpressionOpcode = match sub_expression_opcode_id {
+				0 => return Err(BasicError::InvalidNullExpressionOpcode),
+				sub_expression_opcode_id => FromPrimitive::from_u8(sub_expression_opcode_id)
+					.ok_or_else(|| BasicError::InvalidExpressionOpcode(sub_expression_opcode_id))?,
+			};
+			// Decompile the sub-expression
+			decompile_expression(statement_bytecode, sub_expression_opcode, type_restriction)?
 		}
 		_ => todo!(),
 	})
@@ -715,7 +810,7 @@ fn decompile_l_value(l_value_bytecode: &mut &[u8]) -> Result<Option<ParseTreeEle
 						.ok_or_else(|| BasicError::InvalidExpressionOpcode(bytecode_id))?,
 				};
 				// Decompile the expression
-				let decompiled_expression = decompile_expression(l_value_bytecode, expression_opcode)?;
+				let decompiled_expression = decompile_expression(l_value_bytecode, expression_opcode, TypeRestriction::Any)?;
 				// Add array element to output
 				indices.push(decompiled_expression);
 			}
