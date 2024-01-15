@@ -181,18 +181,25 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 	Ok(out)
 }
 
+/// Converts a list of tokens into a line of code as a string
 pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
 	let mut out = String::new();
+	let mut is_unary_operator = true;
+	// Go over each token
 	let mut tokens_iter = tokens.iter().peekable();
 	loop {
 		let token = match tokens_iter.next() {
 			Some(token) => token,
 			None => break,
 		};
-		let next_token = tokens_iter.peek();
+		// Add the token as a string to the output
 		match token {
+			// Push symbol for separator or operator
 			Token::Separator(separator) => out.push(separator.get_symbol_char()),
+			Token::Operator(operator) => out.push_str(operator.get_name()),
+			// Push number as string
 			Token::NumericalLiteral(literal) => out.push_str(literal),
+			// String literals are surrounded by double quotes and some chars are escaped
 			Token::StringLiteral(literal) => {
 				out.push('"');
 				for char in literal.chars() {
@@ -207,6 +214,7 @@ pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
 				out.push('"');
 			},
 			Token::Command(command) => out.push_str(command.get_name()),
+			// Push name and type restriction char
 			Token::BuiltInFunction(function, type_restriction) => {
 				out.push_str(function.get_name());
 				out.push_str(type_restriction.get_type_restriction_suffix_string());
@@ -215,18 +223,21 @@ pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
 				out.push_str(name);
 				out.push_str(type_restriction.get_type_restriction_suffix_string());
 			}
-			Token::Operator(operator) => out.push_str(operator.get_name()),
+			// Comments start with a single quote
 			Token::Comment(comment) => {
 				out.push('\'');
 				out.push_str(comment);
 			}
 		}
-		// Should we insert a space before the next token?
+		// Peek at the next token
+		let next_token = tokens_iter.peek();
 		let next_token = match next_token {
 			Some(next_token) => *next_token,
 			None => continue,
 		};
+		// Should we insert a space before the next token?
 		let do_insert_space_afterwards = match (token, next_token) {
+			(Token::Operator(..), _) if is_unary_operator && !matches!(next_token, Token::Operator(..)) => false,
 			(Token::Identifier(..) | Token::BuiltInFunction(..), Token::Separator(Separator::OpeningBracket)) => false,
 			(Token::Separator(Separator::OpeningBracket), _) => false,
 			(_, Token::Separator(Separator::ClosingBracket)) => false,
@@ -237,6 +248,11 @@ pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
 		if do_insert_space_afterwards {
 			out.push(' ');
 		}
+		is_unary_operator = match token {
+			Token::Separator(Separator::OpeningBracket | Separator::Comma | Separator::Semicolon) | Token::Operator(..) | Token::Command(..) => true,
+			_ => false,
+		}
 	}
+	// Success
 	Ok(out)
 }

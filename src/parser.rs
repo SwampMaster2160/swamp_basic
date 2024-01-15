@@ -559,16 +559,21 @@ pub fn deparse_line(line_parse_tree_elements: &[ParseTreeElement]) -> Result<Vec
 /// Deparse a parse tree element into a list of tokens
 fn deparse(parse_tree_element: &ParseTreeElement) -> Result<Vec<Token>, BasicError> {
 	let mut out = Vec::new();
+	// Convert the parse tree element
 	match parse_tree_element {
+		// Commands consist of the command name followed by the arguments
 		ParseTreeElement::Command(command, arguments) => {
 			out.push(Token::Command(*command));
 			for argument in arguments {
 				out.extend(deparse(argument)?);
 			}
 		}
+		// Some parse tree elements get converted to a single token
 		ParseTreeElement::NumericalLiteral(string) => out.push(Token::NumericalLiteral(string.clone())),
 		ParseTreeElement::StringLiteral(string) => out.push(Token::StringLiteral(string.clone())),
 		ParseTreeElement::ExpressionSeparator(separator) => out.push(Token::Separator(*separator)),
+		ParseTreeElement::Identifier(name, type_restriction) => out.push(Token::Identifier(name.clone(), *type_restriction)),
+		// Built in functions consist of a name followed by the arguments, arguments are enclosed in brackets if they exist.
 		ParseTreeElement::BuiltInFunction(function, type_restriction, arguments) => {
 			out.push(Token::BuiltInFunction(*function, *type_restriction));
 			if !arguments.is_empty() {
@@ -584,20 +589,7 @@ fn deparse(parse_tree_element: &ParseTreeElement) -> Result<Vec<Token>, BasicErr
 				out.push(Token::Separator(Separator::ClosingBracket));
 			}
 		}
-		ParseTreeElement::BinaryOperator(operator, left_operand, right_operand) => {
-			out.push(Token::Separator(Separator::OpeningBracket));
-			out.extend(deparse(left_operand)?);
-			out.push(Token::Operator(*operator));
-			out.extend(deparse(right_operand)?);
-			out.push(Token::Separator(Separator::ClosingBracket));
-		}
-		ParseTreeElement::UnaryOperator(operator, operand) => {
-			out.push(Token::Separator(Separator::OpeningBracket));
-			out.push(Token::Operator(*operator));
-			out.extend(deparse(operand)?);
-			out.push(Token::Separator(Separator::ClosingBracket));
-		}
-		ParseTreeElement::Identifier(name, type_restriction) => out.push(Token::Identifier(name.clone(), *type_restriction)),
+		// User defined functions consist of a name followed by the arguments, arguments are always enclosed in brackets, even if there are none.
 		ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, arguments) => {
 			out.push(Token::Identifier(name.clone(), *type_restriction));
 			out.push(Token::Separator(Separator::OpeningBracket));
@@ -611,12 +603,28 @@ fn deparse(parse_tree_element: &ParseTreeElement) -> Result<Vec<Token>, BasicErr
 			}
 			out.push(Token::Separator(Separator::ClosingBracket));
 		}
+		// Binary operators consist of the left operand, the operator and the right operand all enclosed in brackets.
+		ParseTreeElement::BinaryOperator(operator, left_operand, right_operand) => {
+			out.push(Token::Separator(Separator::OpeningBracket));
+			out.extend(deparse(left_operand)?);
+			out.push(Token::Operator(*operator));
+			out.extend(deparse(right_operand)?);
+			out.push(Token::Separator(Separator::ClosingBracket));
+		}
+		// Unary operators consist of the operator and the operand.
+		ParseTreeElement::UnaryOperator(operator, operand) => {
+			out.push(Token::Operator(*operator));
+			out.extend(deparse(operand)?);
+		}
+		// Assignment operators consist of the left operand, the "=" operator and the right operand.
 		ParseTreeElement::Assignment(l_value, r_value) => {
 			out.extend(deparse(l_value)?);
 			out.push(Token::Operator(Operator::EqualToAssign));
 			out.extend(deparse(r_value)?);
 		}
+		// Unparsed tokens should never exist here
 		ParseTreeElement::UnparsedToken(token) => out.push(token.clone()),
 	}
+	// Success
 	Ok(out)
 }
