@@ -573,8 +573,13 @@ fn deparse(parse_tree_element: &ParseTreeElement) -> Result<Vec<Token>, BasicErr
 			out.push(Token::BuiltInFunction(*function, *type_restriction));
 			if !arguments.is_empty() {
 				out.push(Token::Separator(Separator::OpeningBracket));
+				let mut is_first_argument = true;
 				for argument in arguments {
+					if !is_first_argument {
+						out.push(Token::Separator(Separator::Comma));
+					}
 					out.extend(deparse(argument)?);
+					is_first_argument = false;
 				}
 				out.push(Token::Separator(Separator::ClosingBracket));
 			}
@@ -596,8 +601,13 @@ fn deparse(parse_tree_element: &ParseTreeElement) -> Result<Vec<Token>, BasicErr
 		ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, arguments) => {
 			out.push(Token::Identifier(name.clone(), *type_restriction));
 			out.push(Token::Separator(Separator::OpeningBracket));
+			let mut is_first_argument = true;
 			for argument in arguments {
+				if !is_first_argument {
+					out.push(Token::Separator(Separator::Comma));
+				}
 				out.extend(deparse(argument)?);
+				is_first_argument = false;
 			}
 			out.push(Token::Separator(Separator::ClosingBracket));
 		}

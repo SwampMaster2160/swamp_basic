@@ -183,13 +183,14 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 
 pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
 	let mut out = String::new();
-	let mut is_first_line = true;
-	for token in tokens {
-		if !is_first_line {
-			out.push(' ');
-		}
+	let mut tokens_iter = tokens.iter().peekable();
+	loop {
+		let token = match tokens_iter.next() {
+			Some(token) => token,
+			None => break,
+		};
+		let next_token = tokens_iter.peek();
 		match token {
-			// TODO: Remove some spaces
 			Token::Separator(separator) => out.push(separator.get_symbol_char()),
 			Token::NumericalLiteral(literal) => out.push_str(literal),
 			Token::StringLiteral(literal) => {
@@ -220,7 +221,22 @@ pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
 				out.push_str(comment);
 			}
 		}
-		is_first_line = false;
+		// Should we insert a space before the next token?
+		let next_token = match next_token {
+			Some(next_token) => *next_token,
+			None => continue,
+		};
+		let do_insert_space_afterwards = match (token, next_token) {
+			(Token::Identifier(..) | Token::BuiltInFunction(..), Token::Separator(Separator::OpeningBracket)) => false,
+			(Token::Separator(Separator::OpeningBracket), _) => false,
+			(_, Token::Separator(Separator::ClosingBracket)) => false,
+			(_, Token::Separator(Separator::Colon | Separator::Comma | Separator::Semicolon)) => false,
+			_ => true,
+		};
+		// Insert the space if we should do so
+		if do_insert_space_afterwards {
+			out.push(' ');
+		}
 	}
 	Ok(out)
 }
