@@ -60,6 +60,11 @@ impl BuiltInFunction {
 		}
 	}
 
+	pub const fn get_name(self) -> &'static str {
+		let (name, _) = self.get_names();
+		name
+	}
+
 	/// Returns a hashmap mapping built-in function names and aliases to built-in functions
 	#[inline(always)]
 	pub fn get_string_to_built_in_function_mapping() -> HashMap<&'static str, BuiltInFunction> {

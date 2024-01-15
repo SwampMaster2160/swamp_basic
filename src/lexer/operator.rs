@@ -61,6 +61,10 @@ impl Operator {
 		}
 	}
 
+	pub const fn get_name(self) -> &'static str {
+		self.get_names().0
+	}
+
 	#[inline(always)]
 	/// Returns a hashmap mapping operator names and aliases to operators
 	pub fn get_string_to_operator_mapping() -> HashMap<&'static str, Self> {

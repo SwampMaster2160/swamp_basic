@@ -541,3 +541,72 @@ fn parse_function_or_array_expressions(mut tokens: &[ParseTreeElement]) -> Resul
 	// Return ok
 	Ok(out)
 }
+
+/// Deparse a parse tree element list into a list of tokens
+pub fn deparse_line(line_parse_tree_elements: &[ParseTreeElement]) -> Result<Vec<Token>, BasicError> {
+	let mut is_first_statement = true;
+	let mut out = Vec::new();
+	for parse_tree_element in line_parse_tree_elements {
+		if !is_first_statement {
+			out.push(Token::Separator(Separator::Colon));
+		}
+		out.extend(deparse(parse_tree_element)?);
+		is_first_statement = false
+	}
+	Ok(out)
+}
+
+/// Deparse a parse tree element into a list of tokens
+fn deparse(parse_tree_element: &ParseTreeElement) -> Result<Vec<Token>, BasicError> {
+	let mut out = Vec::new();
+	match parse_tree_element {
+		ParseTreeElement::Command(command, arguments) => {
+			out.push(Token::Command(*command));
+			for argument in arguments {
+				out.extend(deparse(argument)?);
+			}
+		}
+		ParseTreeElement::NumericalLiteral(string) => out.push(Token::NumericalLiteral(string.clone())),
+		ParseTreeElement::StringLiteral(string) => out.push(Token::StringLiteral(string.clone())),
+		ParseTreeElement::ExpressionSeparator(separator) => out.push(Token::Separator(*separator)),
+		ParseTreeElement::BuiltInFunction(function, type_restriction, arguments) => {
+			out.push(Token::BuiltInFunction(*function, *type_restriction));
+			if !arguments.is_empty() {
+				out.push(Token::Separator(Separator::OpeningBracket));
+				for argument in arguments {
+					out.extend(deparse(argument)?);
+				}
+				out.push(Token::Separator(Separator::ClosingBracket));
+			}
+		}
+		ParseTreeElement::BinaryOperator(operator, left_operand, right_operand) => {
+			out.push(Token::Separator(Separator::OpeningBracket));
+			out.extend(deparse(left_operand)?);
+			out.push(Token::Operator(*operator));
+			out.extend(deparse(right_operand)?);
+			out.push(Token::Separator(Separator::ClosingBracket));
+		}
+		ParseTreeElement::UnaryOperator(operator, operand) => {
+			out.push(Token::Separator(Separator::OpeningBracket));
+			out.push(Token::Operator(*operator));
+			out.extend(deparse(operand)?);
+			out.push(Token::Separator(Separator::ClosingBracket));
+		}
+		ParseTreeElement::Identifier(name, type_restriction) => out.push(Token::Identifier(name.clone(), *type_restriction)),
+		ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, arguments) => {
+			out.push(Token::Identifier(name.clone(), *type_restriction));
+			out.push(Token::Separator(Separator::OpeningBracket));
+			for argument in arguments {
+				out.extend(deparse(argument)?);
+			}
+			out.push(Token::Separator(Separator::ClosingBracket));
+		}
+		ParseTreeElement::Assignment(l_value, r_value) => {
+			out.extend(deparse(l_value)?);
+			out.push(Token::Operator(Operator::EqualToAssign));
+			out.extend(deparse(r_value)?);
+		}
+		ParseTreeElement::UnparsedToken(token) => out.push(token.clone()),
+	}
+	Ok(out)
+}

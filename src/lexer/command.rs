@@ -82,6 +82,12 @@ impl Command {
 		}
 	}
 
+	/// Returns the name of the command
+	pub const fn get_name(self) -> &'static str {
+		let (name, _) = self.get_names();
+		name
+	}
+
 	/// Returns a hashmap mapping command names and aliases to commands
 	#[inline(always)]
 	pub fn get_string_to_command_mapping() -> HashMap<&'static str, Self> {

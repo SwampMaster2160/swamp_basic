@@ -60,6 +60,13 @@ impl TypeRestriction {
 		}
 	}
 
+	pub const fn get_type_restriction_suffix_string(&self) -> &'static str {
+		match self.get_type_restriction_suffix() {
+			Some(suffix) => suffix,
+			None => "",
+		}
+	}
+
 	/// Returns a hashmap mapping char suffixes to type restrictions
 	#[inline(always)]
 	pub fn get_string_to_type_restruction_mapping() -> HashMap<&'static str, Self> {

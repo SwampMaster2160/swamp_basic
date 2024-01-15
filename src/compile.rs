@@ -429,13 +429,8 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 pub fn decompile_line(bytecode: &[u8]) -> Result<Vec<ParseTreeElement>, BasicError> {
 	let mut bytecode = bytecode;
 	let mut out = Vec::new();
-	let mut is_first_statement = true;
 	while !bytecode.is_empty() {
-		if !is_first_statement {
-			out.push(ParseTreeElement::ExpressionSeparator(Separator::Colon));
-		}
 		out.push(decompile_statement(&mut bytecode)?);
-		is_first_statement = false;
 	}
 	Ok(out)
 }

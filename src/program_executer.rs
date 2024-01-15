@@ -5,6 +5,8 @@ use num::{BigInt, complex::Complex64};
 use num_traits::FromPrimitive;
 
 use crate::compile::decompile_line;
+use crate::lexer::tokenize::detokenize_line;
+use crate::parser::deparse_line;
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
 pub struct ProgramExecuter {
@@ -333,9 +335,31 @@ impl ProgramExecuter {
 					// Get bytecode for line
 					let (line_number, line_bytecode) = main_struct.program.get_line_and_number_number_from_line_index(line_number_index);
 					// Decompile line
-					let line_parse_tree_elements = decompile_line(line_bytecode)?;
+					let line_parse_tree_elements = match decompile_line(line_bytecode) {
+						Ok(line_parse_tree_elements) => line_parse_tree_elements,
+						Err(error) => {
+							println!("Decompile error on line {line_number}: {error}");
+							continue;
+						}
+					};
+					// Deparse line
+					let line_tokens = match deparse_line(&line_parse_tree_elements) {
+						Ok(line_parse_tree_elements) => line_parse_tree_elements,
+						Err(error) => {
+							println!("Deparse error on line {line_number}: {error}");
+							continue;
+						}
+					};
+					// Detokenize line
+					let line_string = match detokenize_line(&line_tokens) {
+						Ok(line_parse_tree_elements) => line_parse_tree_elements,
+						Err(error) => {
+							println!("Detokenize error on line {line_number}: {error}");
+							continue;
+						}
+					};
 					// Print line
-					println!("{line_number} {:?}", line_parse_tree_elements);
+					println!("{line_number} {line_string}");
 				}
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),

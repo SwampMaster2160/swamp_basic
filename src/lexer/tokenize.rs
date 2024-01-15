@@ -1,4 +1,4 @@
-use std::mem;
+use std::{mem, char};
 
 use crate::{error::BasicError, Main};
 
@@ -178,5 +178,49 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 		panic!("Parsing type should be None, is {:?}", parsing_type);
 	}
 	// Return parsed tokens
+	Ok(out)
+}
+
+pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
+	let mut out = String::new();
+	let mut is_first_line = true;
+	for token in tokens {
+		if !is_first_line {
+			out.push(' ');
+		}
+		match token {
+			// TODO: Remove some spaces
+			Token::Separator(separator) => out.push(separator.get_symbol_char()),
+			Token::NumericalLiteral(literal) => out.push_str(literal),
+			Token::StringLiteral(literal) => {
+				out.push('"');
+				for char in literal.chars() {
+					match char {
+						'\\' => out.push_str("\\\\"),
+						'\n' => out.push_str("\\n"),
+						'\t' => out.push_str("\\t"),
+						'\r' => out.push_str("\\r"),
+						_ => out.push(char),
+					}
+				}
+				out.push('"');
+			},
+			Token::Command(command) => out.push_str(command.get_name()),
+			Token::BuiltInFunction(function, type_restriction) => {
+				out.push_str(function.get_name());
+				out.push_str(type_restriction.get_type_restriction_suffix_string());
+			}
+			Token::Identifier(name, type_restriction) => {
+				out.push_str(name);
+				out.push_str(type_restriction.get_type_restriction_suffix_string());
+			}
+			Token::Operator(operator) => out.push_str(operator.get_name()),
+			Token::Comment(comment) => {
+				out.push('\'');
+				out.push_str(comment);
+			}
+		}
+		is_first_line = false;
+	}
 	Ok(out)
 }
