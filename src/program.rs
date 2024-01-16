@@ -1,4 +1,4 @@
-use std::{str::from_utf8, rc::Rc};
+use std::{str::from_utf8, rc::Rc, collections::HashMap};
 
 use num::BigInt;
 
@@ -12,6 +12,8 @@ pub struct Program {
 	line_numbers: Vec<(BigInt, usize)>,
 	/// Bytecode for a line program without lines.
 	line_bytecode: Vec<u8>,
+	/// A map from each line that has a comment to its comment.
+	comments: HashMap<BigInt, Box<str>>,
 }
 
 impl Program {
@@ -21,6 +23,7 @@ impl Program {
 			bytecode: Vec::new(),
 			line_numbers: Vec::new(),
 			line_bytecode: Vec::new(),
+			comments: HashMap::new(),
 		}
 	}
 
@@ -65,17 +68,19 @@ impl Program {
 		for (_, bytecode_index) in &mut self.line_numbers.iter_mut().skip(line_numbers_index) {
 			*bytecode_index -= length_of_bytecode_to_remove;
 		}
+		// Remove comment
+		self.comments.remove(line_number);
 
 		Ok(())
 	}
 
 	/// Inserts or updates a line and it's bytecode. Lines afterwards will have their bytecode indicies adjusted.
 	/// If the line's bytecode is empty then will remove the line if it exists or else do nothing.
-	pub fn add_line(&mut self, line_number: &BigInt, bytecode_to_insert: &[u8]) {
+	pub fn add_line(&mut self, line_number: &BigInt, bytecode_to_insert: &[u8], comment: Option<&str>) {
 		// Remove the line if it exists ignoring an error that will be returned if the line does not exist
 		self.remove_line(line_number).ok();
 		// Return and do not insert the line if it is blank
-		if bytecode_to_insert.is_empty() {
+		if bytecode_to_insert.is_empty() && comment.is_none() {
 			return;
 		}
 		// Get the index to insert the line number and the bytecode
@@ -92,6 +97,13 @@ impl Program {
 		// Repoint all the lines after the line inserted
 		for(_, bytecode_index) in &mut self.line_numbers.iter_mut().skip(insert_index + 1) {
 			*bytecode_index += insert_length;
+		}
+		// Set the comment for the line
+		match comment {
+			Some(comment) => {
+				self.comments.insert(line_number.clone(), comment.into());
+			},
+			None => {}
 		}
 	}
 
@@ -195,7 +207,7 @@ impl Program {
 
 	/// Takes in the index of a line and returns the line number and bytecode.
 	/// Returns `None` if the index is out of bounds.
-	pub fn get_line_and_number_number_from_line_index(&self, index: usize) -> (&BigInt, &[u8]) {
+	pub fn get_line_and_number_from_line_index(&self, index: usize) -> (&BigInt, &[u8]) {
 		let (line_number, bytecode_start_index) = &self.line_numbers[index];
 		let bytecode_start_index = *bytecode_start_index;
 		let bytecode_end_index = match self.line_numbers.get(index + 1) {
@@ -204,5 +216,11 @@ impl Program {
 		};
 		let bytecode = &self.bytecode[bytecode_start_index..bytecode_end_index];
 		(line_number, bytecode)
+	}
+
+	/// Gets the comment for a line. Returns `None` if there is no comment for the line.
+	pub fn get_line_comment(&self, line: &BigInt) -> Option<&str> {
+		self.comments.get(line)
+			.map(|comment| &**comment)
 	}
 }

@@ -330,10 +330,9 @@ impl ProgramExecuter {
 				
 				};
 				// List lines
-				// TODO: Decompile lines
 				for line_number_index in start_line_number_index..=end_line_number_index {
 					// Get bytecode for line
-					let (line_number, line_bytecode) = main_struct.program.get_line_and_number_number_from_line_index(line_number_index);
+					let (line_number, line_bytecode) = main_struct.program.get_line_and_number_from_line_index(line_number_index);
 					// Decompile line
 					let line_parse_tree_elements = match decompile_line(line_bytecode) {
 						Ok(line_parse_tree_elements) => line_parse_tree_elements,
@@ -342,8 +341,11 @@ impl ProgramExecuter {
 							continue;
 						}
 					};
+					// Get line comment
+					let line_comment = main_struct.program.get_line_comment(line_number)
+						.map(|comment| comment.to_string());
 					// Deparse line
-					let line_tokens = match deparse_line(&line_parse_tree_elements) {
+					let line_tokens = match deparse_line(&line_parse_tree_elements, line_comment) {
 						Ok(line_parse_tree_elements) => line_parse_tree_elements,
 						Err(error) => {
 							println!("Deparse error on line {line_number}: {error}");

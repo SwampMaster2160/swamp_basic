@@ -543,16 +543,31 @@ fn parse_function_or_array_expressions(mut tokens: &[ParseTreeElement]) -> Resul
 }
 
 /// Deparse a parse tree element list into a list of tokens
-pub fn deparse_line(line_parse_tree_elements: &[ParseTreeElement]) -> Result<Vec<Token>, BasicError> {
+pub fn deparse_line(line_parse_tree_elements: &[ParseTreeElement], comment: Option<String>) -> Result<Vec<Token>, BasicError> {
 	let mut is_first_statement = true;
 	let mut out = Vec::new();
+	// Push tokens for each statement
 	for parse_tree_element in line_parse_tree_elements {
+		// Separate each statement with a semicolon
 		if !is_first_statement {
 			out.push(Token::Separator(Separator::Colon));
 		}
+		// Push deparsed statement
 		out.extend(deparse(parse_tree_element)?);
+		// Next statement is not the first
 		is_first_statement = false
 	}
+	// Push comment
+	match comment {
+		None => {},
+		Some(comment) => {
+			if out.is_empty() {
+				out.push(Token::Command(Command::Remark));
+			}
+			out.push(Token::Comment(comment));
+		}
+	}
+
 	Ok(out)
 }
 

@@ -185,6 +185,7 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
 	let mut out = String::new();
 	let mut is_unary_operator = true;
+	let mut was_remark_keyword_last = false;
 	// Go over each token
 	let mut tokens_iter = tokens.iter().peekable();
 	loop {
@@ -223,11 +224,17 @@ pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
 				out.push_str(name);
 				out.push_str(type_restriction.get_type_restriction_suffix_string());
 			}
-			// Comments start with a single quote
+			// Comments start with a single quote unless going after a rem keyword
 			Token::Comment(comment) => {
-				out.push('\'');
+				if !was_remark_keyword_last {
+					out.push('\'');
+				}
 				out.push_str(comment);
 			}
+		}
+		// A rem keyword should not have a space after it and the following comment should not start with a quote
+		if matches!(token, Token::Command(Command::Remark)) {
+			was_remark_keyword_last = true;
 		}
 		// Peek at the next token
 		let next_token = tokens_iter.peek();
@@ -237,6 +244,7 @@ pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
 		};
 		// Should we insert a space before the next token?
 		let do_insert_space_afterwards = match (token, next_token) {
+			_ if was_remark_keyword_last => false,
 			(Token::Operator(..), _) if is_unary_operator && !matches!(next_token, Token::Operator(..)) => false,
 			(Token::Identifier(..) | Token::BuiltInFunction(..), Token::Separator(Separator::OpeningBracket)) => false,
 			(Token::Separator(Separator::OpeningBracket), _) => false,
