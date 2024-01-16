@@ -248,10 +248,10 @@ pub fn detokenize_line(tokens: &[Token]) -> Result<String, BasicError> {
 		if do_insert_space_afterwards {
 			out.push(' ');
 		}
-		is_unary_operator = match token {
-			Token::Separator(Separator::OpeningBracket | Separator::Comma | Separator::Semicolon) | Token::Operator(..) | Token::Command(..) => true,
-			_ => false,
-		}
+		is_unary_operator = matches!(
+				token,
+				Token::Separator(Separator::OpeningBracket | Separator::Comma | Separator::Semicolon) | Token::Operator(..) | Token::Command(..)
+			);
 	}
 	// Success
 	Ok(out)

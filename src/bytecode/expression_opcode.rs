@@ -1,5 +1,7 @@
 use num_derive::FromPrimitive;
 
+use crate::error::BasicError;
+
 #[derive(FromPrimitive, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ExpressionOpcode {
@@ -67,4 +69,36 @@ pub enum ExpressionOpcode {
 	NewLine,
 	FromStartOrToEnd,
 	OneElement,
+}
+
+impl ExpressionOpcode {
+	/// Get a `ExpressionOpcode` from a `u8` value.
+	pub fn from_u8(opcode_id: u8) -> Result<Option<Self>, BasicError> {
+		Ok(match opcode_id {
+			0 => None,
+			_ => Some(num::FromPrimitive::from_u8(opcode_id).ok_or_else(|| BasicError::InvalidExpressionOpcode(opcode_id))?),
+		})
+	}
+
+	/// Get a `ExpressionOpcode` from a `Option<u8>` value.
+	pub fn from_option_u8(opcode_id: Option<u8>) -> Result<Option<Self>, BasicError> {
+		match opcode_id {
+			Some(opcode_id) => Self::from_u8(opcode_id),
+			None => Err(BasicError::ExpectedExpressionOpcodeButProgramEnd),
+		}
+	}
+
+	/// Get a `ExpressionOpcode` from a `u8` value that should not be zero.
+	pub fn from_non_zero_u8(opcode_id: u8) -> Result<Self, BasicError> {
+		Self::from_u8(opcode_id)?
+			.ok_or_else(|| BasicError::InvalidNullExpressionOpcode)
+	}
+
+	/// Get a `ExpressionOpcode` from a `Option<u8>` value that should not be zero.
+	pub fn from_non_zero_option_u8(opcode_id: Option<u8>) -> Result<Self, BasicError> {
+		match opcode_id {
+			Some(opcode_id) => Self::from_non_zero_u8(opcode_id),
+			None => Err(BasicError::ExpectedExpressionOpcodeButProgramEnd),
+		}
+	}
 }
