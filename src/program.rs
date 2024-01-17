@@ -12,6 +12,8 @@ pub struct Program {
 	line_numbers: Vec<(BigInt, usize)>,
 	/// Bytecode for a line program without lines.
 	line_bytecode: Vec<u8>,
+	/// A map from each line that has labels to a list of its labels.
+	labels: HashMap<BigInt, Box<[Box<str>]>>,
 	/// A map from each line that has a comment to its comment.
 	comments: HashMap<BigInt, Box<str>>,
 }
@@ -24,6 +26,7 @@ impl Program {
 			line_numbers: Vec::new(),
 			line_bytecode: Vec::new(),
 			comments: HashMap::new(),
+			labels: HashMap::new(),
 		}
 	}
 
@@ -68,6 +71,8 @@ impl Program {
 		for (_, bytecode_index) in &mut self.line_numbers.iter_mut().skip(line_numbers_index) {
 			*bytecode_index -= length_of_bytecode_to_remove;
 		}
+		// Remove labels
+		self.labels.remove(line_number);
 		// Remove comment
 		self.comments.remove(line_number);
 
@@ -76,11 +81,11 @@ impl Program {
 
 	/// Inserts or updates a line and it's bytecode. Lines afterwards will have their bytecode indicies adjusted.
 	/// If the line's bytecode is empty then will remove the line if it exists or else do nothing.
-	pub fn add_line(&mut self, line_number: &BigInt, bytecode_to_insert: &[u8], comment: Option<&str>) {
+	pub fn add_line(&mut self, line_number: &BigInt, bytecode_to_insert: &[u8], labels: Box<[Box<str>]>, comment: Option<&str>) {
 		// Remove the line if it exists ignoring an error that will be returned if the line does not exist
 		self.remove_line(line_number).ok();
 		// Return and do not insert the line if it is blank
-		if bytecode_to_insert.is_empty() && comment.is_none() {
+		if bytecode_to_insert.is_empty() && labels.is_empty() && comment.is_none() {
 			return;
 		}
 		// Get the index to insert the line number and the bytecode
@@ -97,6 +102,10 @@ impl Program {
 		// Repoint all the lines after the line inserted
 		for(_, bytecode_index) in &mut self.line_numbers.iter_mut().skip(insert_index + 1) {
 			*bytecode_index += insert_length;
+		}
+		// Set the labels for the line
+		if !self.labels.is_empty() {
+			self.labels.insert(line_number.clone(), labels);
 		}
 		// Set the comment for the line
 		match comment {

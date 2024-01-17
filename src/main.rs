@@ -114,13 +114,14 @@ fn interpret_line(main_struct: &mut Main, program_executer: &mut ProgramExecuter
 		return false;
 	}
 	// Parse tokens
-	let (parse_tree_elements, comment) = match parse_tokens_to_parse_tree_elements(tokens) {
+	let (parse_tree_elements, labels, comment) = match parse_tokens_to_parse_tree_elements(tokens) {
 		Ok(parse_tree_elements) => parse_tree_elements,
 		Err(error) => {
 			println!("Parse error: {error}");
 			return false;
 		}
 	};
+	let labels = labels.into_iter().map(|label| label.into_boxed_str()).collect();
 	// Print parse tree elements if asked to and return
 	if print_parse_tree_elements {
 		for parse_tree_element in parse_tree_elements {
@@ -152,7 +153,7 @@ fn interpret_line(main_struct: &mut Main, program_executer: &mut ProgramExecuter
 	}
 	// Add line to program if it has a line number
 	if let Some(line_number) = line_number {
-		main_struct.program.add_line(&line_number, &bytecode, comment.as_deref());
+		main_struct.program.add_line(&line_number, &bytecode, labels, comment.as_deref());
 		return false;
 	}
 	// Set the line's bytecode and execute line

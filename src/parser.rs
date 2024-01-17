@@ -62,7 +62,7 @@ impl ParseTreeElement {
 
 /// Parse a BASIC line into trees of parse tree elements and extracts the line comment.
 #[inline(always)]
-pub fn parse_tokens_to_parse_tree_elements(mut tokens: Vec<Token>) -> Result<(Vec<ParseTreeElement>, Option<String>), BasicError> {
+pub fn parse_tokens_to_parse_tree_elements(mut tokens: Vec<Token>) -> Result<(Vec<ParseTreeElement>, Vec<String>, Option<String>), BasicError> {
 	// Separate comment
 	let mut comment = None;
 	if let Some(Token::Comment(_)) = tokens.last() {
@@ -81,14 +81,27 @@ pub fn parse_tokens_to_parse_tree_elements(mut tokens: Vec<Token>) -> Result<(Ve
 	}
 	// Parse each semicolon separated section
 	let mut trees_out = Vec::new();
+	let mut labels_out = Vec::new();
 	for mut statements_tokens in tokens.split(|token| *token == Token::Separator(Separator::Colon)) {
-		// Parse each statement in the semicolon separated section
+		// If we have a label
+		if statements_tokens.len() == 1 && matches!(statements_tokens[0], Token::Identifier(..)) {
+			let (label_name, type_restriction) = match statements_tokens[0].clone() {
+				Token::Identifier(label_name, type_restriction) => (label_name, type_restriction),
+				_ => unreachable!(),
+			};
+			if type_restriction != TypeRestriction::Any {
+				return Err(BasicError::InvalidTypeRestriction(type_restriction.get_type_restriction_suffix_string().to_string()));
+			}
+			labels_out.push(label_name);
+			continue;
+		}
+		// Else parse each statement in the semicolon separated section
 		while !statements_tokens.is_empty() {
 			trees_out.push(parse_statement(&mut statements_tokens)?);
 		}
 	}
 	// Return
-	Ok((trees_out, comment))
+	Ok((trees_out, labels_out, comment))
 }
 
 /// Parses and removes a single statement from `tokens`.
@@ -207,6 +220,8 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 			// Parse the merged command
 			parse_command(merged_commands, tokens)?
 		}
+		// Sub
+		Command::Subroutine => return Err(BasicError::InvalidSingleCommand(Command::Subroutine)),
 		// For
 		Command::For => ParseTreeElement::Command(command, vec![parse_assignment(tokens)?]),
 		// Commands with a single l-value
