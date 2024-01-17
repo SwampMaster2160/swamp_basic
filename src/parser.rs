@@ -558,9 +558,14 @@ fn parse_function_or_array_expressions(mut tokens: &[ParseTreeElement]) -> Resul
 }
 
 /// Deparse a parse tree element list into a list of tokens
-pub fn deparse_line(line_parse_tree_elements: &[ParseTreeElement], comment: Option<String>) -> Result<Vec<Token>, BasicError> {
+pub fn deparse_line(line_parse_tree_elements: &[ParseTreeElement], labels: Vec<String>, comment: Option<String>) -> Result<Vec<Token>, BasicError> {
 	let mut is_first_statement = true;
 	let mut out = Vec::new();
+	// Push labels
+	for label in labels {
+		out.push(Token::Identifier(label, TypeRestriction::Any));
+		out.push(Token::Separator(Separator::Colon));
+	}
 	// Push tokens for each statement
 	for parse_tree_element in line_parse_tree_elements {
 		// Separate each statement with a semicolon

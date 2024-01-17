@@ -327,7 +327,6 @@ impl ProgramExecuter {
 				let end_line_number_index = match main_struct.program.get_lines_end_index(end_expression_result) {
 					Some(end_line_number_index) => end_line_number_index,
 					None => break 'a,
-				
 				};
 				// List lines
 				for line_number_index in start_line_number_index..=end_line_number_index {
@@ -341,11 +340,13 @@ impl ProgramExecuter {
 							continue;
 						}
 					};
+					// Get line labels
+					let line_labels = main_struct.program.get_line_labels(line_number);
 					// Get line comment
 					let line_comment = main_struct.program.get_line_comment(line_number)
 						.map(|comment| comment.to_string());
 					// Deparse line
-					let line_tokens = match deparse_line(&line_parse_tree_elements, line_comment) {
+					let line_tokens = match deparse_line(&line_parse_tree_elements, line_labels, line_comment) {
 						Ok(line_parse_tree_elements) => line_parse_tree_elements,
 						Err(error) => {
 							println!("Deparse error on line {line_number}: {error}");

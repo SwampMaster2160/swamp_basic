@@ -104,7 +104,7 @@ impl Program {
 			*bytecode_index += insert_length;
 		}
 		// Set the labels for the line
-		if !self.labels.is_empty() {
+		if !labels.is_empty() {
 			self.labels.insert(line_number.clone(), labels);
 		}
 		// Set the comment for the line
@@ -231,5 +231,15 @@ impl Program {
 	pub fn get_line_comment(&self, line: &BigInt) -> Option<&str> {
 		self.comments.get(line)
 			.map(|comment| &**comment)
+	}
+
+	/// Gets the comment for a line. Returns `None` if there is no comment for the line.
+	pub fn get_line_labels(&self, line: &BigInt) -> Vec<String> {
+		match self.labels.get(line) {
+			Some(labels) => labels.iter()
+				.map(|label| label.to_string())
+				.collect(),
+			None => Vec::new(),
+		}
 	}
 }
