@@ -153,7 +153,11 @@ fn interpret_line(main_struct: &mut Main, program_executer: &mut ProgramExecuter
 	}
 	// Add line to program if it has a line number
 	if let Some(line_number) = line_number {
-		main_struct.program.add_line(&line_number, &bytecode, labels, comment.as_deref());
+		let line_insert_result = main_struct.program.add_line(&line_number, &bytecode, labels, comment.as_deref());
+		match line_insert_result {
+			Err(error) => println!("Error while inserting line: {error}"),
+			Ok(_) => {},
+		}
 		return false;
 	}
 	// Set the line's bytecode and execute line

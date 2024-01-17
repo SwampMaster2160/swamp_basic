@@ -82,9 +82,15 @@ pub fn parse_tokens_to_parse_tree_elements(mut tokens: Vec<Token>) -> Result<(Ve
 	// Parse each semicolon separated section
 	let mut trees_out = Vec::new();
 	let mut labels_out = Vec::new();
+	let mut can_be_label = true;
 	for mut statements_tokens in tokens.split(|token| *token == Token::Separator(Separator::Colon)) {
 		// If we have a label
 		if statements_tokens.len() == 1 && matches!(statements_tokens[0], Token::Identifier(..)) {
+			// Labels should not be after statements
+			if !can_be_label {
+				return Err(BasicError::LabelNotAtLineStart);
+			}
+			// Get label name
 			let (label_name, type_restriction) = match statements_tokens[0].clone() {
 				Token::Identifier(label_name, type_restriction) => (label_name, type_restriction),
 				_ => unreachable!(),
@@ -92,12 +98,15 @@ pub fn parse_tokens_to_parse_tree_elements(mut tokens: Vec<Token>) -> Result<(Ve
 			if type_restriction != TypeRestriction::Any {
 				return Err(BasicError::InvalidTypeRestriction(type_restriction.get_type_restriction_suffix_string().to_string()));
 			}
+			// Push label to label list
 			labels_out.push(label_name);
 			continue;
 		}
 		// Else parse each statement in the semicolon separated section
 		while !statements_tokens.is_empty() {
 			trees_out.push(parse_statement(&mut statements_tokens)?);
+			// Labels should not be after statements
+			can_be_label = false;
 		}
 	}
 	// Return

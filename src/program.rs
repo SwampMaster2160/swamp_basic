@@ -13,7 +13,9 @@ pub struct Program {
 	/// Bytecode for a line program without lines.
 	line_bytecode: Vec<u8>,
 	/// A map from each line that has labels to a list of its labels.
-	labels: HashMap<BigInt, Box<[Box<str>]>>,
+	labels_for_each_line: HashMap<BigInt, Box<[Box<str>]>>,
+	/// A map from labels to their line number.
+	labels: HashMap<Box<str>, BigInt>,
 	/// A map from each line that has a comment to its comment.
 	comments: HashMap<BigInt, Box<str>>,
 }
@@ -26,6 +28,7 @@ impl Program {
 			line_numbers: Vec::new(),
 			line_bytecode: Vec::new(),
 			comments: HashMap::new(),
+			labels_for_each_line: HashMap::new(),
 			labels: HashMap::new(),
 		}
 	}
@@ -72,7 +75,11 @@ impl Program {
 			*bytecode_index -= length_of_bytecode_to_remove;
 		}
 		// Remove labels
-		self.labels.remove(line_number);
+		if let Some(labels) = self.labels_for_each_line.remove(line_number) {
+			for label in labels.into_iter() {
+				self.labels.remove(label);
+			}
+		}
 		// Remove comment
 		self.comments.remove(line_number);
 
@@ -81,12 +88,18 @@ impl Program {
 
 	/// Inserts or updates a line and it's bytecode. Lines afterwards will have their bytecode indicies adjusted.
 	/// If the line's bytecode is empty then will remove the line if it exists or else do nothing.
-	pub fn add_line(&mut self, line_number: &BigInt, bytecode_to_insert: &[u8], labels: Box<[Box<str>]>, comment: Option<&str>) {
+	pub fn add_line(&mut self, line_number: &BigInt, bytecode_to_insert: &[u8], labels: Box<[Box<str>]>, comment: Option<&str>) -> Result<(), BasicError> {
+		// Make sure none of the labels conflict with existing labels in the program
+		for label in labels.iter() {
+			if self.labels.contains_key(label) {
+				return Err(BasicError::LabelConflict(label.to_string()));
+			}
+		}
 		// Remove the line if it exists ignoring an error that will be returned if the line does not exist
 		self.remove_line(line_number).ok();
 		// Return and do not insert the line if it is blank
 		if bytecode_to_insert.is_empty() && labels.is_empty() && comment.is_none() {
-			return;
+			return Ok(());
 		}
 		// Get the index to insert the line number and the bytecode
 		let insert_index = self.get_line_numbers_index_to_insert_line(line_number);
@@ -104,8 +117,11 @@ impl Program {
 			*bytecode_index += insert_length;
 		}
 		// Set the labels for the line
+		for label in labels.iter() {
+			self.labels.insert(label.clone(), line_number.clone());
+		}
 		if !labels.is_empty() {
-			self.labels.insert(line_number.clone(), labels);
+			self.labels_for_each_line.insert(line_number.clone(), labels);
 		}
 		// Set the comment for the line
 		match comment {
@@ -114,6 +130,8 @@ impl Program {
 			},
 			None => {}
 		}
+
+		Ok(())
 	}
 
 	#[inline(always)]
@@ -235,7 +253,7 @@ impl Program {
 
 	/// Gets the comment for a line. Returns `None` if there is no comment for the line.
 	pub fn get_line_labels(&self, line: &BigInt) -> Vec<String> {
-		match self.labels.get(line) {
+		match self.labels_for_each_line.get(line) {
 			Some(labels) => labels.iter()
 				.map(|label| label.to_string())
 				.collect(),

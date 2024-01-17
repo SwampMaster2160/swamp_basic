@@ -52,6 +52,8 @@ pub enum BasicError {
 	NextOnLValueWithoutLoop,
 	NoProgramLines,
 	InvalidNewline,
+	LabelConflict(String),
+	LabelNotAtLineStart,
 }
 
 impl Display for BasicError {
@@ -105,6 +107,8 @@ impl Display for BasicError {
 			Self::NoProgramLines => write!(formatter, "No program lines."),
 			Self::InvalidNewline => write!(formatter, "Invalid newline."),
 			Self::InvalidNullExpressionOpcode => write!(formatter, "Invalid null expression opcode."),
+			Self::LabelConflict(label) => write!(formatter, "Label \"{label}\" already exists in the program."),
+			Self::LabelNotAtLineStart => write!(formatter, "Label must be at the start of the line."),
 		}
 	}
 }
