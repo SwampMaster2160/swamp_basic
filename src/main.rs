@@ -114,7 +114,8 @@ fn interpret_line(main_struct: &mut Main, program_executer: &mut ProgramExecuter
 		return false;
 	}
 	// Parse tokens
-	let (parse_tree_elements, labels, comment) = match parse_tokens_to_parse_tree_elements(tokens) {
+	let is_line_program = line_number.is_none();
+	let (parse_tree_elements, labels, comment) = match parse_tokens_to_parse_tree_elements(tokens, is_line_program) {
 		Ok(parse_tree_elements) => parse_tree_elements,
 		Err(error) => {
 			println!("Parse error: {error}");

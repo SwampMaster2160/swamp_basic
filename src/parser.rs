@@ -60,12 +60,18 @@ impl ParseTreeElement {
 	}
 }
 
-/// Parse a BASIC line into trees of parse tree elements and extracts the line comment.
+/// Parse a BASIC line into trees of parse tree elements and extracts the labels and line comment.
+/// `is_line_program` will not allow labels and comments if `true`.
 #[inline(always)]
-pub fn parse_tokens_to_parse_tree_elements(mut tokens: Vec<Token>) -> Result<(Vec<ParseTreeElement>, Vec<String>, Option<String>), BasicError> {
+pub fn parse_tokens_to_parse_tree_elements(mut tokens: Vec<Token>, is_line_program: bool) -> Result<(Vec<ParseTreeElement>, Vec<String>, Option<String>), BasicError> {
 	// Separate comment
 	let mut comment = None;
 	if let Some(Token::Comment(_)) = tokens.last() {
+		// Should not be a line program
+		if is_line_program {
+			return Err(BasicError::CommentInLineProgram);
+		}
+		// Extract comment
 		match tokens.pop() {
 			Some(Token::Comment(token_comment)) => comment = Some(token_comment),
 			_ => unreachable!(),
@@ -89,6 +95,10 @@ pub fn parse_tokens_to_parse_tree_elements(mut tokens: Vec<Token>) -> Result<(Ve
 			// Labels should not be after statements
 			if !can_be_label {
 				return Err(BasicError::LabelNotAtLineStart);
+			}
+			// Should not be a line program
+			if is_line_program {
+				return Err(BasicError::LabelInLineProgram);
 			}
 			// Get label name
 			let (label_name, type_restriction) = match statements_tokens[0].clone() {

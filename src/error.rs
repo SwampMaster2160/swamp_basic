@@ -54,6 +54,8 @@ pub enum BasicError {
 	InvalidNewline,
 	LabelConflict(String),
 	LabelNotAtLineStart,
+	CommentInLineProgram,
+	LabelInLineProgram,
 }
 
 impl Display for BasicError {
@@ -109,6 +111,8 @@ impl Display for BasicError {
 			Self::InvalidNullExpressionOpcode => write!(formatter, "Invalid null expression opcode."),
 			Self::LabelConflict(label) => write!(formatter, "Label \"{label}\" already exists in the program."),
 			Self::LabelNotAtLineStart => write!(formatter, "Label must be at the start of the line."),
+			Self::CommentInLineProgram => write!(formatter, "Comments must be in a numbered line."),
+			Self::LabelInLineProgram => write!(formatter, "Labels must be in a numbered line."),
 		}
 	}
 }
