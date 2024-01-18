@@ -1,6 +1,9 @@
 use std::mem;
 
-use crate::{lexer::{token::Token, separator::Separator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, operator::Operator, command::Command}, error::BasicError};
+use crate::{
+	lexer::{token::Token, separator::Separator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, operator::Operator, command::Command},
+	error::BasicError
+};
 
 #[derive(Debug, Clone)]
 /// Parsing a line's tokens will result in a tree of parse tree elements for each statement.
@@ -202,7 +205,8 @@ fn parse_l_value(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> 
 fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
 	Ok(match command {
 		// Commands that have a list of expressions and separators as sub-trees
-		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::To | Command::Step | Command::List | Command::On | Command::Return | Command::Stop => {
+		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::To | Command::Step |
+		Command::List | Command::On | Command::Return | Command::Stop | Command::Input => {
 			// Get the length of the expressions (up to the next command token)
 			let expression_index = tokens.iter()
 				.position(|token| matches!(token, Token::Command(_)))
@@ -283,7 +287,8 @@ fn parse_expressions(tokens: &mut &[Token]) -> Result<Vec<ParseTreeElement>, Bas
 				// If we have two expressions sitting next to one another without a separator
 				Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::BuiltInFunction(..) | Token::Separator(Separator::OpeningBracket)
 					if bracket_depth == 0 && index != 0 &&
-					matches!(tokens[index - 1], Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) | Token::Separator(Separator::ClosingBracket) | Token::BuiltInFunction(..)) &&
+					matches!(tokens[index - 1], Token::Identifier(..) | Token::NumericalLiteral(..) | Token::StringLiteral(..) |
+					Token::Separator(Separator::ClosingBracket) | Token::BuiltInFunction(..)) &&
 					!(matches!(token, Token::Separator(Separator::OpeningBracket)) && matches!(tokens[index - 1], Token::Identifier(..) | Token::BuiltInFunction(..))) =>
 				{
 					expression_length = index;
@@ -468,7 +473,8 @@ fn parse_expression(mut parse_tree_elements: Vec<ParseTreeElement>) -> Result<Pa
 		match token {
 			Token::NumericalLiteral(literal) => *parse_tree_element = ParseTreeElement::NumericalLiteral(mem::take(literal)),
 			Token::StringLiteral(literal) => *parse_tree_element = ParseTreeElement::StringLiteral(mem::take(literal)),
-			Token::Identifier(name, type_restriction) => *parse_tree_element = ParseTreeElement::Identifier(mem::take(name), *type_restriction),
+			Token::Identifier(name, type_restriction) =>
+				*parse_tree_element = ParseTreeElement::Identifier(mem::take(name), *type_restriction),
 			_ => continue,
 		}
 	}

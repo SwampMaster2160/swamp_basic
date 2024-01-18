@@ -18,4 +18,5 @@ pub enum StatementOpcode {
 	To,
 	For,
 	Next,
+	Input,
 }

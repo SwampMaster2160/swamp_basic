@@ -29,7 +29,9 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 			Command::End => out.push(StatementOpcode::End as u8),
 			// Print
 			Command::Print => {
+				// Push opcode
 				out.push(StatementOpcode::Print as u8);
+				// Push bytecode for arguments
 				for argument in arguments {
 					match argument {
 						ParseTreeElement::ExpressionSeparator(separator) => match separator {
@@ -40,10 +42,55 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 						_ => out.extend(compile_expression(argument)?),
 					}
 				}
+				// Push a newline opcode if the last argument is not a separator
 				match arguments.last() {
 					Some(ParseTreeElement::ExpressionSeparator(Separator::Semicolon | Separator::Comma)) => {}
 					_ => out.push(ExpressionOpcode::NewLine as u8),
 				}
+				// Terminate
+				out.push(StatementOpcode::End as u8);
+			}
+			// Input
+			Command::Input => {
+				// Get the index where we should split the arguments to print from thoes to be inputs
+				let last_semicolon_index = arguments.iter()
+					.enumerate()
+					.rev()
+					.find(|(_, tree)| matches!(tree, ParseTreeElement::ExpressionSeparator(Separator::Semicolon)))
+					.map(|(index, _)| index);
+				let input_arguments_start_index = match last_semicolon_index {
+					Some(index) => index + 1,
+					None => 0,
+				};
+				// Push opcode
+				out.push(StatementOpcode::Input as u8);
+				// Push bytecode for arguments that will be printed
+				for argument in arguments.iter().take(input_arguments_start_index) {
+					match argument {
+						ParseTreeElement::ExpressionSeparator(separator) => match separator {
+							Separator::Semicolon => {}
+							Separator::Comma => out.push(ExpressionOpcode::Space as u8),
+							_ => panic!(),
+						}
+						_ => out.extend(compile_expression(argument)?),
+					}
+				}
+				// Terminate the arguments that will be printed
+				out.push(StatementOpcode::End as u8);
+				// Push bytecode for arguments that will be inputs
+				for argument in arguments.iter().skip(input_arguments_start_index) {
+					match argument {
+						ParseTreeElement::ExpressionSeparator(separator) => match separator {
+							Separator::Semicolon => panic!("Should not have semicolons here."),
+							Separator::Comma => {},
+							_ => panic!(),
+						}
+						_ => {
+							out.extend(compile_l_value(argument)?)
+						},
+					}
+				}
+				// Terminate the arguments that will be inputs
 				out.push(StatementOpcode::End as u8);
 			}
 			// Commands that take in a list of expressions and ignore commas and semicolons
@@ -268,7 +315,8 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 					out.push(0);
 				}
 				// Operators that don't end in a null byte
-				Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo | Operator::EqualToAssign |
+				Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo |
+				Operator::EqualToAssign |
 				Operator::Divide | Operator::FlooredDivide | Operator::ExclusiveOr | Operator::Exponent | Operator::MinusNegate | Operator::Modulus | Operator::And => {
 					// Push operator opcode
 					out.push(match operator {
@@ -491,6 +539,61 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 			}
 			// Construct the parse tree element
 			ParseTreeElement::Command(Command::Print, sub_expressions)
+		}
+		StatementOpcode::Input => {
+			let mut sub_expressions = Vec::new();
+			// For each expression that will be printed
+			let mut should_print_semicolon = false;
+			loop {
+				// Extract opcode
+				let opcode_id = statement_bytecode.get(0).cloned();
+				*statement_bytecode = &statement_bytecode[1..];
+				let expression_opcode = match ExpressionOpcode::from_option_u8(opcode_id)? {
+					None => break,
+					Some(expression_opcode) => expression_opcode,
+				};
+				// Decompile expression
+				match expression_opcode {
+					// A space opcode is caused by a comma
+					ExpressionOpcode::Space => {
+						sub_expressions.push(ParseTreeElement::ExpressionSeparator(Separator::Comma));
+						should_print_semicolon = false;
+					}
+					// Other expressions
+					other => {
+						// Add semicolon unless this is the first expression for the input statement or a comma was used since the last expression
+						if should_print_semicolon {
+							sub_expressions.push(ParseTreeElement::ExpressionSeparator(Separator::Semicolon));
+						}
+						// Push the decompiled expression
+						sub_expressions.push(decompile_expression(statement_bytecode, other, TypeRestriction::Any)?);
+						should_print_semicolon = true;
+					}
+				}
+			}
+			// End the printed expressions with a semicolon
+			if !sub_expressions.is_empty() {
+				sub_expressions.push(ParseTreeElement::ExpressionSeparator(Separator::Semicolon));
+			}
+			// For each l-value that will be an input
+			let mut should_print_comma = false;
+			loop {
+				// Decompile l-value
+				let decompiled_l_value = match decompile_l_value(statement_bytecode)? {
+					Some(decompiled_l_value) => decompiled_l_value,
+					None => break,
+				};
+				// Add comma unless this is the first l-value for the input statement
+				if should_print_comma {
+					sub_expressions.push(ParseTreeElement::ExpressionSeparator(Separator::Comma));
+				}
+				// Push the decompiled l-value
+				sub_expressions.push(decompiled_l_value);
+				// The next l-value is not the first l-value.
+				should_print_comma = true;
+			}
+			// Construct the parse tree element
+			ParseTreeElement::Command(Command::Input, sub_expressions)
 		}
 		// Decompile null terminated expression list to comma separated expression list
 		StatementOpcode::Goto | StatementOpcode::Run | StatementOpcode::GoSubroutine => {

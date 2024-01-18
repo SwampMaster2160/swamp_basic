@@ -160,6 +160,9 @@ impl ProgramExecuter {
 					print!("{result}");
 				}
 			}
+			StatementOpcode::Input => {
+				todo!()
+			}
 			StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => {
 				// Get the opcode
 				let expression_opcode = self.get_expression_opcode(main_struct)?;
@@ -391,6 +394,9 @@ impl ProgramExecuter {
 					None => break,
 				};
 				self.skip_expression(main_struct, expression_opcode)?;
+			}
+			StatementOpcode::Input => {
+				todo!()
 			}
 			// Skip a l-value and an expression
 			StatementOpcode::Let | StatementOpcode::For => {
