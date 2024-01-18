@@ -260,4 +260,9 @@ impl Program {
 			None => Vec::new(),
 		}
 	}
+
+	/// Takes in a label name and returns the line number it is on.
+	pub fn get_labels_line(&self, label: &str) -> Option<&BigInt> {
+		self.labels.get(label)
+	}
 }

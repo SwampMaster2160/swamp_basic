@@ -7,6 +7,7 @@ use num_traits::FromPrimitive;
 use crate::compile::decompile_line;
 use crate::lexer::tokenize::detokenize_line;
 use crate::parser::deparse_line;
+use crate::program::Program;
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
 pub struct ProgramExecuter {
@@ -272,7 +273,7 @@ impl ProgramExecuter {
 				let for_loop = self.current_routine.for_loop_counters.get(&l_value)
 					.ok_or(BasicError::NextOnLValueWithoutLoop)?;
 				// Get the new value
-				let current_value = self.load_global_scalar_value(l_value.clone())?;
+				let current_value = self.load_global_scalar_value(&main_struct.program, l_value.clone())?;
 				let increment = for_loop.step_value.clone()
 					.unwrap_or(ScalarValue::ONE);
 				let new_value = current_value.add_concatenate(increment.clone())?;
@@ -453,16 +454,20 @@ impl ProgramExecuter {
 	}
 
 	/// Gets the value of a global scalar variable or an element of a global array.
-	fn load_global_scalar_value(&self, l_value: LValue) -> Result<ScalarValue, BasicError> {
+	fn load_global_scalar_value(&self, program: &Program, l_value: LValue) -> Result<ScalarValue, BasicError> {
 		let LValue {
 			name,
 			type_restriction,
 			arguments_or_indices
 		} = l_value;
 		Ok(match arguments_or_indices {
-			None => self.global_scalar_variables.get(&(name, type_restriction))
-				.cloned()
-				.unwrap_or_else(|| type_restriction.default_value()),
+			None => match self.global_scalar_variables.get(&(name.clone(), type_restriction)) {
+					Some(value) => value.clone(),
+					None => match program.get_labels_line(&name) {
+						Some(value) => ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(value.clone()))).compact(),
+						None => type_restriction.default_value(),
+					}
+				}
 			Some(_arguments_or_indices) => return Err(BasicError::FeatureNotYetSupported),
 		})
 	}
@@ -781,7 +786,7 @@ impl ProgramExecuter {
 				// Get name
 				let name = self.get_program_string(main_struct)?.to_string();
 				// Load value
-				self.load_global_scalar_value(LValue {
+				self.load_global_scalar_value(&main_struct.program, LValue {
 					name,
 					type_restriction,
 					arguments_or_indices: None
