@@ -56,6 +56,8 @@ pub enum BasicError {
 	LabelNotAtLineStart,
 	CommentInLineProgram,
 	LabelInLineProgram,
+	TooManyEntries,
+	ParseError,
 }
 
 impl Display for BasicError {
@@ -113,6 +115,8 @@ impl Display for BasicError {
 			Self::LabelNotAtLineStart => write!(formatter, "Label must be at the start of the line."),
 			Self::CommentInLineProgram => write!(formatter, "Comments must be in a numbered line."),
 			Self::LabelInLineProgram => write!(formatter, "Labels must be in a numbered line."),
+			Self::TooManyEntries => write!(formatter, "Too many entries."),
+			Self::ParseError => write!(formatter, "Parse error."),
 		}
 	}
 }

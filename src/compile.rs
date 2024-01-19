@@ -277,7 +277,7 @@ fn compile_l_value(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, Bas
 			// Return
 			out
 		}
-		_ => panic!()
+		_ => return Err(BasicError::ExpectedLValue),
 	})
 }
 

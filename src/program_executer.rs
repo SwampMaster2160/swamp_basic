@@ -1,3 +1,4 @@
+use std::io::{stdin, stdout, Write};
 use std::{rc::Rc, collections::HashMap};
 use std::hash::Hash;
 
@@ -134,6 +135,49 @@ impl ProgramExecuter {
 		main_struct.program.skip_string(self.is_executing_line_program, self.get_program_counter())
 	}
 
+	fn get_input_value(&mut self, input: &str, type_restriction: TypeRestriction) -> Result<ScalarValue, BasicError> {
+		// Parse
+		let out = match type_restriction {
+			TypeRestriction::Any | TypeRestriction::String => ScalarValue::String(BasicString::String(Rc::new(input.to_string())).compact()),
+			TypeRestriction::Integer | TypeRestriction::ComplexFloat | TypeRestriction::Number | TypeRestriction::RealNumber | TypeRestriction::Float => {
+				let input = input.trim();
+				// Try to convert to complex number
+				if input.ends_with('i') {
+					let (string_without_i, _) = input.split_at(input.len() - 1);
+					if let Ok(value) = string_without_i.parse() {
+						return Ok(ScalarValue::ComplexFloat(Complex64::new(0., value)).compact());
+					}
+					return Err(BasicError::ParseError)
+				}
+				// Try to convert to integer
+				if let Ok(value) = input.parse() {
+					return Ok(ScalarValue::Integer(BasicInteger::SmallInteger(value)));
+				}
+				if let Ok(value) = input.parse() {
+					return Ok(ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(value))));
+				}
+				// Try to convert to float
+				if let Ok(value) = input.parse() {
+					return Ok(ScalarValue::Float(value));
+				}
+				// Else error
+				return Err(BasicError::ParseError);
+			}
+			TypeRestriction::Boolean => {
+				match input.trim() {
+					"true" | "t" | "yes" | "y" | "1" => ScalarValue::Boolean(true),
+					"false" | "f" | "no" | "n" | "0"  => ScalarValue::Boolean(false),
+					_ => return Err(BasicError::ParseError),
+				}
+			}
+		};
+		// Make sure the value conforms to the type restriction
+		match out.conforms_to_type_restriction(type_restriction) {
+			true => Ok(out),
+			false => Err(BasicError::TypeMismatch(out, type_restriction)),
+		}
+	}
+
 	/// Executes a single statement.
 	fn execute_statement(&mut self, main_struct: &mut Main, should_exist: bool) -> Result<InstructionExecutionSuccessResult, BasicError> {
 		let mut out = InstructionExecutionSuccessResult::ContinueToNextInstruction;
@@ -158,10 +202,70 @@ impl ProgramExecuter {
 					};
 					let result = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
 					print!("{result}");
+					stdout().flush().unwrap();
 				}
 			}
 			StatementOpcode::Input => {
-				todo!()
+				// Print statements to be printed
+				loop {
+					let expression_opcode = match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => expression_opcode,
+						None => break,
+					};
+					let result = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+					print!("{result}");
+					stdout().flush().unwrap();
+				}
+				// Get a list of input variables
+				let mut l_values = Vec::new();
+				loop {
+					match self.execute_l_value(main_struct)? {
+						Some(l_value) => l_values.push(l_value),
+						None => break,
+					}
+				}
+				// Get input
+				let mut l_value_index = 0;
+				'input_loop: loop {
+					// Get input
+					let mut input = String::new();
+					stdin().read_line(&mut input).unwrap();
+					input = input.chars().filter(|chr| !chr.is_ascii_control()).collect();
+					let input = input.as_str();
+					// Match each comma separated value to a l-value
+					for input in input.split(',') {
+						// Get l-value
+						let l_value = match l_values.get(l_value_index) {
+							Some(l_value) => l_value,
+							None => {
+								println!("Too many entries.");
+								print!("Redo input: ");
+								stdout().flush().unwrap();
+								l_value_index = 0;
+								continue 'input_loop;
+							},
+						};
+						// Parse value
+						let value = match self.get_input_value(input, l_value.type_restriction) {
+							Ok(value) => value,
+							Err(error) => {
+								println!("Entry error: {error}");
+								print!("Redo input: ");
+								stdout().flush().unwrap();
+								l_value_index = 0;
+								continue 'input_loop;
+							}
+						};
+						// Assign value
+						self.assign_global_scalar_value(l_value.clone(), value)?;
+						// Next value
+						l_value_index += 1;
+					}
+					// If there are no more values to assign then break
+					if l_value_index == l_values.len() {
+						break;
+					}
+				}
 			}
 			StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => {
 				// Get the opcode
@@ -395,8 +499,21 @@ impl ProgramExecuter {
 				};
 				self.skip_expression(main_struct, expression_opcode)?;
 			}
+			// Skip expressions untill a null opcode is found then skip l-values untill a null opcode is found
 			StatementOpcode::Input => {
-				todo!()
+				loop {
+					let expression_opcode = match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => expression_opcode,
+						None => break,
+					};
+					self.skip_expression(main_struct, expression_opcode)?;
+				}
+				loop {
+					match self.skip_l_value(main_struct)? {
+						true => {}
+						false => break,
+					}
+				}
 			}
 			// Skip a l-value and an expression
 			StatementOpcode::Let | StatementOpcode::For => {
@@ -488,12 +605,12 @@ impl ProgramExecuter {
 			.ok_or(BasicError::ExpectedLValueOpcodeButProgramEnd)?;
 		let opcode: LValueOpcode = FromPrimitive::from_u8(opcode_id)
 			.ok_or(BasicError::InvalidLValueOpcode(opcode_id))?;
-		// Get name
-		let name = self.get_program_string(main_struct)?.to_string();
 		// Execute opcode
 		Ok(match opcode {
 			LValueOpcode::ScalarAny | LValueOpcode::ScalarBoolean | LValueOpcode::ScalarComplexFloat | LValueOpcode::ScalarFloat | LValueOpcode::ScalarInteger |
 			LValueOpcode::ScalarNumber | LValueOpcode::ScalarRealNumber | LValueOpcode::ScalarString => {
+				// Get name
+				let name = self.get_program_string(main_struct)?.to_string();
 				let type_restriction = match opcode {
 					LValueOpcode::ScalarAny => TypeRestriction::Any,
 					LValueOpcode::ScalarBoolean => TypeRestriction::Boolean,
@@ -513,6 +630,8 @@ impl ProgramExecuter {
 			}
 			LValueOpcode::ArrayElementAny | LValueOpcode::ArrayElementBoolean | LValueOpcode::ArrayElementComplexFloat | LValueOpcode::ArrayElementFloat | LValueOpcode::ArrayElementInteger |
 			LValueOpcode::ArrayElementNumber | LValueOpcode::ArrayElementRealNumber | LValueOpcode::ArrayElementString => {
+				// Get name
+				let name = self.get_program_string(main_struct)?.to_string();
 				let type_restriction = match opcode {
 					LValueOpcode::ArrayElementAny => TypeRestriction::Any,
 					LValueOpcode::ArrayElementBoolean => TypeRestriction::Boolean,
@@ -548,15 +667,21 @@ impl ProgramExecuter {
 			.ok_or(BasicError::ExpectedLValueOpcodeButProgramEnd)?;
 		let opcode: LValueOpcode = FromPrimitive::from_u8(opcode_id)
 			.ok_or(BasicError::InvalidLValueOpcode(opcode_id))?;
-		// Skip name
-		self.skip_program_string(main_struct)?;
 		// Skip opcode
 		Ok(match opcode {
 			LValueOpcode::ScalarAny | LValueOpcode::ScalarBoolean | LValueOpcode::ScalarComplexFloat | LValueOpcode::ScalarFloat | LValueOpcode::ScalarInteger |
-			LValueOpcode::ScalarNumber | LValueOpcode::ScalarRealNumber | LValueOpcode::ScalarString => true,
+			LValueOpcode::ScalarNumber | LValueOpcode::ScalarRealNumber | LValueOpcode::ScalarString => {
+				// Skip name
+				self.skip_program_string(main_struct)?;
+
+				true
+			},
 
 			LValueOpcode::ArrayElementAny | LValueOpcode::ArrayElementBoolean | LValueOpcode::ArrayElementComplexFloat | LValueOpcode::ArrayElementFloat | LValueOpcode::ArrayElementInteger |
 			LValueOpcode::ArrayElementNumber | LValueOpcode::ArrayElementRealNumber | LValueOpcode::ArrayElementString => {
+				// Skip name
+				self.skip_program_string(main_struct)?;
+				
 				loop {
 					let argument_opcode = match self.get_expression_opcode(main_struct)? {
 						Some(argument_opcode) => argument_opcode,
