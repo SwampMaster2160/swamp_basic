@@ -19,4 +19,5 @@ pub enum StatementOpcode {
 	For,
 	Next,
 	Input,
+	Dimension,
 }

@@ -415,6 +415,13 @@ impl ProgramExecuter {
 					}
 				}
 			}
+			StatementOpcode::Dimension => {
+				// Get the l-value with it's dimension lengths
+				let l_value = self.execute_l_value(main_struct)?
+					.ok_or(BasicError::ExpectedLValue)?;
+				
+				todo!()
+			}
 			StatementOpcode::List => 'a: {
 				// Get the start line index
 				let start_expression_opcode = self.get_expression_opcode(main_struct)?
@@ -550,7 +557,7 @@ impl ProgramExecuter {
 			// Skip a sub-statement
 			StatementOpcode::Then | StatementOpcode::Else => self.skip_statement(main_struct)?,
 			// Skip l-value
-			StatementOpcode::Next => {
+			StatementOpcode::Next | StatementOpcode::Dimension => {
 				self.skip_l_value(main_struct)?;
 			}
 		}
@@ -566,11 +573,13 @@ impl ProgramExecuter {
 			arguments_or_indices
 		} = l_value;
 		match arguments_or_indices {
+			// Assign to scalar variable
 			None => {
 				self.global_scalar_variables.insert((name, type_restriction), value);
 			}
+			// Assign to array index
 			Some(_arguments_or_indices) => {
-				return Err(BasicError::FeatureNotYetSupported);
+				todo!();
 			}
 		}
 		Ok(())

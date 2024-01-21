@@ -164,9 +164,14 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 				out.extend(compile_expression(&r_value)?);
 			}
 			// Commands that take in a l-value
-			Command::Next => {
+			Command::Next | Command::Dimension => {
+				let statement_opcode = match command {
+					Command::Next => StatementOpcode::Next,
+					Command::Dimension => StatementOpcode::Dimension,
+					_ => unreachable!(),
+				};
 				// Push bytecode
-				out.push(StatementOpcode::Next as u8);
+				out.push(statement_opcode as u8);
 				out.extend(compile_l_value(&arguments[0])?);
 			}
 			Command::List => {
@@ -707,12 +712,17 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 			ParseTreeElement::Command(command, vec![assignment])
 		}
 		// Statements that take in a single l-value
-		StatementOpcode::Next => {
+		StatementOpcode::Next | StatementOpcode::Dimension => {
 			// Decompile l-value
 			let l_value = decompile_l_value(statement_bytecode)?
 				.ok_or(BasicError::UnexpectedLValueEndOpcode)?;
 			// Construct parse tree element
-			ParseTreeElement::Command(Command::Next, vec![l_value])
+			let command = match opcode {
+				StatementOpcode::Next => Command::Next,
+				StatementOpcode::Dimension => Command::Dimension,
+				_ => unreachable!(),
+			};
+			ParseTreeElement::Command(command, vec![l_value])
 		}
 	})
 }
