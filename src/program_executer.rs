@@ -400,11 +400,11 @@ impl ProgramExecuter {
 				// Get the l-value to increment
 				let l_value = self.execute_l_value(main_struct)?
 					.ok_or(BasicError::ExpectedLValue)?;
+				let current_value = self.load_global_scalar_value(main_struct, l_value.clone())?;
 				// Get the for loop to loop back on
 				let for_loop = self.current_routine.for_loop_counters.get(&l_value)
 					.ok_or(BasicError::NextOnLValueWithoutLoop)?;
 				// Get the new value
-				let current_value = self.load_global_scalar_value(main_struct, l_value.clone())?;
 				let increment = for_loop.step_value.clone()
 					.unwrap_or(ScalarValue::ONE);
 				let new_value = current_value.add_concatenate(increment.clone())?;
@@ -619,7 +619,7 @@ impl ProgramExecuter {
 	}
 
 	/// Gets the value of a global scalar variable or an element of a global array.
-	fn load_global_scalar_value(&self, main_struct: &mut Main, l_value: LValue) -> Result<ScalarValue, BasicError> {
+	fn load_global_scalar_value(&mut self, main_struct: &mut Main, l_value: LValue) -> Result<ScalarValue, BasicError> {
 		let LValue {
 			name,
 			type_restriction,
@@ -634,15 +634,33 @@ impl ProgramExecuter {
 					}
 				}
 			Some(arguments_or_indices) => {
-				match self.global_arrays.get(&(name, type_restriction, arguments_or_indices.len())) {
+				let (dimension_lengths, elements) = match self.global_arrays.get(&(name.clone(), type_restriction, arguments_or_indices.len())) {
 					Some((dimension_lengths, elements)) => {
-						todo!();
+						(dimension_lengths.clone(), elements.clone())
 					}
 					None => {
 						// TODO: Add support for executing functions
-						return Err(BasicError::ArrayOrFunctionDoesNotExist);
+						// Here
+						if arguments_or_indices.len() != 1 {
+							return Err(BasicError::ArrayOrFunctionDoesNotExist);
+						}
+						self.create_array(&name, type_restriction, vec![11])?;
+						self.global_arrays.get(&(name.clone(), type_restriction, arguments_or_indices.len())).unwrap().clone()
 					}
+				};
+				// Get indices
+				let mut indices = Vec::with_capacity(arguments_or_indices.len());
+				for index in arguments_or_indices.into_iter() {
+					indices.push(index.as_length()?);
 				}
+				// Get flat index
+				let flat_index = 0usize;
+				let dimension_length = 1usize;
+				for index in indices.iter() {
+					//dimension_length *= index;
+				}
+
+				todo!()
 			}
 		})
 	}
