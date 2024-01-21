@@ -58,6 +58,8 @@ pub enum BasicError {
 	LabelInLineProgram,
 	TooManyEntries,
 	ParseError,
+	ExpectedArrayLValue,
+	ArraySizeTooLarge,
 }
 
 impl Display for BasicError {
@@ -117,6 +119,8 @@ impl Display for BasicError {
 			Self::LabelInLineProgram => write!(formatter, "Labels must be in a numbered line."),
 			Self::TooManyEntries => write!(formatter, "Too many entries."),
 			Self::ParseError => write!(formatter, "Parse error."),
+			Self::ExpectedArrayLValue => write!(formatter, "Expected array l-value."),
+			Self::ArraySizeTooLarge => write!(formatter, "Array size too large."),
 		}
 	}
 }

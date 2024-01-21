@@ -60,6 +60,14 @@ impl BasicInteger {
 		}
 	}
 
+	/// Get the value as a usize.
+	pub fn as_length(&self) -> Result<usize, BasicError> {
+		match self {
+			Self::SmallInteger(index) => Ok(*index),
+			Self::BigInteger(_) => return Err(BasicError::InvalidSize(self.clone()))
+		}
+	}
+
 	pub fn to_f64(self) -> f64 {
 		match self {
 			Self::SmallInteger(value) => value as f64,

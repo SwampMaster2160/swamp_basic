@@ -426,6 +426,13 @@ impl ScalarValue {
 		})
 	}
 
+	pub fn as_length(&self) -> Result<usize, BasicError> {
+		match self {
+			Self::Integer(integer_index) => integer_index.as_length(),
+			_ => Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
+		}
+	}
+
 	pub const TRUE: Self = Self::Boolean(true);
 	pub const FALSE: Self = Self::Boolean(false);
 	pub const PI: Self = Self::Float(PI);

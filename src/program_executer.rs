@@ -21,6 +21,8 @@ pub struct ProgramExecuter {
 	is_executing_line_program: bool,
 	/// All the global scalar variables.
 	global_scalar_variables: HashMap<(String, TypeRestriction), ScalarValue>,
+	/// A map from (name, type restriction, dimension count) to (dimension lengths, all values in a 1D vector).
+	global_arrays: HashMap<(String, TypeRestriction, usize), (Vec<usize>, Vec<ScalarValue>)>,
 	/// When gosub is called, the current routine level info is pushed here.
 	routine_stack: Vec<RoutineLevel>,
 	/// The current routine level info.
@@ -101,6 +103,7 @@ impl ProgramExecuter {
 			global_scalar_variables: HashMap::new(),
 			current_routine: RoutineLevel::new(),
 			routine_stack: Vec::new(),
+			global_arrays: HashMap::new(),
 		}
 	}
 
@@ -419,8 +422,31 @@ impl ProgramExecuter {
 				// Get the l-value with it's dimension lengths
 				let l_value = self.execute_l_value(main_struct)?
 					.ok_or(BasicError::ExpectedLValue)?;
-				
-				todo!()
+				// Get dimension lengths
+				let scalar_value_lengths = match l_value.arguments_or_indices {
+					Some(lengths) => lengths,
+					None => return Err(BasicError::ExpectedArrayLValue),
+				};
+				let mut dimension_lengths = Vec::with_capacity(scalar_value_lengths.len());
+				for length in scalar_value_lengths.into_iter() {
+					dimension_lengths.push(length.as_length()?);
+				}
+				// Get the total array size
+				let mut total_array_size = 1usize;
+				for dimension_length in dimension_lengths.iter() {
+					total_array_size = match total_array_size.checked_mul(*dimension_length) {
+						Some(total_array_size) => total_array_size,
+						None => return Err(BasicError::ArraySizeTooLarge),
+					}
+				}
+				if dimension_lengths.len() == 0 {
+					total_array_size = 0;
+				}
+				// Construct array
+				let default_value = l_value.type_restriction.default_value();
+				let array: Vec<ScalarValue> = (0..total_array_size).into_iter().map(|_| default_value.clone()).collect();
+				// Add array to global arrays
+				self.global_arrays.insert((l_value.name, l_value.type_restriction, dimension_lengths.len()), (dimension_lengths, array));
 			}
 			StatementOpcode::List => 'a: {
 				// Get the start line index
