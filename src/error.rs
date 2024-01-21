@@ -60,6 +60,7 @@ pub enum BasicError {
 	ParseError,
 	ExpectedArrayLValue,
 	ArraySizeTooLarge,
+	ArrayOrFunctionDoesNotExist,
 }
 
 impl Display for BasicError {
@@ -121,6 +122,7 @@ impl Display for BasicError {
 			Self::ParseError => write!(formatter, "Parse error."),
 			Self::ExpectedArrayLValue => write!(formatter, "Expected array l-value."),
 			Self::ArraySizeTooLarge => write!(formatter, "Array size too large."),
+			Self::ArrayOrFunctionDoesNotExist => write!(formatter, "Array or function does not exist."),
 		}
 	}
 }

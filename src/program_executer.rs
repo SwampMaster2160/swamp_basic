@@ -138,6 +138,27 @@ impl ProgramExecuter {
 		main_struct.program.skip_string(self.is_executing_line_program, self.get_program_counter())
 	}
 
+	fn create_array(&mut self, name: &str, type_restriction: TypeRestriction, dimension_lengths: Vec<usize>) -> Result<(), BasicError> {
+		// Get the total array size
+		let mut total_array_size = 1usize;
+		for dimension_length in dimension_lengths.iter() {
+			total_array_size = match total_array_size.checked_mul(*dimension_length) {
+				Some(total_array_size) => total_array_size,
+				None => return Err(BasicError::ArraySizeTooLarge),
+			}
+		}
+		if dimension_lengths.len() == 0 {
+			total_array_size = 0;
+		}
+		// Construct array
+		let default_value = type_restriction.default_value();
+		let array: Vec<ScalarValue> = (0..total_array_size).into_iter().map(|_| default_value.clone()).collect();
+		// Add array to global arrays
+		self.global_arrays.insert((name.to_string(), type_restriction, dimension_lengths.len()), (dimension_lengths, array));
+
+		Ok(())
+	}
+
 	fn get_input_value(&mut self, input: &str, type_restriction: TypeRestriction) -> Result<ScalarValue, BasicError> {
 		// Parse
 		let out = match type_restriction {
@@ -383,7 +404,7 @@ impl ProgramExecuter {
 				let for_loop = self.current_routine.for_loop_counters.get(&l_value)
 					.ok_or(BasicError::NextOnLValueWithoutLoop)?;
 				// Get the new value
-				let current_value = self.load_global_scalar_value(&main_struct.program, l_value.clone())?;
+				let current_value = self.load_global_scalar_value(main_struct, l_value.clone())?;
 				let increment = for_loop.step_value.clone()
 					.unwrap_or(ScalarValue::ONE);
 				let new_value = current_value.add_concatenate(increment.clone())?;
@@ -431,22 +452,8 @@ impl ProgramExecuter {
 				for length in scalar_value_lengths.into_iter() {
 					dimension_lengths.push(length.as_length()?);
 				}
-				// Get the total array size
-				let mut total_array_size = 1usize;
-				for dimension_length in dimension_lengths.iter() {
-					total_array_size = match total_array_size.checked_mul(*dimension_length) {
-						Some(total_array_size) => total_array_size,
-						None => return Err(BasicError::ArraySizeTooLarge),
-					}
-				}
-				if dimension_lengths.len() == 0 {
-					total_array_size = 0;
-				}
-				// Construct array
-				let default_value = l_value.type_restriction.default_value();
-				let array: Vec<ScalarValue> = (0..total_array_size).into_iter().map(|_| default_value.clone()).collect();
-				// Add array to global arrays
-				self.global_arrays.insert((l_value.name, l_value.type_restriction, dimension_lengths.len()), (dimension_lengths, array));
+				// Create array
+				self.create_array(&l_value.name, l_value.type_restriction, dimension_lengths)?;
 			}
 			StatementOpcode::List => 'a: {
 				// Get the start line index
@@ -612,7 +619,7 @@ impl ProgramExecuter {
 	}
 
 	/// Gets the value of a global scalar variable or an element of a global array.
-	fn load_global_scalar_value(&self, program: &Program, l_value: LValue) -> Result<ScalarValue, BasicError> {
+	fn load_global_scalar_value(&self, main_struct: &mut Main, l_value: LValue) -> Result<ScalarValue, BasicError> {
 		let LValue {
 			name,
 			type_restriction,
@@ -621,12 +628,22 @@ impl ProgramExecuter {
 		Ok(match arguments_or_indices {
 			None => match self.global_scalar_variables.get(&(name.clone(), type_restriction)) {
 					Some(value) => value.clone(),
-					None => match program.get_labels_line(&name) {
+					None => match main_struct.program.get_labels_line(&name) {
 						Some(value) => ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(value.clone()))).compact(),
 						None => type_restriction.default_value(),
 					}
 				}
-			Some(_arguments_or_indices) => return Err(BasicError::FeatureNotYetSupported),
+			Some(arguments_or_indices) => {
+				match self.global_arrays.get(&(name, type_restriction, arguments_or_indices.len())) {
+					Some((dimension_lengths, elements)) => {
+						todo!();
+					}
+					None => {
+						// TODO: Add support for executing functions
+						return Err(BasicError::ArrayOrFunctionDoesNotExist);
+					}
+				}
+			}
 		})
 	}
 
@@ -952,7 +969,7 @@ impl ProgramExecuter {
 				// Get name
 				let name = self.get_program_string(main_struct)?.to_string();
 				// Load value
-				self.load_global_scalar_value(&main_struct.program, LValue {
+				self.load_global_scalar_value(main_struct, LValue {
 					name,
 					type_restriction,
 					arguments_or_indices: None
