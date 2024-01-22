@@ -61,6 +61,7 @@ pub enum BasicError {
 	ExpectedArrayLValue,
 	ArraySizeTooLarge,
 	ArrayOrFunctionDoesNotExist,
+	ArrayIndexOutOfBounds,
 }
 
 impl Display for BasicError {
@@ -123,6 +124,7 @@ impl Display for BasicError {
 			Self::ExpectedArrayLValue => write!(formatter, "Expected array l-value."),
 			Self::ArraySizeTooLarge => write!(formatter, "Array size too large."),
 			Self::ArrayOrFunctionDoesNotExist => write!(formatter, "Array or function does not exist."),
+			Self::ArrayIndexOutOfBounds => write!(formatter, "Index out of bounds."),
 		}
 	}
 }

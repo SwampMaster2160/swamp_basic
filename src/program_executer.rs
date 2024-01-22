@@ -8,7 +8,6 @@ use num_traits::FromPrimitive;
 use crate::compile::decompile_line;
 use crate::lexer::tokenize::detokenize_line;
 use crate::parser::deparse_line;
-use crate::program::Program;
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
 pub struct ProgramExecuter {
@@ -654,13 +653,17 @@ impl ProgramExecuter {
 					indices.push(index.as_length()?);
 				}
 				// Get flat index
-				let flat_index = 0usize;
-				let dimension_length = 1usize;
-				for index in indices.iter() {
-					//dimension_length *= index;
+				let mut flat_index = 0usize;
+				let mut dimension_length = 1usize;
+				for (index_index, index) in indices.iter().enumerate() {
+					if *index > dimension_lengths[index_index] {
+						return Err(BasicError::ArrayIndexOutOfBounds);
+					}
+					flat_index += dimension_length * index;
+					dimension_length *= dimension_lengths[index_index];
 				}
-
-				todo!()
+				// Get element
+				return Ok(elements[flat_index].clone());
 			}
 		})
 	}
