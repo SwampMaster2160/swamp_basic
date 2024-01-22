@@ -248,7 +248,7 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 		// For
 		Command::For => ParseTreeElement::Command(command, vec![parse_assignment(tokens)?]),
 		// Commands with a single l-value
-		Command::Next => {
+		Command::Next | Command::Dimension => {
 			// Get the length of the expressions (up to the next command token)
 			let expression_index = tokens.iter()
 				.position(|token| matches!(token, Token::Command(_)))

@@ -662,9 +662,7 @@ impl ProgramExecuter {
 				}
 			Some(arguments_or_indices) => {
 				let (dimension_lengths, elements) = match self.global_arrays.get(&(name.clone(), type_restriction, arguments_or_indices.len())) {
-					Some((dimension_lengths, elements)) => {
-						(dimension_lengths.clone(), elements.clone())
-					}
+					Some(elements) => elements,
 					None => {
 						// TODO: Add support for executing functions
 						// Here
@@ -672,7 +670,7 @@ impl ProgramExecuter {
 							return Err(BasicError::ArrayOrFunctionDoesNotExist);
 						}
 						self.create_array(&name, type_restriction, vec![11])?;
-						self.global_arrays.get(&(name.clone(), type_restriction, arguments_or_indices.len())).unwrap().clone()
+						self.global_arrays.get(&(name, type_restriction, arguments_or_indices.len())).unwrap()
 					}
 				};
 				// Get indices
@@ -684,7 +682,7 @@ impl ProgramExecuter {
 				let mut flat_index = 0usize;
 				let mut dimension_length = 1usize;
 				for (index_index, index) in indices.iter().enumerate() {
-					if *index > dimension_lengths[index_index] {
+					if *index >= dimension_lengths[index_index] {
 						return Err(BasicError::ArrayIndexOutOfBounds);
 					}
 					flat_index += dimension_length * index;
@@ -1024,7 +1022,41 @@ impl ProgramExecuter {
 					arguments_or_indices: None
 				})?
 			}
-			_ => return Err(BasicError::FeatureNotYetSupported),
+			ExpressionOpcode::CallUserFunctionOrGetArrayValueAny | ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean |
+			ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat | ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat |
+			ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger | ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber |
+			ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber | ExpressionOpcode::CallUserFunctionOrGetArrayValueString => {
+				// Get type restriction
+				let type_restriction = match opcode {
+					ExpressionOpcode::CallUserFunctionOrGetArrayValueAny => TypeRestriction::Any,
+					ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean => TypeRestriction::Boolean,
+					ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat => TypeRestriction::ComplexFloat,
+					ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat => TypeRestriction::Float,
+					ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger => TypeRestriction::Integer,
+					ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber => TypeRestriction::Number,
+					ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber => TypeRestriction::RealNumber,
+					ExpressionOpcode::CallUserFunctionOrGetArrayValueString => TypeRestriction::String,
+					_ => unreachable!(),
+				};
+				// Get name
+				let name = self.get_program_string(main_struct)?.to_string();
+				// Get arguments
+				let mut arguments_or_indices = Vec::new();
+				loop {
+					let expression_opcode = match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => expression_opcode,
+						None => break,
+					};
+					let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+					arguments_or_indices.push(argument);
+				}
+				// Load value
+				self.load_global_scalar_value(main_struct, LValue {
+					name,
+					type_restriction,
+					arguments_or_indices: Some(arguments_or_indices.into_boxed_slice()),
+				})?
+			}
 		})
 	}
 
