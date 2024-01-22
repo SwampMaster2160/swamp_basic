@@ -610,8 +610,36 @@ impl ProgramExecuter {
 				self.global_scalar_variables.insert((name, type_restriction), value);
 			}
 			// Assign to array index
-			Some(_arguments_or_indices) => {
-				todo!();
+			Some(arguments_or_indices) => {
+				let (dimension_lengths, elements) = match self.global_arrays.get_mut(&(name.clone(), type_restriction, arguments_or_indices.len())) {
+					Some(elements) => elements,
+					None => {
+						// TODO: Add support for executing functions
+						// Here
+						if arguments_or_indices.len() != 1 {
+							return Err(BasicError::ArrayOrFunctionDoesNotExist);
+						}
+						self.create_array(&name, type_restriction, vec![11])?;
+						self.global_arrays.get_mut(&(name.clone(), type_restriction, arguments_or_indices.len())).unwrap()
+					}
+				};
+				// Get indices
+				let mut indices = Vec::with_capacity(arguments_or_indices.len());
+				for index in arguments_or_indices.into_iter() {
+					indices.push(index.as_length()?);
+				}
+				// Get flat index
+				let mut flat_index = 0usize;
+				let mut dimension_length = 1usize;
+				for (index_index, index) in indices.iter().enumerate() {
+					if *index > dimension_lengths[index_index] {
+						return Err(BasicError::ArrayIndexOutOfBounds);
+					}
+					flat_index += dimension_length * index;
+					dimension_length *= dimension_lengths[index_index];
+				}
+				// Set element
+				elements[flat_index] = value;
 			}
 		}
 		Ok(())
