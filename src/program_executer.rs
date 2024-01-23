@@ -19,9 +19,9 @@ pub struct ProgramExecuter {
 	/// Is the program executing a line program?
 	is_executing_line_program: bool,
 	/// All the global scalar variables.
-	global_scalar_variables: HashMap<(String, TypeRestriction), ScalarValue>,
+	scalar_variables: HashMap<(Box<str>, TypeRestriction), ScalarValue>,
 	/// A map from (name, type restriction, dimension count) to (dimension lengths, all values in a 1D vector).
-	global_arrays: HashMap<(String, TypeRestriction, usize), (Vec<usize>, Vec<ScalarValue>)>,
+	arrays: HashMap<(Box<str>, TypeRestriction, usize), (Vec<usize>, Vec<ScalarValue>)>,
 	/// When gosub is called, the current routine level info is pushed here.
 	routine_stack: Vec<RoutineLevel>,
 	/// The current routine level info.
@@ -78,7 +78,7 @@ enum InstructionExecutionSuccessResult {
 
 #[derive(Clone, PartialEq, Eq)]
 struct LValue {
-	name: String,
+	name: Box<str>,
 	type_restriction: TypeRestriction,
 	arguments_or_indices: Option<Box<[ScalarValue]>>,
 }
@@ -99,10 +99,10 @@ impl ProgramExecuter {
 			line_program_counter: 0,
 			//continue_counter: None,
 			is_executing_line_program: false,
-			global_scalar_variables: HashMap::new(),
+			scalar_variables: HashMap::new(),
 			current_routine: RoutineLevel::new(),
 			routine_stack: Vec::new(),
-			global_arrays: HashMap::new(),
+			arrays: HashMap::new(),
 		}
 	}
 
@@ -117,7 +117,8 @@ impl ProgramExecuter {
 
 	/// Clears everything about the program's execution state except the execution location including variables, arrays, functions, the stack, ect.
 	fn clear(&mut self) {
-		self.global_scalar_variables = HashMap::new();
+		self.scalar_variables = HashMap::new();
+		self.arrays = HashMap::new();
 		self.current_routine = RoutineLevel::new();
 		self.routine_stack = Vec::new();
 	}
@@ -137,7 +138,8 @@ impl ProgramExecuter {
 		main_struct.program.skip_string(self.is_executing_line_program, self.get_program_counter())
 	}
 
-	fn create_array(&mut self, name: &str, type_restriction: TypeRestriction, dimension_lengths: Vec<usize>) -> Result<(), BasicError> {
+	/// Creates an array
+	fn create_array(&mut self, name: Box<str>, type_restriction: TypeRestriction, dimension_lengths: Vec<usize>) -> Result<(), BasicError> {
 		// Get the total array size
 		let mut total_array_size = 1usize;
 		for dimension_length in dimension_lengths.iter() {
@@ -153,7 +155,7 @@ impl ProgramExecuter {
 		let default_value = type_restriction.default_value();
 		let array: Vec<ScalarValue> = (0..total_array_size).into_iter().map(|_| default_value.clone()).collect();
 		// Add array to global arrays
-		self.global_arrays.insert((name.to_string(), type_restriction, dimension_lengths.len()), (dimension_lengths, array));
+		self.arrays.insert((name, type_restriction, dimension_lengths.len()), (dimension_lengths, array));
 
 		Ok(())
 	}
@@ -280,7 +282,7 @@ impl ProgramExecuter {
 							}
 						};
 						// Assign value
-						self.assign_global_scalar_value(l_value.clone(), value)?;
+						self.assign_scalar_value(l_value.clone(), value)?;
 						// Next value
 						l_value_index += 1;
 					}
@@ -325,7 +327,7 @@ impl ProgramExecuter {
 					.ok_or(BasicError::InvalidNullStatementOpcode)?;
 				let scalar_value = self.execute_expression(main_struct, expression_opcode, l_value.type_restriction)?;
 				// Assign the scalar value to the l-value
-				self.assign_global_scalar_value(l_value, scalar_value)?;
+				self.assign_scalar_value(l_value, scalar_value)?;
 			}
 			StatementOpcode::If => {
 				// Get the opcode
@@ -364,7 +366,7 @@ impl ProgramExecuter {
 					.ok_or(BasicError::InvalidNullStatementOpcode)?;
 				let scalar_value = self.execute_expression(main_struct, expression_opcode, l_value.type_restriction)?;
 				// Assign the scalar value to the l-value
-				self.assign_global_scalar_value(l_value.clone(), scalar_value)?;
+				self.assign_scalar_value(l_value.clone(), scalar_value)?;
 				// Save info about the for loop
 				let for_loop = ForLoop::new(*self.get_program_counter(), self.is_executing_line_program);
 				self.current_routine.for_loop_counters.insert(l_value.clone(), for_loop);
@@ -399,7 +401,7 @@ impl ProgramExecuter {
 				// Get the l-value to increment
 				let l_value = self.execute_l_value(main_struct)?
 					.ok_or(BasicError::ExpectedLValue)?;
-				let current_value = self.load_global_scalar_value(main_struct, l_value.clone())?;
+				let current_value = self.load_scalar_value(main_struct, l_value.clone())?;
 				// Get the for loop to loop back on
 				let for_loop = self.current_routine.for_loop_counters.get(&l_value)
 					.ok_or(BasicError::NextOnLValueWithoutLoop)?;
@@ -430,7 +432,7 @@ impl ProgramExecuter {
 					let is_in_line_program = for_loop.is_in_line_program;
 					let start_bytecode_index = for_loop.start_bytecode_index;
 					// Increment counter
-					self.assign_global_scalar_value(l_value, new_value)?;
+					self.assign_scalar_value(l_value, new_value)?;
 					// Jump to start of loop
 					match is_in_line_program {
 						true => self.line_program_counter = start_bytecode_index,
@@ -452,7 +454,7 @@ impl ProgramExecuter {
 					dimension_lengths.push(length.as_length()?);
 				}
 				// Create array
-				self.create_array(&l_value.name, l_value.type_restriction, dimension_lengths)?;
+				self.create_array(l_value.name, l_value.type_restriction, dimension_lengths)?;
 			}
 			StatementOpcode::List => 'a: {
 				// Get the start line index
@@ -597,46 +599,47 @@ impl ProgramExecuter {
 		Ok(())
 	}
 
-	/// Sets the value of a global scalar variable or an element of a global array.
-	fn assign_global_scalar_value(&mut self, l_value: LValue, value: ScalarValue) -> Result<(), BasicError> {
+	/// Sets the value of a scalar variable or an element of an array.
+	fn assign_scalar_value(&mut self, l_value: LValue, value: ScalarValue) -> Result<(), BasicError> {
+		// Unpack
 		let LValue {
 			name,
 			type_restriction,
 			arguments_or_indices
 		} = l_value;
+		// Check if the l-value is of a array/function or not
 		match arguments_or_indices {
 			// Assign to scalar variable
 			None => {
-				self.global_scalar_variables.insert((name, type_restriction), value);
+				self.scalar_variables.insert((name, type_restriction), value);
 			}
 			// Assign to array index
 			Some(arguments_or_indices) => {
-				let (dimension_lengths, elements) = match self.global_arrays.get_mut(&(name.clone(), type_restriction, arguments_or_indices.len())) {
+				// Get the array to assign to
+				let array_identifier = (name, type_restriction, arguments_or_indices.len());
+				let (dimension_lengths, elements) = match self.arrays.get_mut(&array_identifier) {
+					// If the array exists then get it
 					Some(elements) => elements,
+					// Else create a default one with 11 elements and get the new array
 					None => {
-						// TODO: Add support for executing functions
-						// Here
 						if arguments_or_indices.len() != 1 {
 							return Err(BasicError::ArrayOrFunctionDoesNotExist);
 						}
-						self.create_array(&name, type_restriction, vec![11])?;
-						self.global_arrays.get_mut(&(name.clone(), type_restriction, arguments_or_indices.len())).unwrap()
+						self.create_array(array_identifier.0.clone(), type_restriction, vec![11])?;
+						self.arrays.get_mut(&array_identifier).unwrap()
 					}
 				};
 				// Get indices
 				let mut indices = Vec::with_capacity(arguments_or_indices.len());
-				for index in arguments_or_indices.into_iter() {
-					indices.push(index.as_length()?);
+				for (dimension_index, index) in arguments_or_indices.into_iter().enumerate() {
+					indices.push(index.as_index(dimension_lengths[dimension_index])?);
 				}
-				// Get flat index
+				// Get flat index for the 1D elements vector
 				let mut flat_index = 0usize;
 				let mut dimension_length = 1usize;
-				for (index_index, index) in indices.iter().enumerate() {
-					if *index > dimension_lengths[index_index] {
-						return Err(BasicError::ArrayIndexOutOfBounds);
-					}
+				for (dimension_index, index) in indices.iter().enumerate() {
 					flat_index += dimension_length * index;
-					dimension_length *= dimension_lengths[index_index];
+					dimension_length *= dimension_lengths[dimension_index];
 				}
 				// Set element
 				elements[flat_index] = value;
@@ -645,51 +648,63 @@ impl ProgramExecuter {
 		Ok(())
 	}
 
-	/// Gets the value of a global scalar variable or an element of a global array.
-	fn load_global_scalar_value(&mut self, main_struct: &mut Main, l_value: LValue) -> Result<ScalarValue, BasicError> {
+	/// Gets the value of a scalar variable or the line number of a label or an element of an array.
+	fn load_scalar_value(&mut self, main_struct: &mut Main, l_value: LValue) -> Result<ScalarValue, BasicError> {
+		// Unpack
 		let LValue {
 			name,
 			type_restriction,
 			arguments_or_indices
 		} = l_value;
+		// Check if the l-value is of a array/function or not
 		Ok(match arguments_or_indices {
-			None => match self.global_scalar_variables.get(&(name.clone(), type_restriction)) {
+			// Read from scalar variable or label or get the default value
+			None => {
+				let variable_identifier = (name, type_restriction);
+				match self.scalar_variables.get(&variable_identifier) {
+					// Get the value from the variable if it exists
 					Some(value) => value.clone(),
-					None => match main_struct.program.get_labels_line(&name) {
+
+					None => match main_struct.program.get_labels_line(&variable_identifier.0) {
+						// Else get the line number of the label if it exists
 						Some(value) => ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(value.clone()))).compact(),
+						// Else get the default value for the type restriction
 						None => type_restriction.default_value(),
 					}
 				}
+			}
+			// Read from array index
 			Some(arguments_or_indices) => {
-				let (dimension_lengths, elements) = match self.global_arrays.get(&(name.clone(), type_restriction, arguments_or_indices.len())) {
+				// Get the array to assign to
+				let array_identifier = (name, type_restriction, arguments_or_indices.len());
+				let (dimension_lengths, elements) = match self.arrays.get(&array_identifier) {
+					// If the array exists then get it
 					Some(elements) => elements,
+					// Else create a default one with 11 elements and get the new array
 					None => {
 						// TODO: Add support for executing functions
 						// Here
 						if arguments_or_indices.len() != 1 {
 							return Err(BasicError::ArrayOrFunctionDoesNotExist);
 						}
-						self.create_array(&name, type_restriction, vec![11])?;
-						self.global_arrays.get(&(name, type_restriction, arguments_or_indices.len())).unwrap()
+						self.create_array(array_identifier.0.clone(), type_restriction, vec![11])?;
+						self.arrays.get(&array_identifier).unwrap()
 					}
 				};
 				// Get indices
 				let mut indices = Vec::with_capacity(arguments_or_indices.len());
-				for index in arguments_or_indices.into_iter() {
-					indices.push(index.as_length()?);
+				for (dimension_index, index) in arguments_or_indices.into_iter().enumerate() {
+					indices.push(index.as_index(dimension_lengths[dimension_index])?);
 				}
-				// Get flat index
+				// Get flat index for the 1D elements vector
 				let mut flat_index = 0usize;
 				let mut dimension_length = 1usize;
-				for (index_index, index) in indices.iter().enumerate() {
-					if *index >= dimension_lengths[index_index] {
-						return Err(BasicError::ArrayIndexOutOfBounds);
-					}
+				for (dimension_index, index) in indices.iter().enumerate() {
 					flat_index += dimension_length * index;
-					dimension_length *= dimension_lengths[index_index];
+					dimension_length *= dimension_lengths[dimension_index];
 				}
 				// Get element
-				return Ok(elements[flat_index].clone());
+				elements[flat_index].clone()
 			}
 		})
 	}
@@ -706,10 +721,12 @@ impl ProgramExecuter {
 			.ok_or(BasicError::InvalidLValueOpcode(opcode_id))?;
 		// Execute opcode
 		Ok(match opcode {
+			// l-values that do not access an array
 			LValueOpcode::ScalarAny | LValueOpcode::ScalarBoolean | LValueOpcode::ScalarComplexFloat | LValueOpcode::ScalarFloat | LValueOpcode::ScalarInteger |
 			LValueOpcode::ScalarNumber | LValueOpcode::ScalarRealNumber | LValueOpcode::ScalarString => {
 				// Get name
-				let name = self.get_program_string(main_struct)?.to_string();
+				let name = self.get_program_string(main_struct)?.into();
+				// Get type restriction
 				let type_restriction = match opcode {
 					LValueOpcode::ScalarAny => TypeRestriction::Any,
 					LValueOpcode::ScalarBoolean => TypeRestriction::Boolean,
@@ -721,16 +738,19 @@ impl ProgramExecuter {
 					LValueOpcode::ScalarString => TypeRestriction::String,
 					_ => unreachable!(),
 				};
+				// Construct l-value
 				Some(LValue {
 					name,
 					type_restriction,
 					arguments_or_indices: None,
 				})
 			}
+			// l-values that access an array
 			LValueOpcode::ArrayElementAny | LValueOpcode::ArrayElementBoolean | LValueOpcode::ArrayElementComplexFloat | LValueOpcode::ArrayElementFloat | LValueOpcode::ArrayElementInteger |
 			LValueOpcode::ArrayElementNumber | LValueOpcode::ArrayElementRealNumber | LValueOpcode::ArrayElementString => {
 				// Get name
-				let name = self.get_program_string(main_struct)?.to_string();
+				let name = self.get_program_string(main_struct)?.into();
+				// Get type restriction
 				let type_restriction = match opcode {
 					LValueOpcode::ArrayElementAny => TypeRestriction::Any,
 					LValueOpcode::ArrayElementBoolean => TypeRestriction::Boolean,
@@ -742,6 +762,7 @@ impl ProgramExecuter {
 					LValueOpcode::ArrayElementString => TypeRestriction::String,
 					_ => unreachable!(),
 				};
+				// Get arguments/indices
 				let mut arguments_or_indices = Vec::new();
 				loop {
 					let argument_opcode = match self.get_expression_opcode(main_struct)? {
@@ -750,12 +771,14 @@ impl ProgramExecuter {
 					};
 					arguments_or_indices.push(self.execute_expression(main_struct, argument_opcode, TypeRestriction::Any)?);
 				}
+				// Construct l-value
 				Some(LValue {
 					name,
 					type_restriction,
 					arguments_or_indices: Some(arguments_or_indices.into_boxed_slice()),
 				})
 			}
+			// The end of an l-value list
 			LValueOpcode::End => None,
 		})
 	}
@@ -766,21 +789,22 @@ impl ProgramExecuter {
 			.ok_or(BasicError::ExpectedLValueOpcodeButProgramEnd)?;
 		let opcode: LValueOpcode = FromPrimitive::from_u8(opcode_id)
 			.ok_or(BasicError::InvalidLValueOpcode(opcode_id))?;
-		// Skip opcode
+		// Skip execution
 		Ok(match opcode {
+			// l-values that do not access an array
 			LValueOpcode::ScalarAny | LValueOpcode::ScalarBoolean | LValueOpcode::ScalarComplexFloat | LValueOpcode::ScalarFloat | LValueOpcode::ScalarInteger |
 			LValueOpcode::ScalarNumber | LValueOpcode::ScalarRealNumber | LValueOpcode::ScalarString => {
 				// Skip name
 				self.skip_program_string(main_struct)?;
-
+				// Was not an end of an l-value list
 				true
 			},
-
+			// l-values that access an array
 			LValueOpcode::ArrayElementAny | LValueOpcode::ArrayElementBoolean | LValueOpcode::ArrayElementComplexFloat | LValueOpcode::ArrayElementFloat | LValueOpcode::ArrayElementInteger |
 			LValueOpcode::ArrayElementNumber | LValueOpcode::ArrayElementRealNumber | LValueOpcode::ArrayElementString => {
 				// Skip name
 				self.skip_program_string(main_struct)?;
-				
+				// Skip arguments/indices
 				loop {
 					let argument_opcode = match self.get_expression_opcode(main_struct)? {
 						Some(argument_opcode) => argument_opcode,
@@ -788,8 +812,10 @@ impl ProgramExecuter {
 					};
 					self.skip_expression(main_struct, argument_opcode)?;
 				}
+				// Was not an end of an l-value list
 				true
 			}
+			// The end of an l-value list
 			LValueOpcode::End => false,
 		})
 	}
@@ -1014,9 +1040,9 @@ impl ProgramExecuter {
 					_ => unreachable!(),
 				};
 				// Get name
-				let name = self.get_program_string(main_struct)?.to_string();
+				let name = self.get_program_string(main_struct)?.into();
 				// Load value
-				self.load_global_scalar_value(main_struct, LValue {
+				self.load_scalar_value(main_struct, LValue {
 					name,
 					type_restriction,
 					arguments_or_indices: None
@@ -1039,7 +1065,7 @@ impl ProgramExecuter {
 					_ => unreachable!(),
 				};
 				// Get name
-				let name = self.get_program_string(main_struct)?.to_string();
+				let name = self.get_program_string(main_struct)?.into();
 				// Get arguments
 				let mut arguments_or_indices = Vec::new();
 				loop {
@@ -1051,7 +1077,7 @@ impl ProgramExecuter {
 					arguments_or_indices.push(argument);
 				}
 				// Load value
-				self.load_global_scalar_value(main_struct, LValue {
+				self.load_scalar_value(main_struct, LValue {
 					name,
 					type_restriction,
 					arguments_or_indices: Some(arguments_or_indices.into_boxed_slice()),

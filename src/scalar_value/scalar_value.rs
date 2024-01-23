@@ -426,6 +426,13 @@ impl ScalarValue {
 		})
 	}
 
+	pub fn as_index(&self, container_length: usize) -> Result<usize, BasicError> {
+		match self {
+			Self::Integer(integer_index) => integer_index.as_index(container_length),
+			_ => Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
+		}
+	}
+
 	pub fn as_length(&self) -> Result<usize, BasicError> {
 		match self {
 			Self::Integer(integer_index) => integer_index.as_length(),
