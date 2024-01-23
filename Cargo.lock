@@ -207,7 +207,7 @@ dependencies = [
 
 [[package]]
 name = "swamp_basic"
-version = "0.8.5"
+version = "0.8.6"
 dependencies = [
  "num",
  "num-derive",

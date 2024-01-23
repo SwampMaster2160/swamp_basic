@@ -10,6 +10,7 @@ use crate::lexer::tokenize::detokenize_line;
 use crate::parser::deparse_line;
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
+/// Holds the execution state of an executing program. Holds stuff like variables, the program counter, ect.
 pub struct ProgramExecuter {
 	/// The opcode that will next be executed by the executer if executing the main program.
 	program_counter: usize,
