@@ -1,4 +1,5 @@
 use std::io::{stdin, stdout, Write};
+use std::mem;
 use std::{rc::Rc, collections::HashMap};
 use std::hash::Hash;
 
@@ -39,6 +40,10 @@ struct RoutineLevel {
 	/// `Err(true)` if we have looped back since a "for".
 	/// `Err(false)` if the program started or a subroutine was entered since the last "for" keyword.
 	current_for_loop_counter: Result<LValue, bool>,
+	/// The location that should be returned to when a subroutine ends and we return to the subroutine of this struct.
+	return_address: usize,
+	/// When we return from a subroutine, we need to know if we are returning to a line program or a main program.
+	return_is_line_address: bool,
 }
 
 impl RoutineLevel {
@@ -47,7 +52,15 @@ impl RoutineLevel {
 			if_condition: None,
 			for_loop_counters: HashMap::new(),
 			current_for_loop_counter: Err(false),
+			return_address: 0,
+			return_is_line_address: false,
 		}
+	}
+}
+
+impl Default for RoutineLevel {
+	fn default() -> Self {
+		Self::new()
 	}
 }
 
@@ -296,12 +309,8 @@ impl ProgramExecuter {
 			StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => {
 				// Get the opcode
 				let expression_opcode = self.get_expression_opcode(main_struct)?;
-				// Gosub
-				if opcode == StatementOpcode::GoSubroutine {
-					return Err(BasicError::FeatureNotYetSupported);
-				}
-				// Jump to new location
-				self.program_counter = match expression_opcode {
+				// Get new program counter
+				let new_program_counter = match expression_opcode {
 					None => 0,
 					Some(opcode) => {
 						let result = self.execute_expression(main_struct, opcode, TypeRestriction::Integer)?;
@@ -312,6 +321,16 @@ impl ProgramExecuter {
 						main_struct.program.get_bytecode_index_from_line_number(&line_number)?
 					}
 				};
+				// The current (not new) program counter should now point to the next statement after this run/goto/gosub statement
+				// So save the program counter if we are executing a gosub statement
+				// Also push a new subroutine level to the subroutine stack so that loops and if conditions will be shadowed untill we return.
+				if opcode == StatementOpcode::GoSubroutine {
+					self.current_routine.return_address = self.program_counter;
+					self.current_routine.return_is_line_address = self.is_executing_line_program;
+					self.routine_stack.push(mem::take(&mut self.current_routine))
+				}
+				// Jump to new location
+				self.program_counter = new_program_counter;
 				// We are now executing the main program, not a line program
 				self.is_executing_line_program = false;
 				// Clear variables and some other stuff if the opcode is Run
@@ -515,6 +534,16 @@ impl ProgramExecuter {
 					println!("{line_number} {line_string}");
 				}
 			}
+			StatementOpcode::Return => {
+				// Remove the current subroutine level and use the one below
+				self.current_routine = match self.routine_stack.pop() {
+					Some(routine_level) => routine_level,
+					None => return Err(BasicError::ReturnWhenNotInSubroutine),
+				};
+				// Restore the program counter and weather we are in a line program or not from the new top subroutine level
+				self.program_counter = self.current_routine.return_address;
+				self.is_executing_line_program = self.current_routine.return_is_line_address;
+			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Continue onto next instruction
@@ -532,7 +561,7 @@ impl ProgramExecuter {
 		// Skip statement arguments
 		match opcode {
 			// Skip opcodes with no arguments
-			StatementOpcode::End => {}
+			StatementOpcode::End | StatementOpcode::Return => {}
 			// Skip expressions untill a null opcode is found
 			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => loop {
 				let expression_opcode = match self.get_expression_opcode(main_struct)? {

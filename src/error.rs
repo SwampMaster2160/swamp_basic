@@ -62,6 +62,7 @@ pub enum BasicError {
 	ArraySizeTooLarge,
 	ArrayOrFunctionDoesNotExist,
 	ArrayIndexOutOfBounds,
+	ReturnWhenNotInSubroutine,
 }
 
 impl Display for BasicError {
@@ -125,6 +126,7 @@ impl Display for BasicError {
 			Self::ArraySizeTooLarge => write!(formatter, "Array size too large."),
 			Self::ArrayOrFunctionDoesNotExist => write!(formatter, "Array or function does not exist."),
 			Self::ArrayIndexOutOfBounds => write!(formatter, "Index out of bounds."),
+			Self::ReturnWhenNotInSubroutine => write!(formatter, "A \"return\" statement was executed when not in a subroutine."),
 		}
 	}
 }

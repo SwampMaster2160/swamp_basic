@@ -25,8 +25,12 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 
 	match parse_tree_element {
 		ParseTreeElement::Command(command, arguments) => match command {
-			// End
-			Command::End => out.push(StatementOpcode::End as u8),
+			// Commands that take in nothing
+			Command::End | Command::Return => out.push(match command {
+				Command::End => StatementOpcode::End,
+				Command::Return => StatementOpcode::Return,
+				_ => unreachable!(),
+			} as u8),
 			// Print
 			Command::Print => {
 				// Push opcode
@@ -498,7 +502,13 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 	*statement_bytecode = &statement_bytecode[1..];
 	// Decompile statement
 	Ok(match opcode {
-		StatementOpcode::End => ParseTreeElement::Command(Command::End, Vec::new()),
+		// Statements that take in nothing
+		StatementOpcode::End | StatementOpcode::Return => ParseTreeElement::Command(match opcode {
+			StatementOpcode::End => Command::End,
+			StatementOpcode::Return => Command::Return,
+			_ => unreachable!(),
+		}, Vec::new()),
+
 		StatementOpcode::Print => {
 			let mut sub_expressions = Vec::new();
 			let mut should_print_semicolon = false;

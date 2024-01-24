@@ -20,4 +20,5 @@ pub enum StatementOpcode {
 	Next,
 	Input,
 	Dimension,
+	Return,
 }
