@@ -21,4 +21,6 @@ pub enum StatementOpcode {
 	Input,
 	Dimension,
 	Return,
+	Stop,
+	Continue,
 }

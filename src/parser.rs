@@ -206,7 +206,7 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 	Ok(match command {
 		// Commands that have a list of expressions and separators as sub-trees
 		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::To | Command::Step |
-		Command::List | Command::On | Command::Return | Command::Stop | Command::Input => {
+		Command::List | Command::On | Command::Return | Command::Stop | Command::Input | Command::Continue => {
 			// Get the length of the expressions (up to the next command token)
 			let expression_index = tokens.iter()
 				.position(|token| matches!(token, Token::Command(_)))

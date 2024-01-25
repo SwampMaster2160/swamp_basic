@@ -9,6 +9,7 @@ use crate::Main;
 #[repr(u8)]
 pub enum Command {
 	Base,
+	Continue,
 	Data,
 	Define,
 	Dimension,
@@ -79,6 +80,7 @@ impl Command {
 			Self::Subroutine => ("sub", &["subroutine"]),
 			Self::Then => ("then", &[]),
 			Self::To => ("to", &[]),
+			Self::Continue => ("cont", &["continue"]),
 		}
 	}
 

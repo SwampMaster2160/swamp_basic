@@ -26,9 +26,11 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 	match parse_tree_element {
 		ParseTreeElement::Command(command, arguments) => match command {
 			// Commands that take in nothing
-			Command::End | Command::Return => out.push(match command {
+			Command::End | Command::Stop | Command::Return | Command::Continue => out.push(match command {
 				Command::End => StatementOpcode::End,
 				Command::Return => StatementOpcode::Return,
+				Command::Stop => StatementOpcode::Stop,
+				Command::Continue => StatementOpcode::Continue,
 				_ => unreachable!(),
 			} as u8),
 			// Print
@@ -503,9 +505,11 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 	// Decompile statement
 	Ok(match opcode {
 		// Statements that take in nothing
-		StatementOpcode::End | StatementOpcode::Return => ParseTreeElement::Command(match opcode {
+		StatementOpcode::End | StatementOpcode::Stop | StatementOpcode::Return | StatementOpcode::Continue => ParseTreeElement::Command(match opcode {
 			StatementOpcode::End => Command::End,
+			StatementOpcode::Stop => Command::Stop,
 			StatementOpcode::Return => Command::Return,
+			StatementOpcode::Continue => Command::Continue,
 			_ => unreachable!(),
 		}, Vec::new()),
 

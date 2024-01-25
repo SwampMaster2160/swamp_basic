@@ -17,7 +17,8 @@ pub struct ProgramExecuter {
 	program_counter: usize,
 	/// The opcode that will next be executed by the executer if executing a line program.
 	line_program_counter: usize,
-	//continue_counter: Option<usize>,
+	/// Holds the program counter that should be restoredith a "cont" statement.
+	continue_counter: Option<usize>,
 	/// Is the program executing a line program?
 	is_executing_line_program: bool,
 	/// All the global scalar variables.
@@ -111,7 +112,7 @@ impl ProgramExecuter {
 		ProgramExecuter {
 			program_counter: 0,
 			line_program_counter: 0,
-			//continue_counter: None,
+			continue_counter: None,
 			is_executing_line_program: false,
 			scalar_variables: HashMap::new(),
 			current_routine: RoutineLevel::new(),
@@ -135,6 +136,11 @@ impl ProgramExecuter {
 		self.arrays = HashMap::new();
 		self.current_routine = RoutineLevel::new();
 		self.routine_stack = Vec::new();
+	}
+
+	/// Invalidates the continue counter so that the "cont" keyword will fail.
+	pub fn invalidate_continue_counter(&mut self) {
+		self.continue_counter = None;
 	}
 
 	/// Retrives a byte from the program and increments the current program counter. Or returns None if the end of the program has been reached.
@@ -232,7 +238,18 @@ impl ProgramExecuter {
 			.ok_or(BasicError::InvalidStatementOpcode(opcode_id))?;
 		// Execute statment instruction
 		match opcode {
-			StatementOpcode::End => out = InstructionExecutionSuccessResult::ProgramStopped,
+			StatementOpcode::Stop | StatementOpcode::End => {
+				// Save the program counter for a "cont" keyword
+				if !self.is_executing_line_program {
+					self.continue_counter = Some(self.program_counter);
+				};
+				// Set the program to end
+				out = match opcode {
+					StatementOpcode::Stop => InstructionExecutionSuccessResult::ProgramStopped,
+					StatementOpcode::End => InstructionExecutionSuccessResult::ProgramEnd,
+					_ => unreachable!(),
+				};
+			}
 			StatementOpcode::Print => {
 				loop {
 					let expression_opcode = match self.get_expression_opcode(main_struct)? {
@@ -337,6 +354,15 @@ impl ProgramExecuter {
 				if opcode == StatementOpcode::Run {
 					self.clear();
 				}
+			}
+			StatementOpcode::Continue => {
+				// Jump back to where we ended
+				self.program_counter = match self.continue_counter {
+					Some(program_counter) => program_counter,
+					None => return Err(BasicError::UnableToContinue),
+				};
+				// We should not be executing a line program
+				self.is_executing_line_program = false;
 			}
 			StatementOpcode::Let => {
 				// Get the l-value to assign to
@@ -561,7 +587,7 @@ impl ProgramExecuter {
 		// Skip statement arguments
 		match opcode {
 			// Skip opcodes with no arguments
-			StatementOpcode::End | StatementOpcode::Return => {}
+			StatementOpcode::End | StatementOpcode::Stop | StatementOpcode::Return | StatementOpcode::Continue => {}
 			// Skip expressions untill a null opcode is found
 			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => loop {
 				let expression_opcode = match self.get_expression_opcode(main_struct)? {
@@ -1193,6 +1219,7 @@ impl ProgramExecuter {
 				}
 				Err(error) => {
 					println!("Runtime error: {error}");
+					self.invalidate_continue_counter();
 					break;
 				}
 				Ok(InstructionExecutionSuccessResult::ContinueToNextInstruction) => {}

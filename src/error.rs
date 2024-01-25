@@ -63,6 +63,7 @@ pub enum BasicError {
 	ArrayOrFunctionDoesNotExist,
 	ArrayIndexOutOfBounds,
 	ReturnWhenNotInSubroutine,
+	UnableToContinue,
 }
 
 impl Display for BasicError {
@@ -127,6 +128,7 @@ impl Display for BasicError {
 			Self::ArrayOrFunctionDoesNotExist => write!(formatter, "Array or function does not exist."),
 			Self::ArrayIndexOutOfBounds => write!(formatter, "Index out of bounds."),
 			Self::ReturnWhenNotInSubroutine => write!(formatter, "A \"return\" statement was executed when not in a subroutine."),
+			Self::UnableToContinue => write!(formatter, "Unable to continue."),
 		}
 	}
 }
