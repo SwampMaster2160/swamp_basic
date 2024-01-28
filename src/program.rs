@@ -265,4 +265,8 @@ impl Program {
 	pub fn get_labels_line(&self, label: &str) -> Option<&BigInt> {
 		self.labels.get(label)
 	}
+
+	pub fn save(&self, _file_path: &str) -> Result<(), BasicError> {
+		todo!()
+	}
 }

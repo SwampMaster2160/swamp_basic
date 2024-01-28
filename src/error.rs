@@ -64,6 +64,7 @@ pub enum BasicError {
 	ArrayIndexOutOfBounds,
 	ReturnWhenNotInSubroutine,
 	UnableToContinue,
+	NoFilePath,
 }
 
 impl Display for BasicError {
@@ -129,6 +130,7 @@ impl Display for BasicError {
 			Self::ArrayIndexOutOfBounds => write!(formatter, "Index out of bounds."),
 			Self::ReturnWhenNotInSubroutine => write!(formatter, "A \"return\" statement was executed when not in a subroutine."),
 			Self::UnableToContinue => write!(formatter, "Unable to continue."),
+			Self::NoFilePath => write!(formatter, "No file path."),
 		}
 	}
 }

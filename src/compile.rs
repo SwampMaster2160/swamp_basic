@@ -100,12 +100,14 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 				out.push(StatementOpcode::End as u8);
 			}
 			// Commands that take in a list of expressions and ignore commas and semicolons
-			Command::Goto | Command::Run | Command::GoSubroutine => {
+			Command::Goto | Command::Run | Command::GoSubroutine | Command::Load | Command::Save => {
 				// Push the respective opcode
 				out.push(match command {
 					Command::Goto => StatementOpcode::Goto,
 					Command::Run => StatementOpcode::Run,
 					Command::GoSubroutine => StatementOpcode::GoSubroutine,
+					Command::Load => StatementOpcode::Load,
+					Command::Save => StatementOpcode::Save,
 					_ => unreachable!(),
 				} as u8);
 				// Push arguments
@@ -615,7 +617,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 			ParseTreeElement::Command(Command::Input, sub_expressions)
 		}
 		// Decompile null terminated expression list to comma separated expression list
-		StatementOpcode::Goto | StatementOpcode::Run | StatementOpcode::GoSubroutine => {
+		StatementOpcode::Goto | StatementOpcode::Run | StatementOpcode::GoSubroutine | StatementOpcode::Load | StatementOpcode::Save => {
 			let mut is_first_expression = true;
 			let mut sub_expressions = Vec::new();
 			// For each sub-expression
@@ -641,6 +643,8 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 				StatementOpcode::Goto => Command::Goto,
 				StatementOpcode::Run => Command::Run,
 				StatementOpcode::GoSubroutine => Command::GoSubroutine,
+				StatementOpcode::Load => Command::Load,
+				StatementOpcode::Save => Command::Save,
 				_ => unreachable!(),
 			};
 			ParseTreeElement::Command(command, sub_expressions)

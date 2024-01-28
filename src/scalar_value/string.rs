@@ -66,6 +66,14 @@ impl BasicString {
 		}
 	}
 
+	pub fn to_string(self) -> String {
+		match self {
+			Self::String(value) => get_rc_only_or_clone(value),
+			Self::Char(value) => value.to_string(),
+			Self::EmptyString => String::new(),
+		}
+	}
+
 	pub const SPACE: Self = Self::Char(' ');
 	pub const NEW_LINE: Self = Self::Char('\n');
 }

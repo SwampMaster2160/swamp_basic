@@ -23,4 +23,6 @@ pub enum StatementOpcode {
 	Return,
 	Stop,
 	Continue,
+	Save,
+	Load,
 }

@@ -440,6 +440,13 @@ impl ScalarValue {
 		}
 	}
 
+	pub fn as_basic_string(&self) -> Result<BasicString, BasicError> {
+		match self {
+			Self::String(string) => Ok(string.clone()),
+			_ => Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::String)),
+		}
+	}
+
 	pub const TRUE: Self = Self::Boolean(true);
 	pub const FALSE: Self = Self::Boolean(false);
 	pub const PI: Self = Self::Float(PI);

@@ -38,6 +38,8 @@ pub enum Command {
 	Subroutine,
 	Then,
 	To,
+	Save,
+	Load,
 }
 
 impl Command {
@@ -81,6 +83,8 @@ impl Command {
 			Self::Then => ("then", &[]),
 			Self::To => ("to", &[]),
 			Self::Continue => ("cont", &["continue"]),
+			Self::Save => ("save", &[]),
+			Self::Load => ("load", &[]),
 		}
 	}
 

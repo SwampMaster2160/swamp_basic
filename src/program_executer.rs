@@ -29,6 +29,8 @@ pub struct ProgramExecuter {
 	routine_stack: Vec<RoutineLevel>,
 	/// The current routine level info.
 	current_routine: RoutineLevel,
+	/// The path to save/load from,
+	save_load_path: Option<BasicString>,
 }
 
 struct RoutineLevel {
@@ -118,6 +120,7 @@ impl ProgramExecuter {
 			current_routine: RoutineLevel::new(),
 			routine_stack: Vec::new(),
 			arrays: HashMap::new(),
+			save_load_path: None,
 		}
 	}
 
@@ -570,6 +573,33 @@ impl ProgramExecuter {
 				self.program_counter = self.current_routine.return_address;
 				self.is_executing_line_program = self.current_routine.return_is_line_address;
 			}
+			StatementOpcode::Save => {
+				// Get the filepath
+				let mut expressions_ended = false;
+				let file_path_expression_opcode = self.get_expression_opcode(main_struct)?;
+				let file_path = match file_path_expression_opcode {
+					Some(opcode) => self.execute_expression(main_struct, opcode, TypeRestriction::Any)?.as_basic_string()?,
+					None => {
+						expressions_ended = true;
+						match self.save_load_path.clone() {
+							Some(save_load_path) => save_load_path,
+							None => return Err(BasicError::NoFilePath),
+						}
+					}
+				};
+				// Expressions should end now
+				if !expressions_ended {
+					match self.get_expression_opcode(main_struct)? {
+						Some(..) => return Err(BasicError::FeatureNotYetSupported),
+						None => {}
+					}
+				}
+				// Set the path for the next save/load that does not have a path
+				self.save_load_path = Some(file_path.clone());
+				// Save file
+				let file_path = file_path.to_string();
+				main_struct.program.save(&file_path)?;
+			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		// Continue onto next instruction
@@ -589,7 +619,7 @@ impl ProgramExecuter {
 			// Skip opcodes with no arguments
 			StatementOpcode::End | StatementOpcode::Stop | StatementOpcode::Return | StatementOpcode::Continue => {}
 			// Skip expressions untill a null opcode is found
-			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => loop {
+			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine | StatementOpcode::Load | StatementOpcode::Save => loop {
 				let expression_opcode = match self.get_expression_opcode(main_struct)? {
 					Some(expression_opcode) => expression_opcode,
 					None => break,
