@@ -262,6 +262,16 @@ impl BasicInteger {
 			}
 		}
 	}
+
+	pub fn as_u8(&self) -> Result<u8, BasicError> {
+		match self {
+			Self::BigInteger(_) => Err(BasicError::InvalidU8),
+			Self::SmallInteger(value) => match (*value).try_into() {
+				Ok(value) => Ok(value),
+				Err(..) => Err(BasicError::InvalidU8),
+			}
+		}
+	}
 }
 
 impl Into<Rc<BigInt>> for BasicInteger {

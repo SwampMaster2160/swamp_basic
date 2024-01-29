@@ -1,6 +1,8 @@
-use std::{str::from_utf8, rc::Rc, collections::HashMap};
+use std::{collections::HashMap, fs::File, io::Write, rc::Rc, str::from_utf8};
+use postcard::to_allocvec;
 
 use num::BigInt;
+use serde::{ser::SerializeStruct, Serialize};
 
 use crate::error::BasicError;
 
@@ -266,7 +268,48 @@ impl Program {
 		self.labels.get(label)
 	}
 
-	pub fn save(&self, _file_path: &str) -> Result<(), BasicError> {
-		todo!()
+	pub fn save(&self, file_path: &str, format: &str) -> Result<(), BasicError> {
+		// Get save format from name
+		let format = match format {
+			"" | "b" | "binary" => SaveFormat::Binary,
+			"j" | "json" => SaveFormat::Json,
+			_ => return Err(BasicError::InvalidSaveFormat(format.to_string())),
+		};
+		// Serialize program
+		let serialized_program = match format {
+			SaveFormat::Binary => to_allocvec(self).map_err(|_| BasicError::UnableToSerializeProgram)?,
+			SaveFormat::Json => serde_json::to_string_pretty(self).map_err(|_| BasicError::UnableToSerializeProgram)?
+				.bytes()
+				.collect(),
+		};
+		// Write to file
+		let mut file = File::create(file_path).map_err(|_| BasicError::UnableToCreateFile(file_path.to_string()))?;
+		file.write(&serialized_program).map_err(|_| BasicError::UnableToWriteToFile)?;
+
+		Ok(())
+	}
+}
+
+#[repr(u8)]
+enum SaveFormat {
+	Binary,
+	Json,
+}
+
+const MAGIC_BYTES: [u8; 8] = [b'S', b'W', b'B', b'A', b'S', b'I', b'C', 0x69];
+const FILE_VERSION: u64 = 0;
+
+impl Serialize for Program {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: serde::Serializer {
+		let mut serializer = serializer.serialize_struct("program", 3)?;
+
+		serializer.serialize_field("magic", &MAGIC_BYTES)?;
+		serializer.serialize_field("file_version", &FILE_VERSION)?;
+		serializer.serialize_field("basic_version_patch", &env!("CARGO_PKG_VERSION_PATCH").parse::<u64>().unwrap())?;
+		serializer.serialize_field("basic_version_minor", &env!("CARGO_PKG_VERSION_MINOR").parse::<u64>().unwrap())?;
+		serializer.serialize_field("basic_version_major", &env!("CARGO_PKG_VERSION_MAJOR").parse::<u64>().unwrap())?;
+		serializer.serialize_field("bytecode", &self.bytecode)?;
+
+		serializer.end()
 	}
 }

@@ -587,6 +587,21 @@ impl ProgramExecuter {
 						}
 					}
 				};
+				// Get save format
+				let format = if expressions_ended {
+					String::new()
+				}
+				else {
+					let format_expression_opcode = self.get_expression_opcode(main_struct)?;
+					let format = match format_expression_opcode {
+						Some(opcode) => self.execute_expression(main_struct, opcode, TypeRestriction::Any)?.as_basic_string()?.to_string(),
+						None => {
+							expressions_ended = true;
+							String::new()
+						}
+					};
+					format
+				};
 				// Expressions should end now
 				if !expressions_ended {
 					match self.get_expression_opcode(main_struct)? {
@@ -598,7 +613,7 @@ impl ProgramExecuter {
 				self.save_load_path = Some(file_path.clone());
 				// Save file
 				let file_path = file_path.to_string();
-				main_struct.program.save(&file_path)?;
+				main_struct.program.save(&file_path, &format)?;
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}

@@ -1,4 +1,4 @@
-use std::{fmt::Display, rc::Rc, f64::consts::{PI, E}};
+use std::{fmt::{Display}, rc::Rc, f64::consts::{PI, E}};
 
 use num::{BigInt, complex::Complex64, bigint::ToBigInt};
 use num_traits::{Zero, CheckedDiv, CheckedRem, Pow, One, Signed};
@@ -444,6 +444,13 @@ impl ScalarValue {
 		match self {
 			Self::String(string) => Ok(string.clone()),
 			_ => Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::String)),
+		}
+	}
+
+	pub fn as_u8(&self) -> Result<u8, BasicError> {
+		match self {
+			Self::Integer(integer) => integer.as_u8(),
+			_ => Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
 		}
 	}
 

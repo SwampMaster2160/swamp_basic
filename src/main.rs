@@ -23,7 +23,7 @@ fn main() {
 	let mut main_struct = Main::new();
 	let mut program_executer = ProgramExecuter::new();
 	// Starting message
-	println!("--- Swamp BASIC {}, type \"exit\" to exit interpreter. ---", option_env!("CARGO_PKG_VERSION").unwrap());
+	println!("--- Swamp BASIC {}, type \"exit\" to exit interpreter. ---", env!("CARGO_PKG_VERSION"));
 	// Main loop untill exit typed
 	'main_loop: loop {
 		print!(">");

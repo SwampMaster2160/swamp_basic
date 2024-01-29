@@ -65,6 +65,11 @@ pub enum BasicError {
 	ReturnWhenNotInSubroutine,
 	UnableToContinue,
 	NoFilePath,
+	UnableToCreateFile(String),
+	UnableToSerializeProgram,
+	UnableToWriteToFile,
+	InvalidU8,
+	InvalidSaveFormat(String),
 }
 
 impl Display for BasicError {
@@ -131,6 +136,11 @@ impl Display for BasicError {
 			Self::ReturnWhenNotInSubroutine => write!(formatter, "A \"return\" statement was executed when not in a subroutine."),
 			Self::UnableToContinue => write!(formatter, "Unable to continue."),
 			Self::NoFilePath => write!(formatter, "No file path."),
+			Self::UnableToCreateFile(path) => write!(formatter, "Unable to create file with path \"{path}\"."),
+			Self::UnableToSerializeProgram => write!(formatter, "Unable to serialize program."),
+			Self::UnableToWriteToFile => write!(formatter, "Unable to write to file."),
+			Self::InvalidU8 => write!(formatter, "Invalid u8 value."),
+			Self::InvalidSaveFormat(format) => write!(formatter, "Invalid save format: {format}."),
 		}
 	}
 }
