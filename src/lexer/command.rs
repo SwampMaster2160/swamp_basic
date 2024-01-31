@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::once};
 
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -90,21 +90,20 @@ impl Command {
 
 	/// Returns the name of the command
 	pub const fn get_name(self) -> &'static str {
-		let (name, _) = self.get_names();
-		name
+		self.get_names().0
 	}
 
-	/// Returns a hashmap mapping command names and aliases to commands
+	/// Returns a hashmap mapping command names and aliases to their command
 	#[inline(always)]
 	pub fn get_string_to_command_mapping() -> HashMap<&'static str, Self> {
-		let mut out = HashMap::new();
-		for command in Self::iter() {
-			let (command_name, command_aliases) = command.get_names();
-			out.insert(command_name, command);
-			for command_alias in command_aliases {
-				out.insert(command_alias, command);
-			}
-		}
-		out
+		Self::iter()
+			.map(|command| (command.get_names(), command))
+			.map(|((command_name, command_aliases), command)|
+				once((command_name, command))
+					.chain(command_aliases.iter()
+					.map(move |command_alias| (*command_alias, command)))
+			)
+			.flatten()
+			.collect()
 	}
 }
