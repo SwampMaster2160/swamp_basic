@@ -309,6 +309,9 @@ impl Serialize for Program {
 		serializer.serialize_field("basic_version_minor", &env!("CARGO_PKG_VERSION_MINOR").parse::<u64>().unwrap())?;
 		serializer.serialize_field("basic_version_major", &env!("CARGO_PKG_VERSION_MAJOR").parse::<u64>().unwrap())?;
 		serializer.serialize_field("bytecode", &self.bytecode)?;
+		serializer.serialize_field("line_numbers", &self.line_numbers)?;
+		serializer.serialize_field("labels", &self.labels.iter().map(|(label, line_number)| (line_number, &**label)).collect::<Vec<(&BigInt, &str)>>())?;
+		serializer.serialize_field("comments", &self.comments.iter().map(|(line_number, comment)| (line_number, &**comment)).collect::<Vec<(&BigInt, &str)>>())?;
 
 		serializer.end()
 	}
