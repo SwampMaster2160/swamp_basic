@@ -614,7 +614,7 @@ impl ProgramExecuter {
 				self.save_load_path = Some(file_path.clone());
 				// Save file
 				let file_path = file_path.to_string();
-				main_struct.program.save(&file_path, &format)?;
+				main_struct.program.save(file_path, &format)?;
 			}
 			StatementOpcode::Load => {
 				// Get the filepath
@@ -656,7 +656,7 @@ impl ProgramExecuter {
 				self.save_load_path = Some(file_path.clone());
 				// Load file
 				let file_path = file_path.to_string();
-				main_struct.program = Program::load(&file_path, &format)?;
+				main_struct.program = Program::load(file_path, &format)?;
 
 				out = InstructionExecutionSuccessResult::ProgramEnd;
 			}

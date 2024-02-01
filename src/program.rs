@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::File, io::{Read, Write}, rc::Rc, str::from_utf8};
+use std::{collections::HashMap, fs::File, io::{Read, Write}, path::Path, rc::Rc, str::from_utf8};
 use postcard::{from_bytes, to_allocvec};
 
 use num::BigInt;
@@ -268,13 +268,21 @@ impl Program {
 		self.labels.get(label)
 	}
 
-	pub fn save(&self, file_path: &str, format: &str) -> Result<(), BasicError> {
+	pub fn save(&self, mut file_path: String, format: &str) -> Result<(), BasicError> {
 		// Get save format from name
 		let format = match format {
 			"" | "b" | "binary" => SaveFormat::Binary,
 			"j" | "json" => SaveFormat::Json,
 			_ => return Err(BasicError::InvalidSaveFormat(format.to_string())),
 		};
+		// Get filepath
+		let file_path_path = Path::new(&file_path);
+		if file_path_path.extension().is_none() {
+			file_path.push_str(match format {
+				SaveFormat::Binary => ".sbc",
+				SaveFormat::Json => ".json",
+			});
+		}
 		// Serialize program
 		let serialized_program = match format {
 			SaveFormat::Binary => to_allocvec(self).map_err(|_| BasicError::UnableToSerializeProgram)?,
@@ -283,21 +291,29 @@ impl Program {
 				.collect(),
 		};
 		// Write to file
-		let mut file = File::create(file_path).map_err(|_| BasicError::UnableToCreateFile(file_path.to_string()))?;
+		let mut file = File::create(&file_path).map_err(|_| BasicError::UnableToCreateFile(file_path.to_string()))?;
 		file.write(&serialized_program).map_err(|_| BasicError::UnableToWriteToFile)?;
 
 		Ok(())
 	}
 
-	pub fn load(file_path: &str, format: &str) -> Result<Self, BasicError> {
+	pub fn load(mut file_path: String, format: &str) -> Result<Self, BasicError> {
 		// Get save format from name
 		let format = match format {
 			"" | "b" | "binary" => SaveFormat::Binary,
 			"j" | "json" => SaveFormat::Json,
 			_ => return Err(BasicError::InvalidSaveFormat(format.to_string())),
 		};
+		// Get filepath
+		let file_path_path = Path::new(&file_path);
+		if file_path_path.extension().is_none() {
+			file_path.push_str(match format {
+				SaveFormat::Binary => ".sbc",
+				SaveFormat::Json => ".json",
+			});
+		}
 		// Read from file
-		let mut file = File::open(file_path).map_err(|_| BasicError::UnableToOpenFile(file_path.to_string()))?;
+		let mut file = File::open(&file_path).map_err(|_| BasicError::UnableToOpenFile(file_path.to_string()))?;
 		let mut file_data = Vec::new();
 		file.read_to_end(&mut file_data).map_err(|_| BasicError::UnableToReadFileBytes)?;
 		// Deserialize program
