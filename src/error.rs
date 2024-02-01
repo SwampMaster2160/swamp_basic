@@ -73,6 +73,8 @@ pub enum BasicError {
 	UnableToOpenFile(String),
 	UnableToReadFileBytes,
 	UnableToDeserializeProgram,
+	MagicBytesDoNotMatch,
+	MissingMagicBytes,
 }
 
 impl Display for BasicError {
@@ -147,6 +149,8 @@ impl Display for BasicError {
 			Self::UnableToOpenFile(path) => write!(formatter, "Unable to load file with path \"{path}\"."),
 			Self::UnableToReadFileBytes => write!(formatter, "Unable to read file bytes."),
 			Self::UnableToDeserializeProgram => write!(formatter, "Unable to deserialize program."),
+			Self::MagicBytesDoNotMatch => write!(formatter, "Magic bytes do not match."),
+			Self::MissingMagicBytes => write!(formatter, "Missing magic bytes."),
 		}
 	}
 }
