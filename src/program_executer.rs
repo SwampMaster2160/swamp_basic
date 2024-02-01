@@ -9,6 +9,7 @@ use num_traits::FromPrimitive;
 use crate::compile::decompile_line;
 use crate::lexer::tokenize::detokenize_line;
 use crate::parser::deparse_line;
+use crate::program::Program;
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
 
 /// Holds the execution state of an executing program. Holds stuff like variables, the program counter, ect.
@@ -614,6 +615,50 @@ impl ProgramExecuter {
 				// Save file
 				let file_path = file_path.to_string();
 				main_struct.program.save(&file_path, &format)?;
+			}
+			StatementOpcode::Load => {
+				// Get the filepath
+				let mut expressions_ended = false;
+				let file_path_expression_opcode = self.get_expression_opcode(main_struct)?;
+				let file_path = match file_path_expression_opcode {
+					Some(opcode) => self.execute_expression(main_struct, opcode, TypeRestriction::Any)?.as_basic_string()?,
+					None => {
+						expressions_ended = true;
+						match self.save_load_path.clone() {
+							Some(save_load_path) => save_load_path,
+							None => return Err(BasicError::NoFilePath),
+						}
+					}
+				};
+				// Get save format
+				let format = if expressions_ended {
+					String::new()
+				}
+				else {
+					let format_expression_opcode = self.get_expression_opcode(main_struct)?;
+					let format = match format_expression_opcode {
+						Some(opcode) => self.execute_expression(main_struct, opcode, TypeRestriction::Any)?.as_basic_string()?.to_string(),
+						None => {
+							expressions_ended = true;
+							String::new()
+						}
+					};
+					format
+				};
+				// Expressions should end now
+				if !expressions_ended {
+					match self.get_expression_opcode(main_struct)? {
+						Some(..) => return Err(BasicError::FeatureNotYetSupported),
+						None => {}
+					}
+				}
+				// Set the path for the next save/load that does not have a path
+				self.save_load_path = Some(file_path.clone());
+				// Load file
+				let file_path = file_path.to_string();
+				main_struct.program = Program::load(&file_path, &format)?;
+
+				out = InstructionExecutionSuccessResult::ProgramEnd;
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}

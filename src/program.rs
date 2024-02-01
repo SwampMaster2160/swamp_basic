@@ -1,8 +1,8 @@
-use std::{collections::HashMap, fs::File, io::Write, rc::Rc, str::from_utf8};
-use postcard::to_allocvec;
+use std::{collections::HashMap, fs::File, io::{Read, Write}, rc::Rc, str::from_utf8};
+use postcard::{from_bytes, to_allocvec};
 
 use num::BigInt;
-use serde::{ser::SerializeStruct, Serialize};
+use serde::{de::Visitor, ser::SerializeStruct, Deserialize, Serialize};
 
 use crate::error::BasicError;
 
@@ -288,6 +288,24 @@ impl Program {
 
 		Ok(())
 	}
+
+	pub fn load(file_path: &str, format: &str) -> Result<Self, BasicError> {
+		// Get save format from name
+		let format = match format {
+			"" | "b" | "binary" => SaveFormat::Binary,
+			"j" | "json" => SaveFormat::Json,
+			_ => return Err(BasicError::InvalidSaveFormat(format.to_string())),
+		};
+		// Read from file
+		let mut file = File::open(file_path).map_err(|_| BasicError::UnableToOpenFile(file_path.to_string()))?;
+		let mut file_data = Vec::new();
+		file.read_to_end(&mut file_data).map_err(|_| BasicError::UnableToReadFileBytes)?;
+		// Deserialize program
+		match format {
+			SaveFormat::Binary => from_bytes(&file_data).map_err(|_| BasicError::UnableToDeserializeProgram),
+			SaveFormat::Json => serde_json::from_slice(&file_data).map_err(|_| BasicError::UnableToDeserializeProgram),
+		}
+	}
 }
 
 #[repr(u8)]
@@ -314,5 +332,92 @@ impl Serialize for Program {
 		serializer.serialize_field("comments", &self.comments.iter().map(|(line_number, comment)| (line_number, &**comment)).collect::<Vec<(&BigInt, &str)>>())?;
 
 		serializer.end()
+	}
+}
+
+/// Returns true if a version of BASIC is later then this version.
+fn is_version_later_than_this_version(patch: u64, minor: u64, major: u64) -> bool {
+	let this_version_patch = env!("CARGO_PKG_VERSION_PATCH").parse::<u64>().unwrap();
+	let this_version_minor = env!("CARGO_PKG_VERSION_MINOR").parse::<u64>().unwrap();
+	let this_version_major = env!("CARGO_PKG_VERSION_MAJOR").parse::<u64>().unwrap();
+
+	if major > this_version_major {
+		return true;
+	}
+	else if major < this_version_major {
+		return false;
+	}
+
+	if minor > this_version_minor {
+		return true;
+	}
+	else if minor < this_version_minor {
+		return false;
+	}
+
+	patch > this_version_patch
+}
+
+struct ProgramVisitor;
+
+impl<'de> Visitor<'de> for ProgramVisitor {
+	type Value = Program;
+
+	fn expecting(&self, _formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+		todo!()
+	}
+
+	fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: serde::de::SeqAccess<'de>, {
+		// Make sure magic bytes match
+		let magic_bytes = seq.next_element::<[u8; 8]>()?.ok_or(serde::de::Error::custom("end of file reached"))?;
+		if magic_bytes != MAGIC_BYTES {
+			return Err(serde::de::Error::custom("magic bytes do not match"));
+		};
+		// Read file version
+		let file_version = seq.next_element::<u64>()?.ok_or(serde::de::Error::custom("end of file reached"))?;
+		if file_version > FILE_VERSION {
+			println!("Warning: This file was saved with a later file version. Saved in version {file_version}, loading in version {FILE_VERSION}.");
+		}
+		// Read BASIC version
+		let patch_version = seq.next_element::<u64>()?.ok_or(serde::de::Error::custom("end of file reached"))?;
+		let minor_version = seq.next_element::<u64>()?.ok_or(serde::de::Error::custom("end of file reached"))?;
+		let major_version = seq.next_element::<u64>()?.ok_or(serde::de::Error::custom("end of file reached"))?;
+		if is_version_later_than_this_version(patch_version, minor_version, major_version) {
+			println!("Warning: This file was saved with a later version of Swamp BASIC. Saved in version {major_version}.{minor_version}.{patch_version}, loading in version {}.", env!("CARGO_PKG_VERSION"));
+		}
+		// Read bytecode
+		let bytecode = seq.next_element::<Vec<u8>>()?.ok_or(serde::de::Error::custom("end of file reached"))?;
+		// Read line numbers
+		let line_numbers = seq.next_element::<Vec<(BigInt, usize)>>()?.ok_or(serde::de::Error::custom("end of file reached"))?;
+		// Read labels
+		let labels = seq.next_element::<Vec<(BigInt, String)>>()?.ok_or(serde::de::Error::custom("end of file reached"))?;
+		let mut labels_for_each_line: HashMap<BigInt, Vec<Box<str>>> = HashMap::new();
+		for (line_number, label) in labels.iter() {
+			match labels_for_each_line.get_mut(line_number) {
+				Some(labels) => labels.push(label.clone().into_boxed_str()),
+				None => {
+					labels_for_each_line.insert(line_number.clone(), vec![label.clone().into_boxed_str()]);
+				}
+			}
+		}
+		// Read comments
+		let comments = seq.next_element::<Vec<(BigInt, String)>>()?.ok_or(serde::de::Error::custom("end of file reached"))?;
+		// Construct program struct
+		Ok(Program {
+			bytecode,
+			comments: comments.into_iter().map(|(line_number, comment)| (line_number, comment.into_boxed_str())).collect(),
+			labels: labels.into_iter().map(|(line_number, label)| (label.into_boxed_str(), line_number)).collect(),
+			line_numbers,
+			line_bytecode: Vec::new(),
+			labels_for_each_line: labels_for_each_line.into_iter().map(|(line_number, labels)| (line_number, labels.into_boxed_slice())).collect(),
+		})
+	}
+}
+
+impl<'de> Deserialize<'de> for Program {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: serde::Deserializer<'de> {
+		deserializer.deserialize_struct("program", &[
+			"magic", "file_version", "basic_version_patch", "basic_version_minor", "basic_version_major", "bytecode", "line_numbers", "labels", "comments"
+		], ProgramVisitor)
 	}
 }

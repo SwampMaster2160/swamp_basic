@@ -70,6 +70,9 @@ pub enum BasicError {
 	UnableToWriteToFile,
 	InvalidU8,
 	InvalidSaveFormat(String),
+	UnableToOpenFile(String),
+	UnableToReadFileBytes,
+	UnableToDeserializeProgram,
 }
 
 impl Display for BasicError {
@@ -141,6 +144,9 @@ impl Display for BasicError {
 			Self::UnableToWriteToFile => write!(formatter, "Unable to write to file."),
 			Self::InvalidU8 => write!(formatter, "Invalid u8 value."),
 			Self::InvalidSaveFormat(format) => write!(formatter, "Invalid save format: {format}."),
+			Self::UnableToOpenFile(path) => write!(formatter, "Unable to load file with path \"{path}\"."),
+			Self::UnableToReadFileBytes => write!(formatter, "Unable to read file bytes."),
+			Self::UnableToDeserializeProgram => write!(formatter, "Unable to deserialize program."),
 		}
 	}
 }
