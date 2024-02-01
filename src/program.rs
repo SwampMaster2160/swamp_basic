@@ -432,24 +432,94 @@ impl<'de> Visitor<'de> for ProgramVisitor {
 	fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error> where A: serde::de::MapAccess<'de>, {
 		let mut magic_bytes = None;
 		let mut file_version = None;
+		let mut major_version = None;
+		let mut minor_version = None;
+		let mut patch_version = None;
+		let mut bytecode = None;
+		let mut line_numbers = None;
+		let mut labels = None;
+		let mut comments = None;
 		// Get values
 		while let Some(key) = map.next_key::<String>()? {
 			match key.as_str() {
 				"magic" => magic_bytes = Some(map.next_value::<[u8; 8]>()?),
 				"file_version" => file_version = Some(map.next_value::<u64>()?),
+				"basic_version_major" => major_version = Some(map.next_value::<u64>()?),
+				"basic_version_minor" => minor_version = Some(map.next_value::<u64>()?),
+				"basic_version_patch" => patch_version = Some(map.next_value::<u64>()?),
+				"bytecode" => bytecode = Some(map.next_value::<Vec<u8>>()?),
+				"line_numbers" => line_numbers = Some(map.next_value::<Vec<(BigInt, usize)>>()?),
+				"labels" => labels = Some(map.next_value::<Vec<(BigInt, String)>>()?),
+				"comments" => comments = Some(map.next_value::<Vec<(BigInt, String)>>()?),
 				_ => {
 					map.next_value::<serde_json::Value>()?;
 					println!("Warning: Invalid key \"{key}\".")
 				}
 			}
 		}
-		// Make sure all values exist
+		// Make sure all values exist or get defaults
 		let magic_bytes = match magic_bytes {
 			Some(magic_bytes) => magic_bytes,
 			None => return Ok(Err(BasicError::MissingMagicBytes)),
 		};
+		let file_version = match file_version {
+			Some(file_version) => file_version,
+			None => {
+				println!("Warning: File version not found, using default version.");
+				0
+			}
+		};
+		let major_version = match major_version {
+			Some(major_version) => major_version,
+			None => {
+				println!("Warning: Major version not found, using default version.");
+				0
+			}
+		};
+		let minor_version = match minor_version {
+			Some(minor_version) => minor_version,
+			None => {
+				println!("Warning: Minor version not found, using default version.");
+				0
+			}
+		};
+		let patch_version = match patch_version {
+			Some(patch_version) => patch_version,
+			None => {
+				println!("Warning: Patch version not found, using default version.");
+				0
+			}
+		};
+		let bytecode = match bytecode {
+			Some(bytecode) => bytecode,
+			None => {
+				println!("Warning: Bytecode version not found, using empty bytecode.");
+				Vec::new()
+			}
+		};
+		let line_numbers = match line_numbers {
+			Some(line_numbers) => line_numbers,
+			None => {
+				println!("Warning: Line numbers not found, using no line numbers.");
+				Vec::new()
+			}
+		};
+		let labels = match labels {
+			Some(labels) => labels,
+			None => {
+				println!("Warning: Labels not found, using no labels.");
+				Vec::new()
+			}
+		};
+		let comments = match comments {
+			Some(comments) => comments,
+			None => {
+				println!("Warning: Comments not found, using no comments.");
+				Vec::new()
+			}
+		};
 		// Construct program struct
-		Ok(Program::new_from_loaded_data(magic_bytes, todo!(), todo!(), todo!(), todo!(), todo!(), todo!(), todo!(), todo!()))
+		Ok(Program::new_from_loaded_data(magic_bytes, file_version, major_version, minor_version, patch_version, bytecode, line_numbers, labels, comments))
 	}
 }
 

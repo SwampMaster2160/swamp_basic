@@ -10,9 +10,9 @@
     105
   ],
   "file_version": 0,
-  "basic_version_patch": 0,
-  "basic_version_minor": 9,
   "basic_version_major": 0,
+  "basic_version_minor": 9,
+  "basic_version_patch": 0,
   "bytecode": [
     1,
     2,
