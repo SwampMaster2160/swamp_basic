@@ -25,4 +25,6 @@ pub enum StatementOpcode {
 	Continue,
 	Save,
 	Load,
+	Function,
+	Define,
 }

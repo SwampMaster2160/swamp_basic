@@ -75,6 +75,7 @@ pub enum BasicError {
 	UnableToDeserializeProgram,
 	MagicBytesDoNotMatch,
 	MissingMagicBytes,
+	UnexpectedEnd,
 }
 
 impl Display for BasicError {
@@ -151,6 +152,7 @@ impl Display for BasicError {
 			Self::UnableToDeserializeProgram => write!(formatter, "Unable to deserialize program."),
 			Self::MagicBytesDoNotMatch => write!(formatter, "Magic bytes do not match."),
 			Self::MissingMagicBytes => write!(formatter, "Missing magic bytes."),
+			Self::UnexpectedEnd => write!(formatter, "Unexpected end."),
 		}
 	}
 }

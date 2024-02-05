@@ -26,6 +26,8 @@ pub struct ProgramExecuter {
 	scalar_variables: HashMap<(Box<str>, TypeRestriction), ScalarValue>,
 	/// A map from (name, type restriction, dimension count) to (dimension lengths, all values in a 1D vector).
 	arrays: HashMap<(Box<str>, TypeRestriction, usize), (Vec<usize>, Vec<ScalarValue>)>,
+	/// A map from (name, type restriction, dimension count) to the index of the first byte of the bytecode for the function expression.
+	functions: HashMap<(Box<str>, TypeRestriction, usize), usize>,
 	/// When gosub is called, the current routine level info is pushed here.
 	routine_stack: Vec<RoutineLevel>,
 	/// The current routine level info.
@@ -122,6 +124,7 @@ impl ProgramExecuter {
 			routine_stack: Vec::new(),
 			arrays: HashMap::new(),
 			save_load_path: None,
+			functions: HashMap::new(),
 		}
 	}
 
@@ -138,6 +141,7 @@ impl ProgramExecuter {
 	fn clear(&mut self) {
 		self.scalar_variables = HashMap::new();
 		self.arrays = HashMap::new();
+		self.functions = HashMap::new();
 		self.current_routine = RoutineLevel::new();
 		self.routine_stack = Vec::new();
 	}

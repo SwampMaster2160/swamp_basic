@@ -24,6 +24,7 @@ pub struct Program {
 
 impl Program {
 	/// Construct a new blank program.
+	#[inline(always)]
 	pub fn new() -> Self {
 		Self {
 			bytecode: Vec::new(),

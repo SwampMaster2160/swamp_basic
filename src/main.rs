@@ -195,6 +195,7 @@ impl Main {
 	}
 }
 
+#[inline(always)]
 pub fn get_rc_only_or_clone<T: Clone>(value: Rc<T>) -> T {
 	match Rc::try_unwrap(value) {
 		Ok(unwrapped) => unwrapped,

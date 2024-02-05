@@ -16,6 +16,7 @@ pub enum Command {
 	End,
 	Else,
 	For,
+	Function,
 	Go,
 	GoSubroutine,
 	Goto,
@@ -85,6 +86,7 @@ impl Command {
 			Self::Continue => ("cont", &["continue"]),
 			Self::Save => ("save", &[]),
 			Self::Load => ("load", &[]),
+			Self::Function => ("fn", &["function"]),
 		}
 	}
 

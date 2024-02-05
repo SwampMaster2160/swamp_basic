@@ -260,6 +260,15 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 			let l_value = parse_l_value(&mut expression_tokens)?;
 			ParseTreeElement::Command(command, vec![l_value])
 		}
+		Command::Define => {
+			// The next token may be an optional fn command token. If so then skip said token.
+			let next_token = tokens.get(0).ok_or(BasicError::ExpectedLValueOpcodeButProgramEnd)?;
+			if matches!(next_token, Token::Command(Command::Function)) {
+				*tokens = &mut &tokens[1..];
+			}
+
+			todo!()
+		}
 
 		_ => return Err(BasicError::FeatureNotYetSupported),
 	})
