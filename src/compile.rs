@@ -441,6 +441,8 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 						_ => unreachable!(),
 					} as u8);
 				}
+
+				BuiltInFunction::Function => todo!()
 			}
 		}
 		ParseTreeElement::Identifier(name, type_restriction) => {
@@ -742,6 +744,8 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 			};
 			ParseTreeElement::Command(command, vec![l_value])
 		}
+
+		StatementOpcode::Define | StatementOpcode::Function => todo!()
 	})
 }
 

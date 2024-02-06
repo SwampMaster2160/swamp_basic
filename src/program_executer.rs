@@ -744,6 +744,8 @@ impl ProgramExecuter {
 			StatementOpcode::Next | StatementOpcode::Dimension => {
 				self.skip_l_value(main_struct)?;
 			}
+			
+			StatementOpcode::Define | StatementOpcode::Function => todo!()
 		}
 		// Return that there where no errors
 		Ok(())

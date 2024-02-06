@@ -26,6 +26,7 @@ pub enum BuiltInFunction {
 	ImaginaryUnit,
 	Sum,
 	Product,
+	Function,
 }
 
 impl BuiltInFunction {
@@ -57,6 +58,7 @@ impl BuiltInFunction {
 			Self::ImaginaryUnit => ("i", &["imaginaryunit", "imaginary"]),
 			Self::Sum => ("sum", &[]),
 			Self::Product => ("prod", &["product"]),
+			Self::Function => ("fn", &["function", "func"]),
 		}
 	}
 

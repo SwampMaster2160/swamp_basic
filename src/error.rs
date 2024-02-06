@@ -76,6 +76,7 @@ pub enum BasicError {
 	MagicBytesDoNotMatch,
 	MissingMagicBytes,
 	UnexpectedEnd,
+	InvalidFnFunction,
 }
 
 impl Display for BasicError {
@@ -153,6 +154,7 @@ impl Display for BasicError {
 			Self::MagicBytesDoNotMatch => write!(formatter, "Magic bytes do not match."),
 			Self::MissingMagicBytes => write!(formatter, "Missing magic bytes."),
 			Self::UnexpectedEnd => write!(formatter, "Unexpected end."),
+			Self::InvalidFnFunction => write!(formatter, "Invalid fn function."),
 		}
 	}
 }
