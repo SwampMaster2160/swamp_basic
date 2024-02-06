@@ -2,8 +2,7 @@ use std::str::from_utf8;
 
 use num_traits::FromPrimitive;
 
-use crate::{error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode},
-parser::ParseTreeElement, lexer::{command::Command, operator::Operator, built_in_function::BuiltInFunction, type_restriction::TypeRestriction, separator::Separator}};
+use crate::{bytecode::{expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode, statement_opcode::StatementOpcode}, error::BasicError, lexer::{built_in_function::BuiltInFunction, command::Command, operator::Operator, separator::Separator, type_restriction::TypeRestriction}, parser::ParseTreeElement};
 
 /// Compiles a list of parse tree elements to bytecode
 #[inline(always)]
@@ -238,6 +237,29 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 			out.extend(compile_l_value(&l_value)?);
 			out.extend(compile_expression(&r_value)?);
 		}
+		ParseTreeElement::DefineFunction(name, type_restriction, arguments, function_body_expression) => {
+			// Push opcode
+			out.push(match type_restriction {
+				TypeRestriction::Any => StatementOpcode::DefineAny,
+				TypeRestriction::RealNumber => StatementOpcode::DefineRealNumber,
+				TypeRestriction::Integer => StatementOpcode::DefineInteger,
+				TypeRestriction::Float => StatementOpcode::DefineFloat,
+				TypeRestriction::String => StatementOpcode::DefineString,
+				TypeRestriction::Boolean => StatementOpcode::DefineBoolean,
+				TypeRestriction::ComplexFloat => StatementOpcode::DefineFloat,
+				TypeRestriction::Number => StatementOpcode::DefineNumber,
+			} as u8);
+			// Push name
+			out.extend(name.as_bytes());
+			out.push(0);
+			// Push arguments
+			for argument in arguments {
+				out.extend(compile_l_value(argument)?);
+			}
+			out.push(0);
+			// Push function body expression
+			out.extend(compile_expression(function_body_expression)?);
+		}
 		_ => panic!(),
 	}
 	Ok(out)
@@ -464,14 +486,14 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 		ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, arguments) => {
 			// Push opcode
 			out.push(match *type_restriction {
-				TypeRestriction::Boolean => ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean,
-				TypeRestriction::Integer => ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger,
-				TypeRestriction::String => ExpressionOpcode::CallUserFunctionOrGetArrayValueString,
-				TypeRestriction::ComplexFloat => ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat,
-				TypeRestriction::Number => ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber,
-				TypeRestriction::RealNumber => ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber,
-				TypeRestriction::Float => ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat,
-				TypeRestriction::Any => ExpressionOpcode::CallUserFunctionOrGetArrayValueAny,
+				TypeRestriction::Boolean => ExpressionOpcode::GetArrayValueBoolean,
+				TypeRestriction::Integer => ExpressionOpcode::GetArrayValueInteger,
+				TypeRestriction::String => ExpressionOpcode::GetArrayValueString,
+				TypeRestriction::ComplexFloat => ExpressionOpcode::GetArrayValueComplexFloat,
+				TypeRestriction::Number => ExpressionOpcode::GetArrayValueNumber,
+				TypeRestriction::RealNumber => ExpressionOpcode::GetArrayValueRealNumber,
+				TypeRestriction::Float => ExpressionOpcode::GetArrayValueFloat,
+				TypeRestriction::Any => ExpressionOpcode::GetArrayValueAny,
 			} as u8);
 			// Push null terminated name
 			out.extend(name.as_bytes());
@@ -479,6 +501,28 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 			// Push bytecode for sub-expressions
 			for argument_expression in arguments {
 				out.extend(compile_expression(argument_expression)?);
+			}
+			// Null terminate
+			out.push(0);
+		}
+		ParseTreeElement::UserDefinedFunction(name, type_restriction, arguments) => {
+			// Push opcode
+			out.push(match *type_restriction {
+				TypeRestriction::Boolean => ExpressionOpcode::CallUserFunctionBoolean,
+				TypeRestriction::Integer => ExpressionOpcode::CallUserFunctionInteger,
+				TypeRestriction::String => ExpressionOpcode::CallUserFunctionString,
+				TypeRestriction::ComplexFloat => ExpressionOpcode::CallUserFunctionComplexFloat,
+				TypeRestriction::Number => ExpressionOpcode::CallUserFunctionNumber,
+				TypeRestriction::RealNumber => ExpressionOpcode::CallUserFunctionRealNumber,
+				TypeRestriction::Float => ExpressionOpcode::CallUserFunctionFloat,
+				TypeRestriction::Any => ExpressionOpcode::CallUserFunctionAny,
+			} as u8);
+			// Push null terminated name
+			out.extend(name.as_bytes());
+			out.push(0);
+			// Push bytecode for sub-expressions
+			for argument in arguments {
+				out.extend(compile_expression(argument)?);
 			}
 			// Null terminate
 			out.push(0);
@@ -745,7 +789,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 			ParseTreeElement::Command(command, vec![l_value])
 		}
 
-		StatementOpcode::Define | StatementOpcode::Function => todo!()
+		_ => todo!()
 	})
 }
 
@@ -955,22 +999,22 @@ fn decompile_expression(statement_bytecode: &mut &[u8], opcode: ExpressionOpcode
 			ParseTreeElement::Identifier(name, type_restriction)
 		}
 		// An array access or user defined function
-		ExpressionOpcode::CallUserFunctionOrGetArrayValueAny | ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean |
-		ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat | ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat |
-		ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger | ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber |
-		ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber | ExpressionOpcode::CallUserFunctionOrGetArrayValueString => {
+		ExpressionOpcode::GetArrayValueAny | ExpressionOpcode::GetArrayValueBoolean |
+		ExpressionOpcode::GetArrayValueComplexFloat | ExpressionOpcode::GetArrayValueFloat |
+		ExpressionOpcode::GetArrayValueInteger | ExpressionOpcode::GetArrayValueNumber |
+		ExpressionOpcode::GetArrayValueRealNumber | ExpressionOpcode::GetArrayValueString => {
 			// Get name
 			let name = decompile_string(statement_bytecode)?;
 			// Get type restriction
 			let type_restriction = match opcode {
-				ExpressionOpcode::CallUserFunctionOrGetArrayValueAny => TypeRestriction::Any,
-				ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean => TypeRestriction::Boolean,
-				ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat => TypeRestriction::ComplexFloat,
-				ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat => TypeRestriction::Float,
-				ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger => TypeRestriction::Integer,
-				ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber => TypeRestriction::Number,
-				ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber => TypeRestriction::RealNumber,
-				ExpressionOpcode::CallUserFunctionOrGetArrayValueString => TypeRestriction::String,
+				ExpressionOpcode::GetArrayValueAny => TypeRestriction::Any,
+				ExpressionOpcode::GetArrayValueBoolean => TypeRestriction::Boolean,
+				ExpressionOpcode::GetArrayValueComplexFloat => TypeRestriction::ComplexFloat,
+				ExpressionOpcode::GetArrayValueFloat => TypeRestriction::Float,
+				ExpressionOpcode::GetArrayValueInteger => TypeRestriction::Integer,
+				ExpressionOpcode::GetArrayValueNumber => TypeRestriction::Number,
+				ExpressionOpcode::GetArrayValueRealNumber => TypeRestriction::RealNumber,
+				ExpressionOpcode::GetArrayValueString => TypeRestriction::String,
 				_ => unreachable!(),
 			};
 			// Get each sub-expression
@@ -992,6 +1036,8 @@ fn decompile_expression(statement_bytecode: &mut &[u8], opcode: ExpressionOpcode
 		// Opcodes that should not be here
 		ExpressionOpcode::FromStartOrToEnd | ExpressionOpcode::NewLine | ExpressionOpcode::OneElement | ExpressionOpcode::Space =>
 			return Err(BasicError::InvalidExpressionOpcode(opcode as u8)),
+
+		_ => todo!()
 	})
 }
 

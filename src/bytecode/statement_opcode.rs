@@ -26,5 +26,12 @@ pub enum StatementOpcode {
 	Save,
 	Load,
 	Function,
-	Define,
+	DefineAny,
+	DefineRealNumber,
+	DefineInteger,
+	DefineFloat,
+	DefineString,
+	DefineBoolean,
+	DefineNumber,
+	DefineComplexFloat,
 }

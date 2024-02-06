@@ -77,6 +77,7 @@ pub enum BasicError {
 	MissingMagicBytes,
 	UnexpectedEnd,
 	InvalidFnFunction,
+	FunctionDoesNotExist,
 }
 
 impl Display for BasicError {
@@ -155,6 +156,7 @@ impl Display for BasicError {
 			Self::MissingMagicBytes => write!(formatter, "Missing magic bytes."),
 			Self::UnexpectedEnd => write!(formatter, "Unexpected end."),
 			Self::InvalidFnFunction => write!(formatter, "Invalid fn function."),
+			Self::FunctionDoesNotExist => write!(formatter, "Function does not exist."),
 		}
 	}
 }

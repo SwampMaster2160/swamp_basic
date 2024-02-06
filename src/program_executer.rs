@@ -8,6 +8,7 @@ use num_traits::FromPrimitive;
 
 use crate::compile::decompile_line;
 use crate::lexer::tokenize::detokenize_line;
+use crate::lexer::type_restriction;
 use crate::parser::deparse_line;
 use crate::program::Program;
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
@@ -100,7 +101,7 @@ enum InstructionExecutionSuccessResult {
 struct LValue {
 	name: Box<str>,
 	type_restriction: TypeRestriction,
-	arguments_or_indices: Option<Box<[ScalarValue]>>,
+	indices: Option<Box<[ScalarValue]>>,
 }
 
 impl Hash for LValue {
@@ -499,7 +500,7 @@ impl ProgramExecuter {
 				let l_value = self.execute_l_value(main_struct)?
 					.ok_or(BasicError::ExpectedLValue)?;
 				// Get dimension lengths
-				let scalar_value_lengths = match l_value.arguments_or_indices {
+				let scalar_value_lengths = match l_value.indices {
 					Some(lengths) => lengths,
 					None => return Err(BasicError::ExpectedArrayLValue),
 				};
@@ -745,7 +746,7 @@ impl ProgramExecuter {
 				self.skip_l_value(main_struct)?;
 			}
 			
-			StatementOpcode::Define | StatementOpcode::Function => todo!()
+			_ => todo!()
 		}
 		// Return that there where no errors
 		Ok(())
@@ -757,7 +758,7 @@ impl ProgramExecuter {
 		let LValue {
 			name,
 			type_restriction,
-			arguments_or_indices
+			indices: arguments_or_indices
 		} = l_value;
 		// Check if the l-value is of a array/function or not
 		match arguments_or_indices {
@@ -806,10 +807,10 @@ impl ProgramExecuter {
 		let LValue {
 			name,
 			type_restriction,
-			arguments_or_indices
+			indices
 		} = l_value;
 		// Check if the l-value is of a array/function or not
-		Ok(match arguments_or_indices {
+		Ok(match indices {
 			// Read from scalar variable or label or get the default value
 			None => {
 				let variable_identifier = (name, type_restriction);
@@ -826,17 +827,15 @@ impl ProgramExecuter {
 				}
 			}
 			// Read from array index
-			Some(arguments_or_indices) => {
+			Some(indices) => {
 				// Get the array to assign to
-				let array_identifier = (name, type_restriction, arguments_or_indices.len());
+				let array_identifier = (name, type_restriction, indices.len());
 				let (dimension_lengths, elements) = match self.arrays.get(&array_identifier) {
 					// If the array exists then get it
 					Some(elements) => elements,
 					// Else create a default one with 11 elements and get the new array
 					None => {
-						// TODO: Add support for executing functions
-						// Here
-						if arguments_or_indices.len() != 1 {
+						if indices.len() != 1 {
 							return Err(BasicError::ArrayOrFunctionDoesNotExist);
 						}
 						self.create_array(array_identifier.0.clone(), type_restriction, vec![11])?;
@@ -844,14 +843,14 @@ impl ProgramExecuter {
 					}
 				};
 				// Get indices
-				let mut indices = Vec::with_capacity(arguments_or_indices.len());
-				for (dimension_index, index) in arguments_or_indices.into_iter().enumerate() {
-					indices.push(index.as_index(dimension_lengths[dimension_index])?);
+				let mut indices_vector = Vec::with_capacity(indices.len());
+				for (dimension_index, index) in indices.into_iter().enumerate() {
+					indices_vector.push(index.as_index(dimension_lengths[dimension_index])?);
 				}
 				// Get flat index for the 1D elements vector
 				let mut flat_index = 0usize;
 				let mut dimension_length = 1usize;
-				for (dimension_index, index) in indices.iter().enumerate() {
+				for (dimension_index, index) in indices_vector.iter().enumerate() {
 					flat_index += dimension_length * index;
 					dimension_length *= dimension_lengths[dimension_index];
 				}
@@ -894,7 +893,7 @@ impl ProgramExecuter {
 				Some(LValue {
 					name,
 					type_restriction,
-					arguments_or_indices: None,
+					indices: None,
 				})
 			}
 			// l-values that access an array
@@ -927,7 +926,7 @@ impl ProgramExecuter {
 				Some(LValue {
 					name,
 					type_restriction,
-					arguments_or_indices: Some(arguments_or_indices.into_boxed_slice()),
+					indices: Some(arguments_or_indices.into_boxed_slice()),
 				})
 			}
 			// The end of an l-value list
@@ -1197,43 +1196,77 @@ impl ProgramExecuter {
 				self.load_scalar_value(main_struct, LValue {
 					name,
 					type_restriction,
-					arguments_or_indices: None
+					indices: None
 				})?
 			}
-			ExpressionOpcode::CallUserFunctionOrGetArrayValueAny | ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean |
-			ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat | ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat |
-			ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger | ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber |
-			ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber | ExpressionOpcode::CallUserFunctionOrGetArrayValueString => {
+			ExpressionOpcode::GetArrayValueAny | ExpressionOpcode::GetArrayValueBoolean |
+			ExpressionOpcode::GetArrayValueComplexFloat | ExpressionOpcode::GetArrayValueFloat |
+			ExpressionOpcode::GetArrayValueInteger | ExpressionOpcode::GetArrayValueNumber |
+			ExpressionOpcode::GetArrayValueRealNumber | ExpressionOpcode::GetArrayValueString => {
 				// Get type restriction
 				let type_restriction = match opcode {
-					ExpressionOpcode::CallUserFunctionOrGetArrayValueAny => TypeRestriction::Any,
-					ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean => TypeRestriction::Boolean,
-					ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat => TypeRestriction::ComplexFloat,
-					ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat => TypeRestriction::Float,
-					ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger => TypeRestriction::Integer,
-					ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber => TypeRestriction::Number,
-					ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber => TypeRestriction::RealNumber,
-					ExpressionOpcode::CallUserFunctionOrGetArrayValueString => TypeRestriction::String,
+					ExpressionOpcode::GetArrayValueAny => TypeRestriction::Any,
+					ExpressionOpcode::GetArrayValueBoolean => TypeRestriction::Boolean,
+					ExpressionOpcode::GetArrayValueComplexFloat => TypeRestriction::ComplexFloat,
+					ExpressionOpcode::GetArrayValueFloat => TypeRestriction::Float,
+					ExpressionOpcode::GetArrayValueInteger => TypeRestriction::Integer,
+					ExpressionOpcode::GetArrayValueNumber => TypeRestriction::Number,
+					ExpressionOpcode::GetArrayValueRealNumber => TypeRestriction::RealNumber,
+					ExpressionOpcode::GetArrayValueString => TypeRestriction::String,
 					_ => unreachable!(),
 				};
 				// Get name
 				let name = self.get_program_string(main_struct)?.into();
-				// Get arguments
-				let mut arguments_or_indices = Vec::new();
+				// Get indices
+				let mut indices = Vec::new();
 				loop {
 					let expression_opcode = match self.get_expression_opcode(main_struct)? {
 						Some(expression_opcode) => expression_opcode,
 						None => break,
 					};
 					let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
-					arguments_or_indices.push(argument);
+					indices.push(argument);
 				}
 				// Load value
 				self.load_scalar_value(main_struct, LValue {
 					name,
 					type_restriction,
-					arguments_or_indices: Some(arguments_or_indices.into_boxed_slice()),
+					indices: Some(indices.into_boxed_slice()),
 				})?
+			}
+			ExpressionOpcode::CallUserFunctionAny | ExpressionOpcode::CallUserFunctionBoolean | ExpressionOpcode::CallUserFunctionComplexFloat | ExpressionOpcode::CallUserFunctionFloat |
+			ExpressionOpcode::CallUserFunctionInteger | ExpressionOpcode::CallUserFunctionNumber | ExpressionOpcode::CallUserFunctionRealNumber | ExpressionOpcode::CallUserFunctionString => {
+				// Get type restriction
+				let type_restriction = match opcode {
+					ExpressionOpcode::CallUserFunctionAny => TypeRestriction::Any,
+					ExpressionOpcode::CallUserFunctionBoolean => TypeRestriction::Boolean,
+					ExpressionOpcode::CallUserFunctionComplexFloat => TypeRestriction::ComplexFloat,
+					ExpressionOpcode::CallUserFunctionFloat => TypeRestriction::Float,
+					ExpressionOpcode::CallUserFunctionInteger => TypeRestriction::Integer,
+					ExpressionOpcode::CallUserFunctionNumber => TypeRestriction::Number,
+					ExpressionOpcode::CallUserFunctionRealNumber => TypeRestriction::RealNumber,
+					ExpressionOpcode::CallUserFunctionString => TypeRestriction::String,
+					_ => unreachable!(),
+				};
+				// Get name
+				let name = self.get_program_string(main_struct)?.into();
+				// Get arguments
+				let mut arguments = Vec::new();
+				loop {
+					let expression_opcode = match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => expression_opcode,
+						None => break,
+					};
+					let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+					arguments.push(argument);
+				}
+				// Load function
+				let function = match self.functions.get(&(name, type_restriction, arguments.len())) {
+					Some(function) => *function,
+					None => return Err(BasicError::FunctionDoesNotExist),
+				};
+				// Call function
+				todo!()
 			}
 		})
 	}
@@ -1285,9 +1318,9 @@ impl ProgramExecuter {
 			ExpressionOpcode::ImaginaryUnit | ExpressionOpcode::NewLine | ExpressionOpcode::Space | ExpressionOpcode::FromStartOrToEnd => {}
 
 			// Skip string then null terminated expression list.
-			ExpressionOpcode::CallUserFunctionOrGetArrayValueAny | ExpressionOpcode::CallUserFunctionOrGetArrayValueBoolean |
-			ExpressionOpcode::CallUserFunctionOrGetArrayValueComplexFloat | ExpressionOpcode::CallUserFunctionOrGetArrayValueFloat | ExpressionOpcode::CallUserFunctionOrGetArrayValueInteger |
-			ExpressionOpcode::CallUserFunctionOrGetArrayValueRealNumber | ExpressionOpcode::CallUserFunctionOrGetArrayValueNumber | ExpressionOpcode::CallUserFunctionOrGetArrayValueString => {
+			ExpressionOpcode::GetArrayValueAny | ExpressionOpcode::GetArrayValueBoolean |
+			ExpressionOpcode::GetArrayValueComplexFloat | ExpressionOpcode::GetArrayValueFloat | ExpressionOpcode::GetArrayValueInteger |
+			ExpressionOpcode::GetArrayValueRealNumber | ExpressionOpcode::GetArrayValueNumber | ExpressionOpcode::GetArrayValueString => {
 				self.skip_program_string(main_struct)?;
 				loop {
 					let expression_opcode = match self.get_expression_opcode(main_struct)? {
@@ -1297,6 +1330,8 @@ impl ProgramExecuter {
 					self.skip_expression(main_struct, expression_opcode)?;
 				}
 			}
+
+			_ => todo!()
 		}
 		Ok(())
 	}
