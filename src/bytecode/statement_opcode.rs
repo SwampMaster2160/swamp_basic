@@ -25,7 +25,6 @@ pub enum StatementOpcode {
 	Continue,
 	Save,
 	Load,
-	Function,
 	DefineAny,
 	DefineRealNumber,
 	DefineInteger,

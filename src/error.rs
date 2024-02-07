@@ -78,6 +78,7 @@ pub enum BasicError {
 	UnexpectedEnd,
 	InvalidFnFunction,
 	FunctionDoesNotExist,
+	FunctionAssignmentInLineProgram,
 }
 
 impl Display for BasicError {
@@ -157,6 +158,7 @@ impl Display for BasicError {
 			Self::UnexpectedEnd => write!(formatter, "Unexpected end."),
 			Self::InvalidFnFunction => write!(formatter, "Invalid fn function."),
 			Self::FunctionDoesNotExist => write!(formatter, "Function does not exist."),
+			Self::FunctionAssignmentInLineProgram => write!(formatter, "Function assignment in line program."),
 		}
 	}
 }

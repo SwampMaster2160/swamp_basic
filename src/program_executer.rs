@@ -8,7 +8,6 @@ use num_traits::FromPrimitive;
 
 use crate::compile::decompile_line;
 use crate::lexer::tokenize::detokenize_line;
-use crate::lexer::type_restriction;
 use crate::parser::deparse_line;
 use crate::program::Program;
 use crate::{Main, error::BasicError, bytecode::{statement_opcode::StatementOpcode, expression_opcode::ExpressionOpcode, l_value_opcode::LValueOpcode}, lexer::type_restriction::TypeRestriction, scalar_value::{scalar_value::ScalarValue, integer::BasicInteger, string::BasicString}};
@@ -28,7 +27,7 @@ pub struct ProgramExecuter {
 	/// A map from (name, type restriction, dimension count) to (dimension lengths, all values in a 1D vector).
 	arrays: HashMap<(Box<str>, TypeRestriction, usize), (Vec<usize>, Vec<ScalarValue>)>,
 	/// A map from (name, type restriction, dimension count) to the index of the first byte of the bytecode for the function expression.
-	functions: HashMap<(Box<str>, TypeRestriction, usize), usize>,
+	functions: HashMap<(Box<str>, TypeRestriction, usize), (usize, Box<[(Box<str>, TypeRestriction)]>)>,
 	/// When gosub is called, the current routine level info is pushed here.
 	routine_stack: Vec<RoutineLevel>,
 	/// The current routine level info.
@@ -51,6 +50,8 @@ struct RoutineLevel {
 	return_address: usize,
 	/// When we return from a subroutine, we need to know if we are returning to a line program or a main program.
 	return_is_line_address: bool,
+	/// A map from a name and type restriction to values for local variables.
+	local_variables: HashMap<(Box<str>, TypeRestriction), ScalarValue>,
 }
 
 impl RoutineLevel {
@@ -61,6 +62,7 @@ impl RoutineLevel {
 			current_for_loop_counter: Err(false),
 			return_address: 0,
 			return_is_line_address: false,
+			local_variables: HashMap::new(),
 		}
 	}
 }
@@ -147,9 +149,11 @@ impl ProgramExecuter {
 		self.routine_stack = Vec::new();
 	}
 
-	/// Invalidates the continue counter so that the "cont" keyword will fail.
-	pub fn invalidate_continue_counter(&mut self) {
+	/// Invalidates all indices into the program bytecode from the program executer.
+	pub fn program_changed(&mut self) {
 		self.continue_counter = None;
+		self.functions = HashMap::new();
+		self.routine_stack = Vec::new();
 	}
 
 	/// Retrives a byte from the program and increments the current program counter. Or returns None if the end of the program has been reached.
@@ -353,7 +357,7 @@ impl ProgramExecuter {
 				if opcode == StatementOpcode::GoSubroutine {
 					self.current_routine.return_address = self.program_counter;
 					self.current_routine.return_is_line_address = self.is_executing_line_program;
-					self.routine_stack.push(mem::take(&mut self.current_routine))
+					self.routine_stack.push(mem::take(&mut self.current_routine));
 				}
 				// Jump to new location
 				self.program_counter = new_program_counter;
@@ -662,8 +666,53 @@ impl ProgramExecuter {
 				// Load file
 				let file_path = file_path.to_string();
 				main_struct.program = Program::load(file_path, &format)?;
+				self.program_changed();
 
 				out = InstructionExecutionSuccessResult::ProgramEnd;
+			}
+			StatementOpcode::DefineAny | StatementOpcode::DefineBoolean | StatementOpcode::DefineComplexFloat | StatementOpcode::DefineFloat | StatementOpcode::DefineInteger |
+			StatementOpcode::DefineNumber | StatementOpcode::DefineRealNumber | StatementOpcode::DefineString => {
+				// We should not be in a line program
+				if self.is_executing_line_program {
+					return Err(BasicError::FunctionAssignmentInLineProgram);
+				}
+				// Get type restriction
+				let type_restriction = match opcode {
+					StatementOpcode::DefineAny => TypeRestriction::Any,
+					StatementOpcode::DefineBoolean => TypeRestriction::Boolean,
+					StatementOpcode::DefineComplexFloat => TypeRestriction::ComplexFloat,
+					StatementOpcode::DefineFloat => TypeRestriction::Float,
+					StatementOpcode::DefineInteger => TypeRestriction::Integer,
+					StatementOpcode::DefineNumber => TypeRestriction::Number,
+					StatementOpcode::DefineRealNumber => TypeRestriction::RealNumber,
+					StatementOpcode::DefineString => TypeRestriction::String,
+					_ => unreachable!(),
+				};
+				// Get name
+				let name = self.get_program_string(main_struct)?.into();
+				// Get arguments
+				let mut arguments = Vec::new();
+				loop {
+					match self.execute_l_value(main_struct)? {
+						Some(argument) => {
+							if argument.indices.is_some() {
+								return Err(BasicError::InvalidArgumentCount);
+							}
+							let argument = (argument.name, argument.type_restriction);
+							arguments.push(argument);
+						}
+						None => break,
+					}
+				}
+				// The program counter should now be pointing to the function body
+				// Push the function
+				self.functions.insert((name, type_restriction, arguments.len()), (self.program_counter, arguments.into_boxed_slice()));
+				// Skip the function body (it should only be executed when we execute the function)
+				let expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => expression_opcode,
+					None => return Err(BasicError::ExpectedExpressionOpcodeButProgramEnd),
+				};
+				self.skip_expression(main_struct, expression_opcode)?;
 			}
 			_ => return Err(BasicError::FeatureNotYetSupported),
 		}
@@ -764,7 +813,15 @@ impl ProgramExecuter {
 		match arguments_or_indices {
 			// Assign to scalar variable
 			None => {
-				self.scalar_variables.insert((name, type_restriction), value);
+				let variable_identifier = (name, type_restriction);
+				match self.current_routine.local_variables.get_mut(&variable_identifier) {
+					// Try to assign to a local variable if it exists
+					Some(local_variable) => *local_variable = value,
+					// Assign to a global variable if it does not
+					None => {
+						self.scalar_variables.insert(variable_identifier, value);
+					}
+				}
 			}
 			// Assign to array index
 			Some(arguments_or_indices) => {
@@ -814,15 +871,20 @@ impl ProgramExecuter {
 			// Read from scalar variable or label or get the default value
 			None => {
 				let variable_identifier = (name, type_restriction);
-				match self.scalar_variables.get(&variable_identifier) {
-					// Get the value from the variable if it exists
-					Some(value) => value.clone(),
-
-					None => match main_struct.program.get_labels_line(&variable_identifier.0) {
-						// Else get the line number of the label if it exists
-						Some(value) => ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(value.clone()))).compact(),
-						// Else get the default value for the type restriction
-						None => type_restriction.default_value(),
+				// Try to get the value of a local variable
+				match self.current_routine.local_variables.get(&variable_identifier) {
+					Some(local_value) => local_value.clone(),
+					// Else get a global variable
+					None => match self.scalar_variables.get(&variable_identifier) {
+						// Get the value from the variable if it exists
+						Some(value) => value.clone(),
+	
+						None => match main_struct.program.get_labels_line(&variable_identifier.0) {
+							// Else get the line number of the label if it exists
+							Some(value) => ScalarValue::Integer(BasicInteger::BigInteger(Rc::new(value.clone()))).compact(),
+							// Else get the default value for the type restriction
+							None => type_restriction.default_value(),
+						}
 					}
 				}
 			}
@@ -1251,22 +1313,43 @@ impl ProgramExecuter {
 				// Get name
 				let name = self.get_program_string(main_struct)?.into();
 				// Get arguments
-				let mut arguments = Vec::new();
+				let mut argument_values = Vec::new();
 				loop {
 					let expression_opcode = match self.get_expression_opcode(main_struct)? {
 						Some(expression_opcode) => expression_opcode,
 						None => break,
 					};
-					let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
-					arguments.push(argument);
+					let argument_value = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+					argument_values.push(argument_value);
 				}
 				// Load function
-				let function = match self.functions.get(&(name, type_restriction, arguments.len())) {
-					Some(function) => *function,
+				let (function_address, function_argument_names_and_type_restrictions) = match self.functions.get(&(name, type_restriction, argument_values.len())) {
+					Some(function) => function,
 					None => return Err(BasicError::FunctionDoesNotExist),
 				};
-				// Call function
-				todo!()
+				// Save current program counter
+				self.current_routine.return_address = self.program_counter;
+				self.current_routine.return_is_line_address = self.is_executing_line_program;
+				self.routine_stack.push(mem::take(&mut self.current_routine));
+				// Convert the function arguments to local variables for the function expression
+				for (index, name_and_type_restriction) in function_argument_names_and_type_restrictions.iter().enumerate() {
+					self.current_routine.local_variables.insert(name_and_type_restriction.clone(), argument_values[index].clone());
+				}
+				// Jump to new location
+				self.program_counter = *function_address;
+				// Execute function expression
+				let sub_expression_opcode = match self.get_expression_opcode(main_struct)? {
+					Some(sub_expression_opcode) => sub_expression_opcode,
+					None => return Err(BasicError::ExpectedExpressionOpcodeButProgramEnd),
+				};
+				let function_result = self.execute_expression(main_struct, sub_expression_opcode, type_restriction)?;
+				// Remove the current subroutine level and use the one below
+				self.current_routine = self.routine_stack.pop().expect("We just pushed a routine level.");
+				// Restore the program counter and weather we are in a line program or not from the new top subroutine level
+				self.program_counter = self.current_routine.return_address;
+				self.is_executing_line_program = self.current_routine.return_is_line_address;
+				
+				function_result
 			}
 		})
 	}
@@ -1350,7 +1433,7 @@ impl ProgramExecuter {
 				}
 				Err(error) => {
 					println!("Runtime error: {error}");
-					self.invalidate_continue_counter();
+					self.program_changed();
 					break;
 				}
 				Ok(InstructionExecutionSuccessResult::ContinueToNextInstruction) => {}
