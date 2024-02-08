@@ -754,7 +754,7 @@ fn deparse(parse_tree_element: &ParseTreeElement) -> Result<Vec<Token>, BasicErr
 				out.push(Token::Separator(Separator::ClosingBracket));
 			}
 		}
-		// User defined functions consist of a name followed by the arguments, arguments are always enclosed in brackets, even if there are none.
+		// User defined functions of arrays consist of a name followed by the arguments, arguments are always enclosed in brackets, even if there are none.
 		ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, arguments) => {
 			out.push(Token::Identifier(name.clone(), *type_restriction));
 			out.push(Token::Separator(Separator::OpeningBracket));
@@ -787,9 +787,19 @@ fn deparse(parse_tree_element: &ParseTreeElement) -> Result<Vec<Token>, BasicErr
 			out.push(Token::Operator(Operator::EqualToAssign));
 			out.extend(deparse(r_value)?);
 		}
-
-		ParseTreeElement::DefineFunction(_, _, _, _) => todo!(),
-		ParseTreeElement::UserDefinedFunction(_, _, _) => todo!(),
+		// Function definitions consist of a "def" then "fn" token followed by the name then by the arguments then a "=" token then the function body, arguments are enclosed in brackets.
+		ParseTreeElement::DefineFunction(name, type_restriction, arguments, function_body) => {
+			out.push(Token::Command(Command::Define));
+			out.push(Token::BuiltInFunction(BuiltInFunction::Function, TypeRestriction::Any));
+			out.extend(deparse(&ParseTreeElement::UserDefinedFunctionOrArrayElement(name.clone(), *type_restriction, arguments.clone()))?);
+			out.push(Token::Operator(Operator::EqualToAssign));
+			out.extend(deparse(&function_body)?);
+		}
+		// User defined functions consist of a "fn" token followed by the name then by the arguments, arguments are enclosed in brackets.
+		ParseTreeElement::UserDefinedFunction(name, type_restriction, arguments) => {
+			out.push(Token::BuiltInFunction(BuiltInFunction::Function, TypeRestriction::Any));
+			out.extend(deparse(&ParseTreeElement::UserDefinedFunctionOrArrayElement(name.clone(), *type_restriction, arguments.clone()))?);
+		}
 		// Unparsed tokens should never exist here
 		ParseTreeElement::UnparsedToken(token) => out.push(token.clone()),
 	}

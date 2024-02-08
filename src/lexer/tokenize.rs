@@ -22,6 +22,7 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 	let mut current_token_string = String::new();
 	let mut parsing_type = ParsingType::None;
 	let mut is_string_char_escaped = false;
+	let mut is_function_token = false;
 	let chars: Vec<char> = line.chars().collect();
 	// For each char in the line
 	for (index, this_char) in chars.iter().enumerate() {
@@ -121,6 +122,8 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 			return Err(BasicError::CharEscapeAtLineEnd);
 		}
 		// Convert the token we are tokenizing now to a token
+		let was_last_token_function = is_function_token;
+		is_function_token = false;
 		match parsing_type {
 			// For comments and literals just create the token from the current token string.
 			ParsingType::Comment => out.push(Token::Comment(mem::take(&mut current_token_string))),
@@ -137,6 +140,13 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 			}
 			// For other token types
 			ParsingType::IdentifierKeyword => 'end_parse_other: {
+				// If the last token was a "fn" token then we can use special names such as "cos" or "print" as a user defined function name
+				if was_last_token_function {
+					let (name_without_type_restriction, type_restriction) = TypeRestriction::from_string_with_suffix(main_struct, &current_token_string)?;
+					out.push(Token::Identifier(name_without_type_restriction.to_string(), type_restriction));
+					current_token_string = String::new();
+					break 'end_parse_other;
+				}
 				// Try to convert the string to a command token
 				let as_command = Command::from_str(main_struct, &current_token_string);
 				if let Some(command) = as_command {
@@ -156,6 +166,9 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 				// Try to convert the string to a built-in function token
 				let as_built_in_function = BuiltInFunction::from_str(main_struct, &name_without_type_restriction);
 				if let Some(built_in_function) = as_built_in_function {
+					if built_in_function == BuiltInFunction::Function {
+						is_function_token = true;
+					}
 					out.push(Token::BuiltInFunction(built_in_function, type_restriction));
 					current_token_string = String::new();
 					break 'end_parse_other;

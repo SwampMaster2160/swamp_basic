@@ -734,20 +734,18 @@ impl ProgramExecuter {
 			StatementOpcode::End | StatementOpcode::Stop | StatementOpcode::Return | StatementOpcode::Continue => {}
 			// Skip expressions untill a null opcode is found
 			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine | StatementOpcode::Load | StatementOpcode::Save => loop {
-				let expression_opcode = match self.get_expression_opcode(main_struct)? {
-					Some(expression_opcode) => expression_opcode,
+				match self.get_expression_opcode(main_struct)? {
+					Some(expression_opcode) => self.skip_expression(main_struct, expression_opcode)?,
 					None => break,
-				};
-				self.skip_expression(main_struct, expression_opcode)?;
+				}
 			}
 			// Skip expressions untill a null opcode is found then skip l-values untill a null opcode is found
 			StatementOpcode::Input => {
 				loop {
-					let expression_opcode = match self.get_expression_opcode(main_struct)? {
-						Some(expression_opcode) => expression_opcode,
+					match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => self.skip_expression(main_struct, expression_opcode)?,
 						None => break,
-					};
-					self.skip_expression(main_struct, expression_opcode)?;
+					}
 				}
 				loop {
 					match self.skip_l_value(main_struct)? {
@@ -794,8 +792,19 @@ impl ProgramExecuter {
 			StatementOpcode::Next | StatementOpcode::Dimension => {
 				self.skip_l_value(main_struct)?;
 			}
-			
-			_ => todo!()
+			// Skip a string, a null terminated list of l-values then another expression
+			StatementOpcode::DefineAny | StatementOpcode::DefineBoolean | StatementOpcode::DefineComplexFloat | StatementOpcode::DefineFloat | StatementOpcode::DefineInteger |
+			StatementOpcode::DefineNumber | StatementOpcode::DefineRealNumber | StatementOpcode::DefineString => {
+				// Skip name
+				self.skip_program_string(main_struct)?;
+				// Skip arguments
+				while self.skip_l_value(main_struct)? {}
+				// Skip function body expression
+				// Get the opcode
+				let expression_opcode = self.get_expression_opcode(main_struct)?
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				self.skip_expression(main_struct, expression_opcode)?;
+			}
 		}
 		// Return that there where no errors
 		Ok(())
@@ -1403,18 +1412,17 @@ impl ProgramExecuter {
 			// Skip string then null terminated expression list.
 			ExpressionOpcode::GetArrayValueAny | ExpressionOpcode::GetArrayValueBoolean |
 			ExpressionOpcode::GetArrayValueComplexFloat | ExpressionOpcode::GetArrayValueFloat | ExpressionOpcode::GetArrayValueInteger |
-			ExpressionOpcode::GetArrayValueRealNumber | ExpressionOpcode::GetArrayValueNumber | ExpressionOpcode::GetArrayValueString => {
+			ExpressionOpcode::GetArrayValueRealNumber | ExpressionOpcode::GetArrayValueNumber | ExpressionOpcode::GetArrayValueString |
+			ExpressionOpcode::CallUserFunctionAny | ExpressionOpcode::CallUserFunctionBoolean | ExpressionOpcode::CallUserFunctionComplexFloat | ExpressionOpcode::CallUserFunctionFloat |
+			ExpressionOpcode::CallUserFunctionInteger | ExpressionOpcode::CallUserFunctionNumber | ExpressionOpcode::CallUserFunctionRealNumber | ExpressionOpcode::CallUserFunctionString => {
 				self.skip_program_string(main_struct)?;
 				loop {
-					let expression_opcode = match self.get_expression_opcode(main_struct)? {
-						Some(expression_opcode) => expression_opcode,
+					match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => self.skip_expression(main_struct, expression_opcode)?,
 						None => break,
 					};
-					self.skip_expression(main_struct, expression_opcode)?;
 				}
 			}
-
-			_ => todo!()
 		}
 		Ok(())
 	}
