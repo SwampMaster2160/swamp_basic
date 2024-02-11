@@ -357,7 +357,7 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 				// Operators that don't end in a null byte
 				Operator::EqualTo | Operator::GreaterThan | Operator::GreaterThanOrEqualTo | Operator::LessThan | Operator::LessThanOrEqualTo | Operator::NotEqualTo |
 				Operator::EqualToAssign |
-				Operator::Divide | Operator::FlooredDivide | Operator::ExclusiveOr | Operator::Exponent | Operator::MinusNegate | Operator::Modulus | Operator::And => {
+				Operator::Divide | Operator::FlooredDivide | Operator::ExclusiveOr | Operator::Exponent | Operator::MinusNegate | Operator::Modulus | Operator::And | Operator::Or => {
 					// Push operator opcode
 					out.push(match operator {
 						Operator::EqualTo => ExpressionOpcode::EqualTo,
@@ -374,6 +374,7 @@ fn compile_expression(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, 
 						Operator::MinusNegate => ExpressionOpcode::Subtract,
 						Operator::Modulus => ExpressionOpcode::Modulus,
 						Operator::FlooredDivide => ExpressionOpcode::FlooredDivide,
+						Operator::Or => ExpressionOpcode::Or,
 						_ => unreachable!(),
 					} as u8);
 					// Push bytecode for sub-expressions

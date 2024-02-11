@@ -354,16 +354,21 @@ impl ProgramExecuter {
 					None => Some(0),
 				};
 				// Get the new program counter
-				let new_line_number = match new_line_number_index {
-					None => break 'branch_statement,
-					Some(new_line_number_index) => new_line_numbers.get(new_line_number_index),
+				let new_program_counter = match new_line_numbers.is_empty() {
+					true => 0,
+					false => {
+						let new_line_number = match new_line_number_index {
+							None => break 'branch_statement,
+							Some(new_line_number_index) => new_line_numbers.get(new_line_number_index),
+						};
+						let new_line_number: BasicInteger = match new_line_number {
+							None => break 'branch_statement,
+							Some(new_line_number) => new_line_number.clone().try_into()?,
+						};
+						let new_line_number = &new_line_number.into();
+						main_struct.program.get_bytecode_index_from_line_number(new_line_number)?
+					}
 				};
-				let new_line_number: BasicInteger = match new_line_number {
-					None => break 'branch_statement,
-					Some(new_line_number) => new_line_number.clone().try_into()?,
-				};
-				let new_line_number = &new_line_number.into();
-				let new_program_counter = main_struct.program.get_bytecode_index_from_line_number(new_line_number)?;
 				// The current (not new) program counter should now point to the next statement after this run/goto/gosub statement
 				// So save the program counter if we are executing a gosub statement
 				// Also push a new subroutine level to the subroutine stack so that loops and if conditions will be shadowed untill we return.
