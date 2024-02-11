@@ -600,3 +600,12 @@ impl Num for BasicInteger {
 		unimplemented!()
 	}
 }
+
+impl Into<BigInt> for BasicInteger {
+	fn into(self) -> BigInt {
+		match self {
+			Self::SmallInteger(value) => value.to_bigint().unwrap(),
+			Self::BigInteger(value) => get_rc_only_or_clone(value),
+		}
+	}
+}

@@ -516,6 +516,17 @@ impl TryInto<bool> for ScalarValue {
 	}
 }
 
+impl TryInto<BasicInteger> for ScalarValue {
+	type Error = BasicError;
+
+	fn try_into(self) -> Result<BasicInteger, Self::Error> {
+		match self {
+			Self::Integer(value) => Ok(value),
+			_ => return Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
+		}
+	}
+}
+
 impl Display for ScalarValue {
 	fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {

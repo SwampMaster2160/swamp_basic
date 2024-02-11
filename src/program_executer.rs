@@ -52,6 +52,8 @@ struct RoutineLevel {
 	return_is_line_address: bool,
 	/// A map from a name and type restriction to values for local variables.
 	local_variables: HashMap<(Box<str>, TypeRestriction), ScalarValue>,
+	/// The index of the line + 1 in the list of the lines for a goto/run/gosub to go to. `None` means that on has not been used since the program start, sub call or run/gosub/run.
+	on_number: Option<usize>,
 }
 
 impl RoutineLevel {
@@ -63,6 +65,7 @@ impl RoutineLevel {
 			return_address: 0,
 			return_is_line_address: false,
 			local_variables: HashMap::new(),
+			on_number: None,
 		}
 	}
 }
@@ -336,21 +339,31 @@ impl ProgramExecuter {
 					}
 				}
 			}
-			StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => {
-				// Get the opcode
-				let expression_opcode = self.get_expression_opcode(main_struct)?;
-				// Get new program counter
-				let new_program_counter = match expression_opcode {
-					None => 0,
-					Some(opcode) => {
-						let result = self.execute_expression(main_struct, opcode, TypeRestriction::Integer)?;
-						let line_number: Rc<BigInt> = result.try_into()?;
-						if self.get_expression_opcode(main_struct)? != None {
-							return Err(BasicError::InvalidArgumentCount);
-						}
-						main_struct.program.get_bytecode_index_from_line_number(&line_number)?
+			StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine => 'branch_statement: {
+				// Get new jump locations
+				let mut new_line_numbers = Vec::new();
+				loop {
+					match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => new_line_numbers.push(self.execute_expression(main_struct, expression_opcode, TypeRestriction::Integer)?),
+						None => break,
 					}
+				}
+				// Get the jump locations index
+				let new_line_number_index = match self.current_routine.on_number {
+					Some(on_number) => on_number.checked_sub(1),
+					None => Some(0),
 				};
+				// Get the new program counter
+				let new_line_number = match new_line_number_index {
+					None => break 'branch_statement,
+					Some(new_line_number_index) => new_line_numbers.get(new_line_number_index),
+				};
+				let new_line_number: BasicInteger = match new_line_number {
+					None => break 'branch_statement,
+					Some(new_line_number) => new_line_number.clone().try_into()?,
+				};
+				let new_line_number = &new_line_number.into();
+				let new_program_counter = main_struct.program.get_bytecode_index_from_line_number(new_line_number)?;
 				// The current (not new) program counter should now point to the next statement after this run/goto/gosub statement
 				// So save the program counter if we are executing a gosub statement
 				// Also push a new subroutine level to the subroutine stack so that loops and if conditions will be shadowed untill we return.
@@ -510,7 +523,7 @@ impl ProgramExecuter {
 				};
 				let mut dimension_lengths = Vec::with_capacity(scalar_value_lengths.len());
 				for length in scalar_value_lengths.into_iter() {
-					dimension_lengths.push(length.as_length()?);
+					dimension_lengths.push(length.as_length()?.checked_add(1).ok_or(BasicError::ArraySizeTooLarge)?);
 				}
 				// Create array
 				self.create_array(l_value.name, l_value.type_restriction, dimension_lengths)?;
@@ -714,7 +727,14 @@ impl ProgramExecuter {
 				};
 				self.skip_expression(main_struct, expression_opcode)?;
 			}
-			_ => return Err(BasicError::FeatureNotYetSupported),
+			StatementOpcode::On => {
+				// Get the expression opcode
+				let expression_opcode = self.get_expression_opcode(main_struct)?
+				// Get the on number
+					.ok_or(BasicError::InvalidNullStatementOpcode)?;
+				let expression_result: usize = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Integer)?.as_length()?;
+				self.current_routine.on_number = Some(expression_result);
+			}
 		}
 		// Continue onto next instruction
 		Ok(out)
