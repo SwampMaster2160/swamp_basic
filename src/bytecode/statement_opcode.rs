@@ -33,4 +33,6 @@ pub enum StatementOpcode {
 	DefineBoolean,
 	DefineNumber,
 	DefineComplexFloat,
+	Data,
+	Read,
 }

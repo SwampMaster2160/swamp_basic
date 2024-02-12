@@ -104,7 +104,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 				out.push(StatementOpcode::End as u8);
 			}
 			// Commands that take in a list of expressions and ignore commas and semicolons
-			Command::Goto | Command::Run | Command::GoSubroutine | Command::Load | Command::Save => {
+			Command::Goto | Command::Run | Command::GoSubroutine | Command::Load | Command::Save | Command::Data => {
 				// Push the respective opcode
 				out.push(match command {
 					Command::Goto => StatementOpcode::Goto,
@@ -112,6 +112,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 					Command::GoSubroutine => StatementOpcode::GoSubroutine,
 					Command::Load => StatementOpcode::Load,
 					Command::Save => StatementOpcode::Save,
+					Command::Data => StatementOpcode::Data,
 					_ => unreachable!(),
 				} as u8);
 				// Push arguments
@@ -126,6 +127,27 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 							debug_assert!(argument.is_expression());
 							out.extend(compile_expression(argument)?);
 						}
+					}
+				}
+				// Null terminate
+				out.push(StatementOpcode::End as u8);
+			}
+			// Commands that take in a list of l-values and ignore commas and semicolons
+			Command::Read => {
+				// Push the respective opcode
+				out.push(match command {
+					Command::Read => StatementOpcode::Read,
+					_ => unreachable!(),
+				} as u8);
+				// Push arguments
+				for argument in arguments {
+					match argument {
+						ParseTreeElement::ExpressionSeparator(separator) => {
+							if *separator != Separator::Comma && *separator != Separator::Semicolon {
+								return Err(BasicError::InvalidSeparator(*separator));
+							}
+						}
+						_ => out.extend(compile_l_value(argument)?),
 					}
 				}
 				// Null terminate
@@ -669,7 +691,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 			ParseTreeElement::Command(Command::Input, sub_expressions)
 		}
 		// Decompile null terminated expression list to comma separated expression list
-		StatementOpcode::Goto | StatementOpcode::Run | StatementOpcode::GoSubroutine | StatementOpcode::Load | StatementOpcode::Save => {
+		StatementOpcode::Goto | StatementOpcode::Run | StatementOpcode::GoSubroutine | StatementOpcode::Load | StatementOpcode::Save | StatementOpcode::Data => {
 			let mut is_first_expression = true;
 			let mut sub_expressions = Vec::new();
 			// For each sub-expression
@@ -697,9 +719,37 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 				StatementOpcode::GoSubroutine => Command::GoSubroutine,
 				StatementOpcode::Load => Command::Load,
 				StatementOpcode::Save => Command::Save,
+				StatementOpcode::Data => Command::Data,
 				_ => unreachable!(),
 			};
 			ParseTreeElement::Command(command, sub_expressions)
+		}
+		// Decompile null terminated l-value list to comma separated l-value list
+		StatementOpcode::Read => {
+			let mut is_first_l_value = true;
+			let mut l_values = Vec::new();
+			// For each l-value
+			loop {
+				// Decompile the l-value or break if it is he null l-value
+				let l_value = match decompile_l_value(statement_bytecode)? {
+					Some(decompiled_l_value) => decompiled_l_value,
+					None => break,
+				};
+				// Push a comma if it is not the first l-value.
+				if !is_first_l_value {
+					l_values.push(ParseTreeElement::ExpressionSeparator(Separator::Comma));
+				}
+				// Push the l-value
+				l_values.push(l_value);
+				// The next l-value is not the first l-value.
+				is_first_l_value = false;
+			}
+			// Create the parse tree element
+			let command = match opcode {
+				StatementOpcode::Read => Command::Read,
+				_ => unreachable!(),
+			};
+			ParseTreeElement::Command(command, l_values)
 		}
 		// Statements that take in a single expression
 		StatementOpcode::If | StatementOpcode::On | StatementOpcode::Step | StatementOpcode::To => {

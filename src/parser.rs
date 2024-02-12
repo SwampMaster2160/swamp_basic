@@ -210,8 +210,8 @@ fn parse_l_value(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> 
 fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
 	Ok(match command {
 		// Commands that have a list of expressions and separators as sub-trees
-		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::To | Command::Step |
-		Command::List | Command::On | Command::Return | Command::Stop | Command::Input | Command::Continue | Command::Load | Command::Save => {
+		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::To | Command::Step | Command::Read |
+		Command::List | Command::On | Command::Return | Command::Stop | Command::Input | Command::Continue | Command::Load | Command::Save | Command::Data => {
 			// Get the length of the expressions (up to the next command token)
 			let expression_index = tokens.iter()
 				.position(|token| matches!(token, Token::Command(_)))
@@ -328,8 +328,11 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 			//ParseTreeElement::DefineFunction(Box::new(ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, bracketed_area_parsed)), Box::new(body_expression_parsed))
 			ParseTreeElement::DefineFunction(name, type_restriction, bracketed_area_parsed, Box::new(body_expression_parsed))
 		}
-
-		_ => return Err(BasicError::FeatureNotYetSupported),
+		Command::Base => return Err(BasicError::FeatureNotYetSupported),
+		Command::Option => return Err(BasicError::FeatureNotYetSupported),
+		Command::Randomize => return Err(BasicError::FeatureNotYetSupported),
+		Command::Restore => return Err(BasicError::FeatureNotYetSupported),
+		Command::Remark => panic!(),
 	})
 }
 

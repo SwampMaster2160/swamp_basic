@@ -34,6 +34,10 @@ pub struct ProgramExecuter {
 	current_routine: RoutineLevel,
 	/// The path to save/load from,
 	save_load_path: Option<BasicString>,
+	/// A list of constants defined via the "data" command,
+	data_constants: Vec<ScalarValue>,
+	/// The index of the next data constant to read.
+	data_read_index: usize,
 }
 
 struct RoutineLevel {
@@ -131,6 +135,8 @@ impl ProgramExecuter {
 			arrays: HashMap::new(),
 			save_load_path: None,
 			functions: HashMap::new(),
+			data_constants: Vec::new(),
+			data_read_index: 0,
 		}
 	}
 
@@ -150,6 +156,8 @@ impl ProgramExecuter {
 		self.functions = HashMap::new();
 		self.current_routine = RoutineLevel::new();
 		self.routine_stack = Vec::new();
+		self.data_constants = Vec::new();
+		self.data_read_index = 0;
 	}
 
 	/// Invalidates all indices into the program bytecode from the program executer.
@@ -740,6 +748,37 @@ impl ProgramExecuter {
 				let expression_result: usize = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Integer)?.as_length()?;
 				self.current_routine.on_number = Some(expression_result);
 			}
+			StatementOpcode::Data => {
+				// For each expression
+				loop {
+					// Get and push the expression
+					let expression_opcode = match self.get_expression_opcode(main_struct)? {
+						Some(expression_opcode) => expression_opcode,
+						None => break,
+					};
+					let result = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+					self.data_constants.push(result);
+				}
+			}
+			StatementOpcode::Read => {
+				// For each l-value to read to
+				loop {
+					// Get the l-value or break if it is null
+					let l_value = match self.execute_l_value(main_struct)? {
+						Some(l_value) => l_value,
+						None => break,
+					};
+					// Read the constant from the data list
+					let data_read = match self.data_constants.get(self.data_read_index) {
+						Some(data_read) => data_read,
+						None => return Err(BasicError::TooManyReads),
+					};
+					// The next read will read the constant afterwards
+					self.data_read_index += 1;
+					// Assign the value to the l-value
+					self.assign_scalar_value(l_value, data_read.clone())?;
+				}
+			}
 		}
 		// Continue onto next instruction
 		Ok(out)
@@ -758,7 +797,7 @@ impl ProgramExecuter {
 			// Skip opcodes with no arguments
 			StatementOpcode::End | StatementOpcode::Stop | StatementOpcode::Return | StatementOpcode::Continue => {}
 			// Skip expressions untill a null opcode is found
-			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine | StatementOpcode::Load | StatementOpcode::Save => loop {
+			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine | StatementOpcode::Load | StatementOpcode::Save | StatementOpcode::Data => loop {
 				match self.get_expression_opcode(main_struct)? {
 					Some(expression_opcode) => self.skip_expression(main_struct, expression_opcode)?,
 					None => break,
@@ -772,6 +811,15 @@ impl ProgramExecuter {
 						None => break,
 					}
 				}
+				loop {
+					match self.skip_l_value(main_struct)? {
+						true => {}
+						false => break,
+					}
+				}
+			}
+			// Skip l-values untill a null opcode is found
+			StatementOpcode::Read => {
 				loop {
 					match self.skip_l_value(main_struct)? {
 						true => {}

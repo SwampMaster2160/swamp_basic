@@ -79,6 +79,7 @@ pub enum BasicError {
 	InvalidFnFunction,
 	FunctionDoesNotExist,
 	FunctionAssignmentInLineProgram,
+	TooManyReads,
 }
 
 impl Display for BasicError {
@@ -159,6 +160,7 @@ impl Display for BasicError {
 			Self::InvalidFnFunction => write!(formatter, "Invalid fn function."),
 			Self::FunctionDoesNotExist => write!(formatter, "Function does not exist."),
 			Self::FunctionAssignmentInLineProgram => write!(formatter, "Function assignment in line program."),
+			Self::TooManyReads => write!(formatter, "Too many reads for the amount of data constants defined."),
 		}
 	}
 }
