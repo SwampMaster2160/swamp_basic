@@ -186,9 +186,10 @@ pub fn tokenize_line(main_struct: &Main, line: &str) -> Result<Vec<Token>, Basic
 		}
 	}
 	// Parsing type should be None after parsing line
-	#[cfg(debug_assertions)]
-	if parsing_type != ParsingType::None {
-		panic!("Parsing type should be None, is {:?}", parsing_type);
+	match parsing_type {
+		ParsingType::None => {},
+		ParsingType::Comment => out.push(Token::Comment(current_token_string)),
+		_ => panic!("Parsing type should be None, is {:?}", parsing_type),
 	}
 	// Return parsed tokens
 	Ok(out)

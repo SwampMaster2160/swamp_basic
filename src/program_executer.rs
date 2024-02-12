@@ -779,6 +779,27 @@ impl ProgramExecuter {
 					self.assign_scalar_value(l_value, data_read.clone())?;
 				}
 			}
+			StatementOpcode::Restore => {
+				// Get where to reastore to
+				let restore_to = match self.get_expression_opcode(main_struct)? {
+					// If we have an argument then it is the read index to restore to
+					Some(expression_opcode) => {
+						// Get the read index
+						let restore_to = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?
+							.as_index(self.data_constants.len())?;
+						// Make sure there are not any more arguments
+						if self.get_expression_opcode(main_struct)? != None {
+							return Err(BasicError::InvalidArgumentCount);
+						}
+						
+						restore_to
+					},
+					// Else restore to the first element
+					None => 0,
+				};
+				// Restore the data read index
+				self.data_read_index = restore_to;
+			}
 		}
 		// Continue onto next instruction
 		Ok(out)
@@ -878,6 +899,7 @@ impl ProgramExecuter {
 					.ok_or(BasicError::InvalidNullStatementOpcode)?;
 				self.skip_expression(main_struct, expression_opcode)?;
 			}
+			_ => todo!()
 		}
 		// Return that there where no errors
 		Ok(())

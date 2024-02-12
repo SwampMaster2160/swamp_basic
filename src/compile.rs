@@ -104,7 +104,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 				out.push(StatementOpcode::End as u8);
 			}
 			// Commands that take in a list of expressions and ignore commas and semicolons
-			Command::Goto | Command::Run | Command::GoSubroutine | Command::Load | Command::Save | Command::Data => {
+			Command::Goto | Command::Run | Command::GoSubroutine | Command::Load | Command::Save | Command::Data | Command::Restore => {
 				// Push the respective opcode
 				out.push(match command {
 					Command::Goto => StatementOpcode::Goto,
@@ -113,6 +113,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 					Command::Load => StatementOpcode::Load,
 					Command::Save => StatementOpcode::Save,
 					Command::Data => StatementOpcode::Data,
+					Command::Restore => StatementOpcode::Restore,
 					_ => unreachable!(),
 				} as u8);
 				// Push arguments
@@ -256,8 +257,13 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 					_ => return Err(BasicError::InvalidArgumentCount),
 				}
 			}
+			Command::Base => return Err(BasicError::FeatureNotYetSupported),
+			Command::Randomize => return Err(BasicError::FeatureNotYetSupported),
+			Command::Option => return Err(BasicError::FeatureNotYetSupported),
+			Command::Let | Command::Go | Command::Subroutine | Command::Define | Command::Remark => panic!(),
 
-			_ => return Err(BasicError::FeatureNotYetSupported),
+
+			//_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		ParseTreeElement::Assignment(l_value, r_value) => {
 			out.push(StatementOpcode::Let as u8);
@@ -691,7 +697,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 			ParseTreeElement::Command(Command::Input, sub_expressions)
 		}
 		// Decompile null terminated expression list to comma separated expression list
-		StatementOpcode::Goto | StatementOpcode::Run | StatementOpcode::GoSubroutine | StatementOpcode::Load | StatementOpcode::Save | StatementOpcode::Data => {
+		StatementOpcode::Goto | StatementOpcode::Run | StatementOpcode::GoSubroutine | StatementOpcode::Load | StatementOpcode::Save | StatementOpcode::Data | StatementOpcode::Restore => {
 			let mut is_first_expression = true;
 			let mut sub_expressions = Vec::new();
 			// For each sub-expression
@@ -720,6 +726,7 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 				StatementOpcode::Load => Command::Load,
 				StatementOpcode::Save => Command::Save,
 				StatementOpcode::Data => Command::Data,
+				StatementOpcode::Restore => Command::Restore,
 				_ => unreachable!(),
 			};
 			ParseTreeElement::Command(command, sub_expressions)

@@ -35,4 +35,5 @@ pub enum StatementOpcode {
 	DefineComplexFloat,
 	Data,
 	Read,
+	Restore,
 }

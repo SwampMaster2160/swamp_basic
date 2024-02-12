@@ -211,7 +211,7 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 	Ok(match command {
 		// Commands that have a list of expressions and separators as sub-trees
 		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::To | Command::Step | Command::Read |
-		Command::List | Command::On | Command::Return | Command::Stop | Command::Input | Command::Continue | Command::Load | Command::Save | Command::Data => {
+		Command::List | Command::On | Command::Return | Command::Stop | Command::Input | Command::Continue | Command::Load | Command::Save | Command::Data | Command::Restore => {
 			// Get the length of the expressions (up to the next command token)
 			let expression_index = tokens.iter()
 				.position(|token| matches!(token, Token::Command(_)))
@@ -331,7 +331,6 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 		Command::Base => return Err(BasicError::FeatureNotYetSupported),
 		Command::Option => return Err(BasicError::FeatureNotYetSupported),
 		Command::Randomize => return Err(BasicError::FeatureNotYetSupported),
-		Command::Restore => return Err(BasicError::FeatureNotYetSupported),
 		Command::Remark => panic!(),
 	})
 }
