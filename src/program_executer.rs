@@ -275,25 +275,24 @@ impl ProgramExecuter {
 				};
 			}
 			StatementOpcode::Print => {
+				// Loop over all statements untill a null statement is found
 				loop {
-					let expression_opcode = match self.get_expression_opcode(main_struct)? {
-						Some(expression_opcode) => expression_opcode,
+					let value = match self.execute_expression(main_struct, TypeRestriction::Any)? {
+						Some(result) => result,
 						None => break,
 					};
-					let result = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
-					print!("{result}");
+					print!("{value}");
 					stdout().flush().unwrap();
 				}
 			}
 			StatementOpcode::Input => {
 				// Print statements to be printed
 				loop {
-					let expression_opcode = match self.get_expression_opcode(main_struct)? {
-						Some(expression_opcode) => expression_opcode,
+					let value = match self.execute_expression(main_struct, TypeRestriction::Any)? {
+						Some(result) => result,
 						None => break,
 					};
-					let result = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
-					print!("{result}");
+					print!("{value}");
 					stdout().flush().unwrap();
 				}
 				// Get a list of input variables
@@ -351,8 +350,8 @@ impl ProgramExecuter {
 				// Get new jump locations
 				let mut new_line_numbers = Vec::new();
 				loop {
-					match self.get_expression_opcode(main_struct)? {
-						Some(expression_opcode) => new_line_numbers.push(self.execute_expression(main_struct, expression_opcode, TypeRestriction::Integer)?),
+					match self.execute_expression(main_struct, TypeRestriction::Any)? {
+						Some(result) => new_line_numbers.push(result),
 						None => break,
 					}
 				}
@@ -408,17 +407,12 @@ impl ProgramExecuter {
 				let l_value = self.execute_l_value(main_struct)?
 					.ok_or(BasicError::UnexpectedLValueEndOpcode)?;
 				// Get the scalar value to assign to the l-value
-				let expression_opcode = self.get_expression_opcode(main_struct)?
-					.ok_or(BasicError::InvalidNullStatementOpcode)?;
-				let scalar_value = self.execute_expression(main_struct, expression_opcode, l_value.type_restriction)?;
+				let scalar_value = self.execute_non_null_expression(main_struct, l_value.type_restriction)?;
 				// Assign the scalar value to the l-value
 				self.assign_scalar_value(l_value, scalar_value)?;
 			}
 			StatementOpcode::If => {
-				// Get the opcode
-				let expression_opcode = self.get_expression_opcode(main_struct)?
-					.ok_or(BasicError::InvalidNullStatementOpcode)?;
-				let expression_result: bool = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Boolean)?
+				let expression_result = self.execute_non_null_expression(main_struct, TypeRestriction::Boolean)?
 					.try_into()?;
 				self.current_routine.if_condition = Some((expression_result, !expression_result));
 			}
@@ -447,9 +441,7 @@ impl ProgramExecuter {
 				let l_value = self.execute_l_value(main_struct)?
 					.ok_or(BasicError::UnexpectedLValueEndOpcode)?;
 				// Get the scalar value to assign to the l-value
-				let expression_opcode = self.get_expression_opcode(main_struct)?
-					.ok_or(BasicError::InvalidNullStatementOpcode)?;
-				let scalar_value = self.execute_expression(main_struct, expression_opcode, l_value.type_restriction)?;
+				let scalar_value = self.execute_non_null_expression(main_struct, l_value.type_restriction)?;
 				// Assign the scalar value to the l-value
 				self.assign_scalar_value(l_value.clone(), scalar_value)?;
 				// Save info about the for loop
@@ -458,15 +450,12 @@ impl ProgramExecuter {
 				self.current_routine.current_for_loop_counter = Ok(l_value);
 			}
 			StatementOpcode::To | StatementOpcode::Step => {
-				// Get the expression opcode
-				let expression_opcode = self.get_expression_opcode(main_struct)?
-					.ok_or(BasicError::InvalidNullStatementOpcode)?;
 				// See if there is a for loop to modify
 				match self.current_routine.current_for_loop_counter.clone() {
 					// If so then modify the for loop
 					Ok(current_for_loop) => {
 						// Execute the sub-expression to get the value to assign to the for loop
-						let value = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+						let value = self.execute_non_null_expression(main_struct, TypeRestriction::Any)?;
 						// Get the loop to modify
 						let for_loop = self.current_routine.for_loop_counters.get_mut(&current_for_loop).unwrap();
 						// Assign value to the for loop end or step
@@ -479,7 +468,11 @@ impl ProgramExecuter {
 					// Error if we have not executed a "for" statement since the program start or last gosub call
 					Err(false) => return Err(BasicError::ToStepNoForLoop),
 					// Skip the sub-expression if we have looped back since the last "for" statement
-					Err(true) => self.skip_expression(main_struct, expression_opcode)?,
+					Err(true) => {
+						let expression_opcode = self.get_expression_opcode(main_struct)?
+							.ok_or(BasicError::InvalidNullExpressionOpcode)?;
+						self.skip_expression(main_struct, expression_opcode)?
+					}
 				}
 			}
 			StatementOpcode::Next => {
@@ -547,7 +540,7 @@ impl ProgramExecuter {
 					.ok_or(BasicError::InvalidNullStatementOpcode)?;
 				let start_expression_result: Option<Rc<BigInt>> = match start_expression_opcode {
 					ExpressionOpcode::FromStartOrToEnd => None,
-					_ => Some(self.execute_expression(main_struct, start_expression_opcode, TypeRestriction::Integer)?.try_into()?),
+					_ => Some(self.execute_expression_with_opcode(main_struct, start_expression_opcode, TypeRestriction::Integer)?.try_into()?),
 				};
 				let start_line_number_index = main_struct.program.get_lines_start_index(start_expression_result.clone());
 				// Get the end line index
@@ -556,7 +549,7 @@ impl ProgramExecuter {
 				let end_expression_result: Option<Rc<BigInt>> = match end_expression_opcode {
 					ExpressionOpcode::FromStartOrToEnd => None,
 					ExpressionOpcode::OneElement => start_expression_result.clone(),
-					_ => Some(self.execute_expression(main_struct, end_expression_opcode, TypeRestriction::Integer)?.try_into()?),
+					_ => Some(self.execute_expression_with_opcode(main_struct, end_expression_opcode, TypeRestriction::Integer)?.try_into()?),
 				};
 				let end_line_number_index = match main_struct.program.get_lines_end_index(end_expression_result) {
 					Some(end_line_number_index) => end_line_number_index,
@@ -611,12 +604,11 @@ impl ProgramExecuter {
 			}
 			StatementOpcode::Save => {
 				// Get the filepath
-				let mut expressions_ended = false;
-				let file_path_expression_opcode = self.get_expression_opcode(main_struct)?;
-				let file_path = match file_path_expression_opcode {
-					Some(opcode) => self.execute_expression(main_struct, opcode, TypeRestriction::Any)?.as_basic_string()?,
+				let mut has_expressions_ended = false;
+				let file_path = match self.execute_expression(main_struct, TypeRestriction::String)? {
+					Some(result) => result.as_basic_string()?,
 					None => {
-						expressions_ended = true;
+						has_expressions_ended = true;
 						match self.save_load_path.clone() {
 							Some(save_load_path) => save_load_path,
 							None => return Err(BasicError::NoFilePath),
@@ -624,22 +616,18 @@ impl ProgramExecuter {
 					}
 				};
 				// Get save format
-				let format = if expressions_ended {
-					String::new()
-				}
-				else {
-					let format_expression_opcode = self.get_expression_opcode(main_struct)?;
-					let format = match format_expression_opcode {
-						Some(opcode) => self.execute_expression(main_struct, opcode, TypeRestriction::Any)?.as_basic_string()?.to_string(),
+				let format = match has_expressions_ended {
+					true => String::new(),
+					false => match self.execute_expression(main_struct, TypeRestriction::String)? {
+						Some(result) => result.as_basic_string()?.to_string(),
 						None => {
-							expressions_ended = true;
+							has_expressions_ended = true;
 							String::new()
 						}
-					};
-					format
+					}
 				};
 				// Expressions should end now
-				if !expressions_ended {
+				if !has_expressions_ended {
 					match self.get_expression_opcode(main_struct)? {
 						Some(..) => return Err(BasicError::FeatureNotYetSupported),
 						None => {}
@@ -653,12 +641,11 @@ impl ProgramExecuter {
 			}
 			StatementOpcode::Load => {
 				// Get the filepath
-				let mut expressions_ended = false;
-				let file_path_expression_opcode = self.get_expression_opcode(main_struct)?;
-				let file_path = match file_path_expression_opcode {
-					Some(opcode) => self.execute_expression(main_struct, opcode, TypeRestriction::Any)?.as_basic_string()?,
+				let mut has_expressions_ended = false;
+				let file_path = match self.execute_expression(main_struct, TypeRestriction::String)? {
+					Some(result) => result.as_basic_string()?,
 					None => {
-						expressions_ended = true;
+						has_expressions_ended = true;
 						match self.save_load_path.clone() {
 							Some(save_load_path) => save_load_path,
 							None => return Err(BasicError::NoFilePath),
@@ -666,22 +653,18 @@ impl ProgramExecuter {
 					}
 				};
 				// Get save format
-				let format = if expressions_ended {
-					String::new()
-				}
-				else {
-					let format_expression_opcode = self.get_expression_opcode(main_struct)?;
-					let format = match format_expression_opcode {
-						Some(opcode) => self.execute_expression(main_struct, opcode, TypeRestriction::Any)?.as_basic_string()?.to_string(),
+				let format = match has_expressions_ended {
+					true => String::new(),
+					false => match self.execute_expression(main_struct, TypeRestriction::String)? {
+						Some(result) => result.as_basic_string()?.to_string(),
 						None => {
-							expressions_ended = true;
+							has_expressions_ended = true;
 							String::new()
 						}
-					};
-					format
+					}
 				};
 				// Expressions should end now
-				if !expressions_ended {
+				if !has_expressions_ended {
 					match self.get_expression_opcode(main_struct)? {
 						Some(..) => return Err(BasicError::FeatureNotYetSupported),
 						None => {}
@@ -741,22 +724,18 @@ impl ProgramExecuter {
 				self.skip_expression(main_struct, expression_opcode)?;
 			}
 			StatementOpcode::On => {
-				// Get the expression opcode
-				let expression_opcode = self.get_expression_opcode(main_struct)?
 				// Get the on number
-					.ok_or(BasicError::InvalidNullStatementOpcode)?;
-				let expression_result: usize = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Integer)?.as_length()?;
+				let expression_result: usize = self.execute_non_null_expression(main_struct, TypeRestriction::Integer)?.as_length()?;
 				self.current_routine.on_number = Some(expression_result);
 			}
 			StatementOpcode::Data => {
 				// For each expression
 				loop {
 					// Get and push the expression
-					let expression_opcode = match self.get_expression_opcode(main_struct)? {
-						Some(expression_opcode) => expression_opcode,
+					let result = match self.execute_expression(main_struct, TypeRestriction::Any)? {
+						Some(result) => result,
 						None => break,
 					};
-					let result = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
 					self.data_constants.push(result);
 				}
 			}
@@ -780,25 +759,20 @@ impl ProgramExecuter {
 				}
 			}
 			StatementOpcode::Restore => {
-				// Get where to reastore to
-				let restore_to = match self.get_expression_opcode(main_struct)? {
+				// Set the read index
+				self.data_read_index = match self.execute_expression(main_struct, TypeRestriction::Integer)? {
 					// If we have an argument then it is the read index to restore to
-					Some(expression_opcode) => {
-						// Get the read index
-						let restore_to = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?
-							.as_index(self.data_constants.len())?;
+					Some(restore_to) => {
 						// Make sure there are not any more arguments
 						if self.get_expression_opcode(main_struct)? != None {
 							return Err(BasicError::InvalidArgumentCount);
 						}
-						
-						restore_to
+						// Convert the value we got to an index
+						restore_to.as_index(self.data_constants.len())?
 					},
 					// Else restore to the first element
 					None => 0,
 				};
-				// Restore the data read index
-				self.data_read_index = restore_to;
 			}
 		}
 		// Continue onto next instruction
@@ -1086,7 +1060,7 @@ impl ProgramExecuter {
 						Some(argument_opcode) => argument_opcode,
 						None => break,
 					};
-					arguments_or_indices.push(self.execute_expression(main_struct, argument_opcode, TypeRestriction::Any)?);
+					arguments_or_indices.push(self.execute_expression_with_opcode(main_struct, argument_opcode, TypeRestriction::Any)?);
 				}
 				// Construct l-value
 				Some(LValue {
@@ -1150,8 +1124,27 @@ impl ProgramExecuter {
 		})
 	}
 
-	/// Executes an expression.
-	fn execute_expression(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, return_type_restriction: TypeRestriction) -> Result<ScalarValue, BasicError> {
+	/// Executes an expression. Returns:
+	/// * `Ok(Some(scalar value))` if there is no error while execting the expression.
+	/// * `Ok(None)` if we get a null opcode.
+	/// * `Err(error)` otherwise.
+	fn execute_expression(&mut self, main_struct: &mut Main, return_type_restriction: TypeRestriction) -> Result<Option<ScalarValue>, BasicError> {
+		Ok(match self.get_expression_opcode(main_struct)? {
+			Some(expression_opcode) => Some(self.execute_expression_with_opcode(main_struct, expression_opcode, return_type_restriction)?),
+			None => None,
+		})
+	}
+
+	/// Executes an expression that should not be a null opcode.
+	fn execute_non_null_expression(&mut self, main_struct: &mut Main, return_type_restriction: TypeRestriction) -> Result<ScalarValue, BasicError> {
+		match self.execute_expression(main_struct, return_type_restriction)? {
+			Some(result) => Ok(result),
+			None => Err(BasicError::InvalidNullExpressionOpcode),
+		}
+	}
+
+	/// Executes an expression with a given opcode.
+	fn execute_expression_with_opcode(&mut self, main_struct: &mut Main, opcode: ExpressionOpcode, return_type_restriction: TypeRestriction) -> Result<ScalarValue, BasicError> {
 		// Execute expression
 		Ok(match opcode {
 			ExpressionOpcode::OneElement | ExpressionOpcode::FromStartOrToEnd => return Err(BasicError::InvalidExpressionOpcode(opcode as u8)),
@@ -1193,7 +1186,7 @@ impl ProgramExecuter {
 						Some(expression_opcode) => expression_opcode,
 						None => break,
 					};
-					let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+					let argument = self.execute_expression_with_opcode(main_struct, expression_opcode, TypeRestriction::Any)?;
 					result = Some(match result {
 						Some(some_value) => match opcode {
 							ExpressionOpcode::SumConcatenate => some_value.add_concatenate(argument)?,
@@ -1217,12 +1210,12 @@ impl ProgramExecuter {
 					Some(expression_opcode) => expression_opcode,
 					None => return Err(BasicError::InvalidNullStatementOpcode),
 				};
-				let left_argument = self.execute_expression(main_struct, left_expression_opcode, TypeRestriction::Any)?;
+				let left_argument = self.execute_expression_with_opcode(main_struct, left_expression_opcode, TypeRestriction::Any)?;
 				let right_expression_opcode = match self.get_expression_opcode(main_struct)? {
 					Some(expression_opcode) => expression_opcode,
 					None => return Err(BasicError::InvalidNullStatementOpcode),
 				};
-				let right_argument = self.execute_expression(main_struct, right_expression_opcode, TypeRestriction::Any)?;
+				let right_argument = self.execute_expression_with_opcode(main_struct, right_expression_opcode, TypeRestriction::Any)?;
 				match opcode {
 					ExpressionOpcode::Subtract => left_argument.subtract(right_argument)?,
 					ExpressionOpcode::Divide => left_argument.divide(right_argument)?,
@@ -1248,7 +1241,7 @@ impl ProgramExecuter {
 					Some(expression_opcode) => expression_opcode,
 					None => return Err(BasicError::InvalidNullStatementOpcode),
 				};
-				let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+				let argument = self.execute_expression_with_opcode(main_struct, expression_opcode, TypeRestriction::Any)?;
 				match opcode {
 					ExpressionOpcode::AbsoluteValue => argument.absolute_value()?,
 					ExpressionOpcode::Arctangent => argument.arctangent(return_type_restriction)?,
@@ -1268,11 +1261,11 @@ impl ProgramExecuter {
 				let first_expression_opcode = self.get_expression_opcode(main_struct)?;
 				match first_expression_opcode {
 					Some(first_expression_opcode) => {
-						let first_argument = self.execute_expression(main_struct, first_expression_opcode, TypeRestriction::Any)?;
+						let first_argument = self.execute_expression_with_opcode(main_struct, first_expression_opcode, TypeRestriction::Any)?;
 						let second_expression_opcode = self.get_expression_opcode(main_struct)?;
 						match second_expression_opcode {
 							Some(second_expression_opcode) => {
-								let second_argument = self.execute_expression(main_struct, second_expression_opcode, TypeRestriction::Any)?;
+								let second_argument = self.execute_expression_with_opcode(main_struct, second_expression_opcode, TypeRestriction::Any)?;
 								if self.get_expression_opcode(main_struct)? != None {
 									return Err(BasicError::InvalidArgumentCount);
 								}
@@ -1289,10 +1282,10 @@ impl ProgramExecuter {
 					Some(expression_opcode) => expression_opcode,
 					None => return Err(BasicError::InvalidArgumentCount),
 				};
-				let first_argument = self.execute_expression(main_struct, first_expression_opcode, return_type_restriction)?;
+				let first_argument = self.execute_expression_with_opcode(main_struct, first_expression_opcode, return_type_restriction)?;
 				match self.get_expression_opcode(main_struct)? {
 					Some(second_expression_opcode) => {
-						let second_argument = self.execute_expression(main_struct, second_expression_opcode, return_type_restriction)?;
+						let second_argument = self.execute_expression_with_opcode(main_struct, second_expression_opcode, return_type_restriction)?;
 						if self.get_expression_opcode(main_struct)? != None {
 							return Err(BasicError::InvalidArgumentCount);
 						}
@@ -1335,7 +1328,7 @@ impl ProgramExecuter {
 					None => return Err(BasicError::InvalidNullStatementOpcode),
 				};
 				// Execute the expression with the type restriction
-				let out = self.execute_expression(main_struct, expression_opcode, type_restriction_for_argument)?;
+				let out = self.execute_expression_with_opcode(main_struct, expression_opcode, type_restriction_for_argument)?;
 				match out.conforms_to_type_restriction(type_restriction_for_argument) {
 					true => out,
 					false => return Err(BasicError::TypeMismatch(out, type_restriction_for_argument)),
@@ -1390,7 +1383,7 @@ impl ProgramExecuter {
 						Some(expression_opcode) => expression_opcode,
 						None => break,
 					};
-					let argument = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+					let argument = self.execute_expression_with_opcode(main_struct, expression_opcode, TypeRestriction::Any)?;
 					indices.push(argument);
 				}
 				// Load value
@@ -1423,7 +1416,7 @@ impl ProgramExecuter {
 						Some(expression_opcode) => expression_opcode,
 						None => break,
 					};
-					let argument_value = self.execute_expression(main_struct, expression_opcode, TypeRestriction::Any)?;
+					let argument_value = self.execute_expression_with_opcode(main_struct, expression_opcode, TypeRestriction::Any)?;
 					argument_values.push(argument_value);
 				}
 				// Load function
@@ -1446,7 +1439,7 @@ impl ProgramExecuter {
 					Some(sub_expression_opcode) => sub_expression_opcode,
 					None => return Err(BasicError::ExpectedExpressionOpcodeButProgramEnd),
 				};
-				let function_result = self.execute_expression(main_struct, sub_expression_opcode, type_restriction)?;
+				let function_result = self.execute_expression_with_opcode(main_struct, sub_expression_opcode, type_restriction)?;
 				// Remove the current subroutine level and use the one below
 				self.current_routine = self.routine_stack.pop().expect("We just pushed a routine level.");
 				// Restore the program counter and weather we are in a line program or not from the new top subroutine level
