@@ -30,11 +30,12 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 	match parse_tree_element {
 		ParseTreeElement::Command(command, arguments) => match command {
 			// Commands that take in nothing
-			Command::End | Command::Stop | Command::Return | Command::Continue => out.push(match command {
+			Command::End | Command::Stop | Command::Return | Command::Continue | Command::Randomize => out.push(match command {
 				Command::End => StatementOpcode::End,
 				Command::Return => StatementOpcode::Return,
 				Command::Stop => StatementOpcode::Stop,
 				Command::Continue => StatementOpcode::Continue,
+				Command::Randomize => StatementOpcode::Randomize,
 				_ => unreachable!(),
 			} as u8),
 			// Print
@@ -258,11 +259,7 @@ fn compile_statement(parse_tree_element: &ParseTreeElement) -> Result<Vec<u8>, B
 					_ => return Err(BasicError::InvalidArgumentCount),
 				}
 			}
-			Command::Randomize => return Err(BasicError::FeatureNotYetSupported),
 			Command::Let | Command::Go | Command::Subroutine | Command::Define | Command::Remark | Command::Option => panic!(),
-
-
-			//_ => return Err(BasicError::FeatureNotYetSupported),
 		}
 		ParseTreeElement::Assignment(l_value, r_value) => {
 			out.push(StatementOpcode::Let as u8);
@@ -586,11 +583,12 @@ fn decompile_statement(statement_bytecode: &mut &[u8]) -> Result<ParseTreeElemen
 	// Decompile statement
 	Ok(match opcode {
 		// Statements that take in nothing
-		StatementOpcode::End | StatementOpcode::Stop | StatementOpcode::Return | StatementOpcode::Continue => ParseTreeElement::Command(match opcode {
+		StatementOpcode::End | StatementOpcode::Stop | StatementOpcode::Return | StatementOpcode::Continue | StatementOpcode::Randomize => ParseTreeElement::Command(match opcode {
 			StatementOpcode::End => Command::End,
 			StatementOpcode::Stop => Command::Stop,
 			StatementOpcode::Return => Command::Return,
 			StatementOpcode::Continue => Command::Continue,
+			StatementOpcode::Randomize => Command::Randomize,
 			_ => unreachable!(),
 		}, Vec::new()),
 

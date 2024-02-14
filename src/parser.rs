@@ -210,7 +210,7 @@ fn parse_l_value(tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> 
 fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeElement, BasicError> {
 	Ok(match command {
 		// Commands that have a list of expressions and separators as sub-trees
-		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::To | Command::Step | Command::Read |
+		Command::Print | Command::Goto | Command::Run | Command::End | Command::GoSubroutine | Command::If | Command::To | Command::Step | Command::Read | Command::Randomize |
 		Command::List | Command::On | Command::Return | Command::Stop | Command::Input | Command::Continue | Command::Load | Command::Save | Command::Data | Command::Restore => {
 			// Get the length of the expressions (up to the next command token)
 			let expression_index = tokens.iter()
@@ -351,7 +351,6 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 			// Parse expressions and construct parse tree
 			ParseTreeElement::Command(parsed_command, parse_expressions(&mut extression_tokens)?)
 		}
-		Command::Randomize => return Err(BasicError::FeatureNotYetSupported),
 		Command::Remark => panic!(),
 	})
 }

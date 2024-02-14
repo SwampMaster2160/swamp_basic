@@ -283,6 +283,7 @@ impl ProgramExecuter {
 					_ => unreachable!(),
 				};
 			}
+			StatementOpcode::Randomize => {}
 			StatementOpcode::Print => {
 				// Loop over all statements untill a null statement is found
 				loop {
@@ -812,7 +813,7 @@ impl ProgramExecuter {
 		// Skip statement arguments
 		match opcode {
 			// Skip opcodes with no arguments
-			StatementOpcode::End | StatementOpcode::Stop | StatementOpcode::Return | StatementOpcode::Continue => {}
+			StatementOpcode::End | StatementOpcode::Stop | StatementOpcode::Return | StatementOpcode::Continue | StatementOpcode::Randomize => {}
 			// Skip expressions untill a null opcode is found
 			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine |
 			StatementOpcode::Load | StatementOpcode::Save | StatementOpcode::Data | StatementOpcode::OptionBase | StatementOpcode::Restore => loop {

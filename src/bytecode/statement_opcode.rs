@@ -37,4 +37,5 @@ pub enum StatementOpcode {
 	Read,
 	Restore,
 	OptionBase,
+	Randomize,
 }
