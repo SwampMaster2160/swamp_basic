@@ -248,8 +248,8 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 			// Parse the merged command
 			parse_command(merged_commands, tokens)?
 		}
-		// Sub
-		Command::Subroutine => return Err(BasicError::InvalidSingleCommand(Command::Subroutine)),
+		// Invalid commands
+		Command::Subroutine | Command::Base => return Err(BasicError::InvalidSingleCommand(command)),
 		// For
 		Command::For => ParseTreeElement::Command(command, vec![parse_assignment(tokens)?]),
 		// Commands with a single l-value
@@ -325,11 +325,32 @@ fn parse_command(command: Command, tokens: &mut &[Token]) -> Result<ParseTreeEle
 			let body_expression = statement_tokens.iter().map(|token| ParseTreeElement::UnparsedToken(token.clone())).collect();
 			let body_expression_parsed = parse_expression(body_expression)?;
 			// Construct tree
-			//ParseTreeElement::DefineFunction(Box::new(ParseTreeElement::UserDefinedFunctionOrArrayElement(name, type_restriction, bracketed_area_parsed)), Box::new(body_expression_parsed))
 			ParseTreeElement::DefineFunction(name, type_restriction, bracketed_area_parsed, Box::new(body_expression_parsed))
 		}
-		Command::Base => return Err(BasicError::FeatureNotYetSupported),
-		Command::Option => return Err(BasicError::FeatureNotYetSupported),
+		// Option
+		Command::Option => {
+			// Extract the second command
+			let next_token = tokens.get(0).ok_or(BasicError::ExpectedCommand)?;
+			let next_command = match next_token {
+				Token::Command(command) => *command,
+				_ => return Err(BasicError::ExpectedCommand),
+			};
+			*tokens = &mut &tokens[1..];
+			// Convert to a single token
+			let parsed_command = match next_command {
+				Command::Base => next_command,
+				_ => return Err(BasicError::InvalidMultiCommand(vec![command, next_command])),
+			};
+			// Get the length of the expressions (up to the next command token)
+			let expression_index = tokens.iter()
+				.position(|token| matches!(token, Token::Command(_)))
+				.unwrap_or_else(|| tokens.len());
+			// Get the expression tokens
+			let mut extression_tokens;
+			(extression_tokens, *tokens) = tokens.split_at(expression_index);
+			// Parse expressions and construct parse tree
+			ParseTreeElement::Command(parsed_command, parse_expressions(&mut extression_tokens)?)
+		}
 		Command::Randomize => return Err(BasicError::FeatureNotYetSupported),
 		Command::Remark => panic!(),
 	})
@@ -730,6 +751,9 @@ fn deparse(parse_tree_element: &ParseTreeElement) -> Result<Vec<Token>, BasicErr
 	match parse_tree_element {
 		// Commands consist of the command name followed by the arguments
 		ParseTreeElement::Command(command, arguments) => {
+			if *command == Command::Base {
+				out.push(Token::Command(Command::Option));
+			}
 			out.push(Token::Command(*command));
 			for argument in arguments {
 				out.extend(deparse(argument)?);

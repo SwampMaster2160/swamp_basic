@@ -454,6 +454,13 @@ impl ScalarValue {
 		}
 	}
 
+	pub fn as_basic_integer(&self) -> Result<BasicInteger, BasicError> {
+		match self {
+			Self::Integer(integer) => Ok(integer.clone()),
+			_ => Err(BasicError::TypeMismatch(self.clone(), TypeRestriction::Integer)),
+		}
+	}
+
 	pub const TRUE: Self = Self::Boolean(true);
 	pub const FALSE: Self = Self::Boolean(false);
 	pub const PI: Self = Self::Float(PI);

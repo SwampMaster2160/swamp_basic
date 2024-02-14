@@ -1,10 +1,11 @@
 use std::io::{stdin, stdout, Write};
+use std::iter::once;
 use std::mem;
 use std::{rc::Rc, collections::HashMap};
 use std::hash::Hash;
 
 use num::{BigInt, complex::Complex64};
-use num_traits::FromPrimitive;
+use num_traits::{FromPrimitive, One, Zero};
 
 use crate::compile::decompile_line;
 use crate::lexer::tokenize::detokenize_line;
@@ -38,6 +39,10 @@ pub struct ProgramExecuter {
 	data_constants: Vec<ScalarValue>,
 	/// The index of the next data constant to read.
 	data_read_index: usize,
+	/// What should be the first index number of an array dimension.
+	array_start: BasicInteger,
+	/// When "dim" is used, how much extra elements per dimension should we allocate.
+	to_add_to_array_dimension: BasicInteger,
 }
 
 struct RoutineLevel {
@@ -137,6 +142,8 @@ impl ProgramExecuter {
 			functions: HashMap::new(),
 			data_constants: Vec::new(),
 			data_read_index: 0,
+			array_start: BasicInteger::zero(),
+			to_add_to_array_dimension: BasicInteger::one(),
 		}
 	}
 
@@ -158,6 +165,8 @@ impl ProgramExecuter {
 		self.routine_stack = Vec::new();
 		self.data_constants = Vec::new();
 		self.data_read_index = 0;
+		self.array_start = BasicInteger::zero();
+		self.to_add_to_array_dimension = BasicInteger::one();
 	}
 
 	/// Invalidates all indices into the program bytecode from the program executer.
@@ -529,7 +538,8 @@ impl ProgramExecuter {
 				};
 				let mut dimension_lengths = Vec::with_capacity(scalar_value_lengths.len());
 				for length in scalar_value_lengths.into_iter() {
-					dimension_lengths.push(length.as_length()?.checked_add(1).ok_or(BasicError::ArraySizeTooLarge)?);
+					let length = length.as_basic_integer()? + self.to_add_to_array_dimension.clone();
+					dimension_lengths.push(length.as_length()?);
 				}
 				// Create array
 				self.create_array(l_value.name, l_value.type_restriction, dimension_lengths)?;
@@ -774,6 +784,18 @@ impl ProgramExecuter {
 					None => 0,
 				};
 			}
+			StatementOpcode::OptionBase => {
+				// Get the array start index
+				let start = self.execute_non_null_expression(main_struct, TypeRestriction::Integer)?.as_basic_integer()?;
+				// Get the amount to add to any dimension length
+				let to_add = match self.execute_expression(main_struct, TypeRestriction::Integer)? {
+					Some(to_add) => to_add.as_basic_integer()?,
+					None => BasicInteger::one() - start.clone(),
+				};
+				// Set the option base
+				self.array_start = start;
+				self.to_add_to_array_dimension = to_add;
+			}
 		}
 		// Continue onto next instruction
 		Ok(out)
@@ -792,7 +814,8 @@ impl ProgramExecuter {
 			// Skip opcodes with no arguments
 			StatementOpcode::End | StatementOpcode::Stop | StatementOpcode::Return | StatementOpcode::Continue => {}
 			// Skip expressions untill a null opcode is found
-			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine | StatementOpcode::Load | StatementOpcode::Save | StatementOpcode::Data => loop {
+			StatementOpcode::Print | StatementOpcode::Run | StatementOpcode::Goto | StatementOpcode::GoSubroutine |
+			StatementOpcode::Load | StatementOpcode::Save | StatementOpcode::Data | StatementOpcode::OptionBase | StatementOpcode::Restore => loop {
 				match self.get_expression_opcode(main_struct)? {
 					Some(expression_opcode) => self.skip_expression(main_struct, expression_opcode)?,
 					None => break,
@@ -873,7 +896,6 @@ impl ProgramExecuter {
 					.ok_or(BasicError::InvalidNullStatementOpcode)?;
 				self.skip_expression(main_struct, expression_opcode)?;
 			}
-			_ => todo!()
 		}
 		// Return that there where no errors
 		Ok(())
@@ -902,30 +924,30 @@ impl ProgramExecuter {
 				}
 			}
 			// Assign to array index
-			Some(arguments_or_indices) => {
+			Some(indices) => {
 				// Get the array to assign to
-				let array_identifier = (name, type_restriction, arguments_or_indices.len());
+				let array_identifier = (name, type_restriction, indices.len());
 				let (dimension_lengths, elements) = match self.arrays.get_mut(&array_identifier) {
 					// If the array exists then get it
 					Some(elements) => elements,
 					// Else create a default one with 11 elements and get the new array
 					None => {
-						if arguments_or_indices.len() != 1 {
-							return Err(BasicError::ArrayOrFunctionDoesNotExist);
-						}
-						self.create_array(array_identifier.0.clone(), type_restriction, vec![11])?;
+						let dimension_length = (self.to_add_to_array_dimension.clone() + BasicInteger::SmallInteger(10)).as_length()?;
+						let dimension_lengths = once(dimension_length).cycle().take(indices.len()).collect();
+						self.create_array(array_identifier.0.clone(), type_restriction, dimension_lengths)?;
 						self.arrays.get_mut(&array_identifier).unwrap()
 					}
 				};
 				// Get indices
-				let mut indices = Vec::with_capacity(arguments_or_indices.len());
-				for (dimension_index, index) in arguments_or_indices.into_iter().enumerate() {
-					indices.push(index.as_index(dimension_lengths[dimension_index])?);
+				let mut indices_vector = Vec::with_capacity(indices.len());
+				for (dimension_index, index) in indices.into_iter().enumerate() {
+					let index_zero_indexed = (index.as_basic_integer()? - self.array_start.clone()).as_index(dimension_lengths[dimension_index])?;
+					indices_vector.push(index_zero_indexed);
 				}
 				// Get flat index for the 1D elements vector
 				let mut flat_index = 0usize;
 				let mut dimension_length = 1usize;
-				for (dimension_index, index) in indices.iter().enumerate() {
+				for (dimension_index, index) in indices_vector.iter().enumerate() {
 					flat_index += dimension_length * index;
 					dimension_length *= dimension_lengths[dimension_index];
 				}
@@ -975,17 +997,17 @@ impl ProgramExecuter {
 					Some(elements) => elements,
 					// Else create a default one with 11 elements and get the new array
 					None => {
-						if indices.len() != 1 {
-							return Err(BasicError::ArrayOrFunctionDoesNotExist);
-						}
-						self.create_array(array_identifier.0.clone(), type_restriction, vec![11])?;
-						self.arrays.get(&array_identifier).unwrap()
+						let dimension_length = (self.to_add_to_array_dimension.clone() + BasicInteger::SmallInteger(10)).as_length()?;
+						let dimension_lengths = once(dimension_length).cycle().take(indices.len()).collect();
+						self.create_array(array_identifier.0.clone(), type_restriction, dimension_lengths)?;
+						self.arrays.get_mut(&array_identifier).unwrap()
 					}
 				};
 				// Get indices
 				let mut indices_vector = Vec::with_capacity(indices.len());
 				for (dimension_index, index) in indices.into_iter().enumerate() {
-					indices_vector.push(index.as_index(dimension_lengths[dimension_index])?);
+					let index_zero_indexed = (index.as_basic_integer()? - self.array_start.clone()).as_index(dimension_lengths[dimension_index])?;
+					indices_vector.push(index_zero_indexed);
 				}
 				// Get flat index for the 1D elements vector
 				let mut flat_index = 0usize;

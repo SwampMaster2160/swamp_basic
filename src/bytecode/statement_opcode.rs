@@ -36,4 +36,5 @@ pub enum StatementOpcode {
 	Data,
 	Read,
 	Restore,
+	OptionBase,
 }
